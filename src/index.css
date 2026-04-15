@@ -346,6 +346,7 @@ body {
 }
 .btn-month-project {
   padding: 7px 12px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   font-size: 13px;
@@ -640,7 +641,8 @@ body {
 .btn-link-like {
   background: none;
   border: none;
-  padding: 0;
+  padding: 12px 4px;
+  min-height: 44px;
   font-size: inherit;
   font-family: inherit;
   font-weight: 600;
