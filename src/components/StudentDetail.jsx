@@ -296,7 +296,7 @@ export default function StudentDetail({
                               <span className="per-unit">/ 堂</span>
                             </div>
                             <div className="price-row-actions">
-                              <span className="price-result">= {(hrs * effective).toLocaleString()}</span>
+                              <span className="price-result">= {Math.round(hrs * effective).toLocaleString()}</span>
                               {custom && (
                                 <button
                                   type="button"

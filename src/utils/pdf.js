@@ -39,11 +39,11 @@ export function buildInvoiceRows(invoiceEntries) {
   return invoiceEntries.flatMap(({ course, prices: p }) => {
     const subj = escapeHtml(course.subject || '')
     const lines = []
-    if (course.ind1 > 0) lines.push([subj, `個人課 × ${course.ind1} 堂`, `NT$ ${p.price_ind1}/堂`, `NT$ ${(course.ind1 * p.price_ind1).toLocaleString()}`])
-    if (course.ind2 > 0) lines.push([subj, `2人課 × ${course.ind2} 堂`, `NT$ ${p.price_ind2}/堂`, `NT$ ${(course.ind2 * p.price_ind2).toLocaleString()}`])
-    if (course.grp34 > 0) lines.push([subj, `3-4人課 × ${course.grp34} 堂`, `NT$ ${p.price_grp34}/堂`, `NT$ ${(course.grp34 * p.price_grp34).toLocaleString()}`])
-    if (course.ind_special > 0) lines.push([subj, `特殊個人課 × ${course.ind_special} 堂`, `NT$ ${p.price_ind_special}/堂`, `NT$ ${(course.ind_special * p.price_ind_special).toLocaleString()}`])
-    if (course.ind_other > 0) lines.push([subj, `其他個人課 × ${course.ind_other} 堂`, `NT$ ${p.price_ind_other}/堂`, `NT$ ${(course.ind_other * p.price_ind_other).toLocaleString()}`])
+    if (course.ind1 > 0) lines.push([subj, `個人課 × ${course.ind1} 堂`, `NT$ ${p.price_ind1}/堂`, `NT$ ${Math.round(course.ind1 * p.price_ind1).toLocaleString()}`])
+    if (course.ind2 > 0) lines.push([subj, `2人課 × ${course.ind2} 堂`, `NT$ ${p.price_ind2}/堂`, `NT$ ${Math.round(course.ind2 * p.price_ind2).toLocaleString()}`])
+    if (course.grp34 > 0) lines.push([subj, `3-4人課 × ${course.grp34} 堂`, `NT$ ${p.price_grp34}/堂`, `NT$ ${Math.round(course.grp34 * p.price_grp34).toLocaleString()}`])
+    if (course.ind_special > 0) lines.push([subj, `特殊個人課 × ${course.ind_special} 堂`, `NT$ ${p.price_ind_special}/堂`, `NT$ ${Math.round(course.ind_special * p.price_ind_special).toLocaleString()}`])
+    if (course.ind_other > 0) lines.push([subj, `其他個人課 × ${course.ind_other} 堂`, `NT$ ${p.price_ind_other}/堂`, `NT$ ${Math.round(course.ind_other * p.price_ind_other).toLocaleString()}`])
     if (p.team_override > 0) lines.push([subj, '團班費', '—', `NT$ ${Number(p.team_override).toLocaleString()}`])
     if (p.book_fee_override > 0) lines.push([subj, '書錢/教材費', '—', `NT$ ${Number(p.book_fee_override).toLocaleString()}`])
     return lines
