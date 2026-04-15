@@ -49,6 +49,7 @@ body {
 }
 .app-nav-btn {
   padding: 8px 16px;
+  min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
@@ -788,6 +789,7 @@ body {
 .btn-month-project-tiny {
   flex-shrink: 0;
   padding: 5px 12px;
+  min-height: 44px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
@@ -957,6 +959,7 @@ body {
 .btn-roster-join {
   margin-right: 6px;
   padding: 6px 10px;
+  min-height: 44px;
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
@@ -971,6 +974,7 @@ body {
 }
 .btn-roster-del {
   padding: 6px 10px;
+  min-height: 44px;
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
