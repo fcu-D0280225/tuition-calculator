@@ -64,9 +64,9 @@ export function resolveUnitPrice(course, fieldKey, unitDraft) {
   return d != null && !Number.isNaN(Number(d)) ? Number(d) : 0
 }
 
-/** 與畫面／存檔一致的小計（依 effective 單價） */
+/** 與畫面／存檔一致的小計（依 effective 單價，四捨五入至整數元） */
 export function computeCourseSubtotal(course, unitDraft) {
-  return (
+  return Math.round(
     (course.ind1 || 0) * resolveUnitPrice(course, 'price_ind1', unitDraft) +
     (course.ind2 || 0) * resolveUnitPrice(course, 'price_ind2', unitDraft) +
     (course.grp34 || 0) * resolveUnitPrice(course, 'price_grp34', unitDraft) +

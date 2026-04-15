@@ -34,6 +34,14 @@ describe('computeCourseSubtotal', () => {
   it('returns 0 for empty course', () => {
     expect(computeCourseSubtotal({}, UNIT)).toBe(0)
   })
+
+  it('rounds fractional-hour result to integer (no NT$ 0.5 cents)', () => {
+    // 4.5 hrs × 700 = 3150 (exact), but non-integer prices could produce floats
+    // Ensure the return is always a whole number
+    const course = { ind1: 4.5 }
+    expect(Number.isInteger(computeCourseSubtotal(course, UNIT))).toBe(true)
+    expect(computeCourseSubtotal(course, UNIT)).toBe(3150)
+  })
 })
 
 describe('resolveUnitPrice', () => {
