@@ -382,7 +382,7 @@ body {
   background: var(--surface);
   color: var(--text);
 }
-.month-project-period-input:focus {
+.month-project-period-input:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
@@ -757,7 +757,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.month-project-roster-filter:focus {
+.month-project-roster-filter:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
@@ -858,7 +858,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.roster-search:focus {
+.roster-search:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
@@ -1121,7 +1121,7 @@ body {
   color: var(--text);
   background: var(--bg);
 }
-.period-input:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.period-input:focus-visible { outline: 2px solid var(--accent); border-color: transparent; }
 
 .month-bundle-bar {
   margin-top: 12px;
@@ -1199,7 +1199,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.search:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.search:focus-visible { outline: 2px solid var(--accent); border-color: transparent; }
 
 .count-badge {
   font-size: 11px;
@@ -1248,7 +1248,7 @@ body {
   font-size: 13px;
   font-family: ui-monospace, 'SF Mono', 'Menlo', 'Consolas', monospace;
 }
-.defaults-field input:focus {
+.defaults-field input:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
@@ -1269,7 +1269,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.add-student-input:focus {
+.add-student-input:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
@@ -1686,7 +1686,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.structure-input:focus {
+.structure-input:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
@@ -1973,7 +1973,7 @@ body {
   background: var(--bg);
   color: var(--text);
 }
-.catalog-input:focus {
+.catalog-input:focus-visible {
   outline: 2px solid var(--accent);
   border-color: transparent;
 }
