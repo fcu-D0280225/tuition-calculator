@@ -27,13 +27,24 @@ html {
   --danger-hover: #fee2e2;
   --disabled: #94a3b8;
   --scrollbar: #cbd5e1;
-  --success-gradient-from: var(--success-gradient-from);
-  --success-gradient-to: var(--success-gradient-to);
-  --success-border: var(--success-border);
+  --success-gradient-from: #ecfdf5;
+  --success-gradient-to: #e0f2fe;
+  --success-border: #a7f3d0;
   --sidebar-w: 300px;
   --radius: 10px;
   --radius-md: 8px;
   --radius-sm: 6px;
+  /* Spacing scale (base 4px) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  /* Breakpoints (reference only — use in @media) */
+  /* --bp-sm: 480px; --bp-md: 768px; --bp-lg: 960px; --bp-xl: 1280px; */
 }
 
 body {
@@ -2121,3 +2132,61 @@ select.catalog-input.catalog-select {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: var(--radius); }
+
+/* ============================================================
+   Responsive breakpoints
+   sm: 480px  md: 768px  lg: 960px  xl: 1280px
+   ============================================================ */
+
+/* sm: 480px — nav wrap + smaller padding */
+@media (max-width: 480px) {
+  .app-top-nav {
+    flex-wrap: wrap;
+    padding: var(--space-2) var(--space-3);
+    gap: var(--space-1);
+  }
+  .app-nav-btn {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  .billing-setup-hero {
+    padding: var(--space-4);
+  }
+  .billing-setup-actions {
+    padding: var(--space-4) var(--space-4) var(--space-6);
+  }
+  .main {
+    padding: var(--space-4);
+  }
+}
+
+/* md: 768px — stack sidebar below main */
+@media (max-width: 768px) {
+  .app-split {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    /* Collapsed by default on mobile via details[open] in JSX */
+  }
+  .main {
+    padding: var(--space-5) var(--space-4);
+  }
+  .billing-workspace-heading {
+    padding: var(--space-3) var(--space-4);
+  }
+  .roster-page {
+    padding: 0 var(--space-4);
+  }
+  .catalog-page {
+    padding: 0 var(--space-4);
+  }
+}
+
+/* lg: 960px — constrain max-width on wide desktops */
+@media (min-width: 960px) {
+  .detail { max-width: 960px; }
+}
