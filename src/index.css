@@ -13,10 +13,27 @@ html {
   --text: #1e293b;
   --muted: #64748b;
   --accent: #2563eb;
+  --accent-dark: #1d4ed8;
   --accent-light: #dbeafe;
   --green: #16a34a;
+  --green-dark: #15803d;
+  --green-light: #dcfce7;
+  --green-text: #166534;
+  --green-text-dark: #14532d;
+  --green-active: #3f6212;
+  --danger: #b91c1c;
+  --danger-light: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-hover: #fee2e2;
+  --disabled: #94a3b8;
+  --scrollbar: #cbd5e1;
+  --success-gradient-from: var(--success-gradient-from);
+  --success-gradient-to: var(--success-gradient-to);
+  --success-border: var(--success-border);
   --sidebar-w: 300px;
   --radius: 10px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
 }
 
 body {
@@ -347,8 +364,8 @@ body {
   cursor: not-allowed;
 }
 .btn-month-project-danger:hover:not(:disabled) {
-  border-color: #dc2626;
-  color: #dc2626;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 .month-project-hint {
   margin-top: 10px;
@@ -443,8 +460,8 @@ body {
   color: white;
 }
 .btn-month-project-primary:hover:not(:disabled) {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
   color: white;
 }
 .btn-month-project-primary:disabled {
@@ -632,7 +649,7 @@ body {
   text-decoration: underline;
 }
 .btn-link-like:hover {
-  color: #1d4ed8;
+  color: var(--accent-dark);
 }
 .btn-link-like:disabled {
   opacity: 0.45;
@@ -812,12 +829,12 @@ body {
   filter: brightness(0.97);
 }
 .btn-month-project-tiny--danger {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #b91c1c;
+  background: var(--danger-light);
+  border-color: var(--danger-border);
+  color: var(--danger);
 }
 .btn-month-project-tiny--danger:hover:not(:disabled) {
-  background: #fee2e2;
+  background: var(--danger-hover);
 }
 
 /* 學生名冊頁 */
@@ -940,8 +957,8 @@ body {
   font-weight: 700;
 }
 .roster-badge-in {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--green-light);
+  color: var(--green-text);
 }
 .roster-badge-out {
   background: var(--bg);
@@ -978,14 +995,14 @@ body {
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--danger-border);
   border-radius: 6px;
-  background: #fef2f2;
-  color: #b91c1c;
+  background: var(--danger-light);
+  color: var(--danger);
   cursor: pointer;
 }
 .btn-roster-del:hover {
-  background: #fee2e2;
+  background: var(--danger-hover);
 }
 .roster-empty {
   margin: 0;
@@ -1126,8 +1143,8 @@ body {
 .month-bundle-bar {
   margin-top: 12px;
   padding: 12px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #e0f2fe 100%);
-  border: 1px solid #a7f3d0;
+  background: linear-gradient(135deg, var(--success-gradient-from) 0%, var(--success-gradient-to) 100%);
+  border: 1px solid var(--success-border);
   border-radius: 10px;
 }
 .month-bundle-stat {
@@ -1139,14 +1156,14 @@ body {
 .month-bundle-label {
   font-size: 11px;
   font-weight: 700;
-  color: #166534;
+  color: var(--green-text);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 .month-bundle-total {
   font-size: 20px;
   font-family: ui-monospace, 'SF Mono', 'Menlo', 'Consolas', monospace;
-  color: #14532d;
+  color: var(--green-text-dark);
 }
 .month-bundle-meta {
   font-size: 11px;
@@ -1160,21 +1177,21 @@ body {
   font-size: 13px;
   font-weight: 700;
   font-family: inherit;
-  background: #15803d;
+  background: var(--green-dark);
   color: white;
   cursor: pointer;
   transition: filter 0.12s;
 }
 .btn-bundle-pdf:hover:not(:disabled) { filter: brightness(1.06); }
 .btn-bundle-pdf:disabled {
-  background: #94a3b8;
+  background: var(--disabled);
   cursor: not-allowed;
 }
 .month-bundle-hint {
   margin-top: 8px;
   font-size: 11px;
   line-height: 1.45;
-  color: #3f6212;
+  color: var(--green-active);
 }
 
 .search-wrap {
@@ -1593,7 +1610,7 @@ body {
   cursor: pointer;
   text-decoration: underline;
 }
-.btn-link:hover { color: #1d4ed8; }
+.btn-link:hover { color: var(--accent-dark); }
 
 .pdf-btn {
   background: var(--accent);
@@ -1608,9 +1625,9 @@ body {
   transition: background 0.15s, transform 0.1s;
   white-space: nowrap;
 }
-.pdf-btn:hover { background: #1d4ed8; }
+.pdf-btn:hover { background: var(--accent-dark); }
 .pdf-btn:active { transform: scale(0.97); }
-.pdf-btn.loading { background: #94a3b8; cursor: not-allowed; }
+.pdf-btn.loading { background: var(--disabled); cursor: not-allowed; }
 
 .btn-secondary {
   background: var(--surface);
@@ -1638,14 +1655,14 @@ body {
   font-size: 12px;
   font-family: inherit;
   font-weight: 600;
-  color: #b91c1c;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  color: var(--danger);
+  background: var(--danger-light);
+  border: 1px solid var(--danger-border);
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
 }
-.btn-remove-course:hover { background: #fee2e2; }
+.btn-remove-course:hover { background: var(--danger-hover); }
 
 .course-structure {
   margin-bottom: 20px;
@@ -1705,13 +1722,13 @@ body {
 .course-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-top: 3px solid var(--accent, #2563eb);
+  border-top: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 20px 24px;
 }
 .course-card--excluded {
   opacity: 0.72;
-  border-top-color: #94a3b8;
+  border-top-color: var(--disabled);
 }
 
 .course-detail-collapse {
@@ -2026,7 +2043,7 @@ select.catalog-input.catalog-select {
   color: white;
   cursor: pointer;
 }
-.btn-catalog-primary:hover { background: #1d4ed8; }
+.btn-catalog-primary:hover { background: var(--accent-dark); }
 .catalog-section-title {
   font-size: 15px;
   font-weight: 700;
@@ -2090,15 +2107,15 @@ select.catalog-input.catalog-select {
 }
 .btn-table:hover { border-color: var(--accent); color: var(--accent); }
 .btn-table-danger {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: #fef2f2;
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-light);
 }
 .btn-table-danger:hover {
-  background: #fee2e2;
+  background: var(--danger-hover);
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 10px; }
