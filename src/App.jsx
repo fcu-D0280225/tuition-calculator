@@ -408,6 +408,23 @@ export default function App() {
     }))
   }
 
+  function removeStudentFromProject(rosterId) {
+    const rosterEntry = studentRoster.find(r => r.id === rosterId)
+    const displayName = rosterEntry?.name ?? '此學生'
+    if (
+      !window.confirm(
+        `確定將「${displayName}」從本專案移除？課程資料將一併刪除，但該生仍保留在學生名冊中。`
+      )
+    ) {
+      return
+    }
+    mapActiveProject(p => ({
+      ...p,
+      students: p.students.filter(s => s.rosterId !== rosterId),
+    }))
+    setSelectedRosterId(null)
+  }
+
   return (
     <div className="app">
       <header className="app-top-nav" role="navigation">
@@ -677,6 +694,7 @@ export default function App() {
                   onSetAllInvoiceInclude={include => setAllInvoiceInclude(selected.rosterId, include)}
                   courseCatalogItems={courseCatalog}
                   onAddFromCatalog={item => addCourseFromCatalog(selected.rosterId, item)}
+                  onRemoveFromProject={() => removeStudentFromProject(selected.rosterId)}
                 />
               ) : (
                 <div className="empty-state">

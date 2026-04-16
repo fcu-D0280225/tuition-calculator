@@ -1677,6 +1677,28 @@ body {
 }
 .btn-remove-course:hover { background: var(--danger-hover); }
 
+.btn-remove-from-project {
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 600;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  cursor: pointer;
+  min-height: 44px;
+  white-space: nowrap;
+}
+.btn-remove-from-project:hover { background: var(--danger-light); }
+
+.month-project-duplicate-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
 .course-structure {
   margin-bottom: 20px;
   padding-bottom: 16px;

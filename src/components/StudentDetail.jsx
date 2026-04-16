@@ -49,6 +49,7 @@ export default function StudentDetail({
   onSetAllInvoiceInclude,
   courseCatalogItems = [],
   onAddFromCatalog,
+  onRemoveFromProject,
 }) {
   const [generating, setGenerating] = useState(false)
   const [pickCatalogId, setPickCatalogId] = useState('')
@@ -94,7 +95,7 @@ export default function StudentDetail({
     }, 0)
 
     if (rowsCount === 0) {
-      window.alert('請至少勾選一門課程，且該課程需有堂數或固定費用，才能重新產生學費單。')
+      window.alert('尚無可列印的課程內容。請先填入課程堂數或費用，並勾選「列入本期學費單」，再產生學費單。')
       return
     }
 
@@ -158,6 +159,15 @@ export default function StudentDetail({
               <span className="grand-amount">NT$ {grandInvoice.toLocaleString()}</span>
               <span className="grand-amount-note">已選 {nInvoice} 門課程</span>
             </div>
+            {onRemoveFromProject && (
+              <button
+                type="button"
+                className="btn-remove-from-project"
+                onClick={onRemoveFromProject}
+              >
+                從本專案移除
+              </button>
+            )}
             <button
               className={`pdf-btn ${generating ? 'loading' : ''}`}
               onClick={handlePDF}

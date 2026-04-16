@@ -25,14 +25,8 @@ export default function MonthProjectBar({
   /** 新專案將納入的學生（依加入順序） */
   const [newProjPickedIds, setNewProjPickedIds] = useState([])
   const [newProjRosterFilter, setNewProjRosterFilter] = useState('')
-
-  function promptLabel(title) {
-    const d = defaultPeriodLabel()
-    const raw = window.prompt(title, d)
-    if (raw === null) return null
-    const label = String(raw).trim()
-    return label || d
-  }
+  const [showDuplicate, setShowDuplicate] = useState(false)
+  const [duplicateLabel, setDuplicateLabel] = useState('')
 
   function syncImportDraftOnOpen() {
     setImportDraft({
@@ -238,16 +232,58 @@ export default function MonthProjectBar({
                 </button>
               </div>
             </details>
-            <button
-              type="button"
-              className="btn-month-project"
-              onClick={() => {
-                const label = promptLabel('複製目前專案：請輸入新專案的期別名稱')
-                if (label !== null) onDuplicateProject(label)
-              }}
-            >
-              複製目前專案
-            </button>
+            {showDuplicate ? (
+              <form
+                className="month-project-duplicate-form"
+                onSubmit={e => {
+                  e.preventDefault()
+                  const label = duplicateLabel.trim() || defaultPeriodLabel()
+                  onDuplicateProject(label)
+                  setShowDuplicate(false)
+                  setDuplicateLabel('')
+                }}
+              >
+                <input
+                  className="month-project-period-input"
+                  value={duplicateLabel}
+                  onChange={e => setDuplicateLabel(e.target.value)}
+                  placeholder={defaultPeriodLabel()}
+                  maxLength={48}
+                  autoFocus
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') {
+                      setShowDuplicate(false)
+                      setDuplicateLabel('')
+                    }
+                  }}
+                  aria-label="新複本的期別名稱"
+                />
+                <button type="submit" className="btn-month-project btn-month-project-primary">
+                  建立複本
+                </button>
+                <button
+                  type="button"
+                  className="btn-month-project"
+                  onClick={() => {
+                    setShowDuplicate(false)
+                    setDuplicateLabel('')
+                  }}
+                >
+                  取消
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className="btn-month-project"
+                onClick={() => {
+                  setDuplicateLabel(defaultPeriodLabel())
+                  setShowDuplicate(true)
+                }}
+              >
+                複製目前專案
+              </button>
+            )}
             <button
               type="button"
               className="btn-month-project btn-month-project-danger"
