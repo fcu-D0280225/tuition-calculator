@@ -129,6 +129,7 @@ body {
   font-size: 14px;
   line-height: 1.6;
   color: var(--muted);
+  max-width: 680px;
 }
 .billing-setup-desc strong {
   color: var(--text);
