@@ -2226,3 +2226,523 @@ select.catalog-input.catalog-select {
 @media (min-width: 960px) {
   .detail { max-width: 960px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   新版頁面（5 頁籤）— 沿用舊版視覺語彙
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 應用殼層 ────────────────────────────────────────────────── */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+/* header：沿用 .app-top-nav 語彙（白底＋下邊框）*/
+.app-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.app-nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* nav-tab：沿用 .app-nav-btn 語彙（有邊框 pill）*/
+.nav-tab {
+  padding: 8px 16px;
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--muted);
+  background: var(--bg);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.nav-tab:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.nav-tab.active {
+  color: white;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.app-main {
+  flex: 1;
+  padding: var(--space-6) var(--space-4);
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── 通用頁面容器 ─────────────────────────────────────────────── */
+
+.page {}
+
+.page-header {
+  margin-bottom: var(--space-5);
+}
+.page-header h1 {
+  font-size: clamp(1.15rem, 2.5vw, 1.5rem);
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.loading    { color: var(--muted); padding: var(--space-6) 0; }
+.empty-hint { color: var(--muted); padding: var(--space-8) 0; text-align: center; font-size: 14px; }
+.error-msg  { color: var(--danger); font-size: 13px; margin-top: var(--space-2); }
+
+/* ── 新增表單 row ─────────────────────────────────────────────── */
+
+.add-form {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.add-input {
+  flex: 1;
+  max-width: 320px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  transition: border-color 0.12s;
+}
+.add-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── 按鈕 ────────────────────────────────────────────────────── */
+
+/* btn-primary：沿用 .btn-billing-enter 語彙 */
+.btn-primary {
+  padding: 9px 18px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  transition: filter 0.12s, opacity 0.12s;
+}
+.btn-primary:hover:not(:disabled) { filter: brightness(1.05); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* btn-sm：沿用 .btn-billing-back-setup 語彙 */
+.btn-sm {
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.btn-sm:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--muted);
+  background: var(--bg);
+}
+.btn-sm:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-sm.btn-primary {
+  border: none;
+  background: var(--accent);
+  color: white;
+}
+.btn-sm.btn-primary:hover:not(:disabled) { filter: brightness(1.05); background: var(--accent); }
+
+.btn-sm.btn-danger {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-light);
+}
+.btn-sm.btn-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+  border-color: var(--danger);
+}
+
+/* ── 實體表格（學生／老師／課程）────────────────────────────── */
+
+.entity-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.entity-table th {
+  background: var(--bg);
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.entity-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.entity-table tr:last-child td { border-bottom: none; }
+.entity-table tr:hover td { background: var(--bg); }
+
+.row-actions {
+  text-align: right;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.inline-edit-input {
+  padding: 5px 9px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  width: 200px;
+}
+.inline-edit-input:focus { outline: none; }
+
+/* ── 展開列（單價/時薪設定）─────────────────────────────────── */
+
+.expandable-name {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.expandable-name:hover { color: var(--accent); }
+
+.expand-icon { font-size: 9px; color: var(--muted); }
+
+.expanded-row td { background: var(--bg) !important; padding: 0 !important; }
+
+.expanded-section {
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+  border-top: 1px solid var(--border);
+}
+
+.expanded-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-3);
+}
+
+/* ── PriceManager ────────────────────────────────────────────── */
+
+.price-manager-table {
+  width: 100%;
+  max-width: 500px;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.price-manager-table th {
+  background: var(--bg);
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.price-manager-table td {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.price-manager-table tr:last-child td { border-bottom: none; }
+
+.price-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.price-add-row td { padding-top: var(--space-3); background: var(--bg); }
+
+.price-input {
+  width: 100px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+}
+.price-input:focus { outline: none; border-color: var(--accent); }
+
+.price-select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  width: 160px;
+}
+
+/* ── 上課紀錄頁 ──────────────────────────────────────────────── */
+
+/* 新增表單卡片：沿用 billing-setup 卡片感 */
+.lesson-form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+  margin-bottom: var(--space-5);
+}
+
+.form-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-3);
+}
+
+.lesson-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.lesson-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lesson-form select,
+.lesson-form input[type="date"],
+.lesson-form input[type="text"],
+.lesson-form input[type="number"] {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  transition: border-color 0.12s;
+}
+.lesson-form select:focus,
+.lesson-form input:focus { outline: none; border-color: var(--accent); }
+
+.hours-input { width: 80px; }
+.note-input  { width: 180px; }
+
+/* 篩選 bar */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+
+.filter-bar select,
+.filter-bar input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+}
+.filter-bar select:focus,
+.filter-bar input:focus { outline: none; border-color: var(--accent); }
+
+/* 上課紀錄表格 */
+.lesson-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.lesson-table th {
+  background: var(--bg);
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.lesson-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.lesson-table tr:last-child td { border-bottom: none; }
+.lesson-table tr:hover td { background: var(--bg); }
+
+.note-cell { color: var(--muted); font-size: 13px; }
+
+/* ── 結算頁 ──────────────────────────────────────────────────── */
+
+.settlement-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: flex-end;
+  margin-bottom: var(--space-8);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-5);
+}
+
+.settlement-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.settlement-form input[type="date"] {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+}
+.settlement-form input[type="date"]:focus { outline: none; border-color: var(--accent); }
+
+.settlement-section { margin-bottom: var(--space-10); }
+
+.settlement-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.settlement-section-header h2 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.period-badge {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.settlement-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.settlement-table th {
+  background: var(--bg);
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+}
+
+.settlement-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.settlement-table tr:last-child td { border-bottom: none; }
+
+.num-cell    { text-align: right; font-variant-numeric: tabular-nums; font-family: monospace; }
+.student-cell { font-weight: 600; vertical-align: top; }
+
+.subtotal-row td { background: var(--bg); }
+.subtotal-label  { text-align: right; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.subtotal-amount { font-weight: 700; color: var(--text); }
+
+.grand-total-row td { background: var(--accent); color: white; font-weight: 700; }
+.grand-total-label  { text-align: right; }
+.grand-total-amount { font-size: 15px; font-weight: 800; }
