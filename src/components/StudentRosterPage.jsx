@@ -1,9 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
-import { createRosterId } from '../data/studentRoster'
 
 export default function StudentRosterPage({
   roster,
-  onChangeRoster,
+  loading,
+  error,
+  onRenameRoster,
+  onDeleteRoster,
+  onAddRoster,
+  onRetry,
   projects,
   activeProjectId,
   onAddRosterToActiveProject,
@@ -37,7 +41,7 @@ export default function StudentRosterPage({
       window.alert('姓名不可空白')
       return
     }
-    onChangeRoster(roster.map(r => (r.id === id ? { ...r, name: n } : r)))
+    onRenameRoster(id, n)
   }
 
   function handleDelete(id) {
@@ -46,10 +50,10 @@ export default function StudentRosterPage({
       return
     }
     if (!window.confirm('從名冊刪除此學生？（僅限未加入任何專案者）')) return
-    onChangeRoster(roster.filter(r => r.id !== id))
+    onDeleteRoster(id)
   }
 
-  function handleAddOnlyToRoster(e) {
+  async function handleAddOnlyToRoster(e) {
     e.preventDefault()
     const name = newName.trim()
     if (!name) {
@@ -59,8 +63,8 @@ export default function StudentRosterPage({
     if (roster.some(r => r.name === name)) {
       if (!window.confirm('名冊已有相同姓名，仍要新增一筆（不同學生可同名）？')) return
     }
-    onChangeRoster([...roster, { id: createRosterId(), name }])
-    setNewName('')
+    const created = await onAddRoster(name)
+    if (created) setNewName('')
   }
 
   return (
@@ -68,9 +72,20 @@ export default function StudentRosterPage({
       <header className="roster-header">
         <h1 className="roster-title">學生名冊</h1>
         <p className="roster-sub">
-          全站共用一份名冊；各「當月專案」從名冊挑人後，再維護該期的課程與金額。在此可新增名冊（不一定立刻加入目前專案）、改名、刪除（僅限尚未出現在任何專案者）。
+          全站共用一份名冊（儲存於伺服器 DB）；各「當月專案」從名冊挑人後，再維護該期的課程與金額。在此可新增名冊（不一定立刻加入目前專案）、改名、刪除（僅限尚未出現在任何專案者）。
         </p>
       </header>
+
+      {error && (
+        <div className="roster-error">
+          <span>名冊載入失敗：{error}</span>
+          {onRetry && (
+            <button type="button" className="btn-roster-retry" onClick={onRetry}>
+              重試
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="roster-toolbar">
         <input
@@ -148,7 +163,9 @@ export default function StudentRosterPage({
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="roster-empty">{search.trim() ? '找不到符合的學生' : '名冊尚無學生'}</p>
+          <p className="roster-empty">
+            {loading ? '名冊載入中…' : search.trim() ? '找不到符合的學生' : '名冊尚無學生'}
+          </p>
         )}
       </div>
     </div>

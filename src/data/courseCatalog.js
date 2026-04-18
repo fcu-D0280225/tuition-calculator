@@ -1,7 +1,6 @@
 import { createEmptyCourse } from './students'
 import { computeCourseSubtotal } from './pricingDefaults'
-
-export const CATALOG_STORAGE_KEY = 'tuition-calculator-course-catalog-v1'
+import { apiGetCatalog, apiPutCatalog } from './api'
 
 export const CYCLE_PRESETS = ['一個月', '兩個月', '三個月', '半年', '每期', '每週', '雙週', '單堂']
 
@@ -14,26 +13,16 @@ export function createCatalogId() {
 
 /** @typedef {{ id: string, name: string, subject?: string, hours: number, cycleLabel: string, defaultAmount: number, billingShape?: object }} CourseCatalogItem */
 
-/** @returns {CourseCatalogItem[]} */
-export function loadCourseCatalog() {
-  try {
-    const raw = localStorage.getItem(CATALOG_STORAGE_KEY)
-    if (!raw) return []
-    const arr = JSON.parse(raw)
-    if (!Array.isArray(arr)) return []
-    return arr.map(normalizeCatalogItem).filter(Boolean)
-  } catch {
-    return []
-  }
+/** @returns {Promise<CourseCatalogItem[]>} */
+export async function loadCourseCatalog() {
+  const arr = await apiGetCatalog()
+  if (!Array.isArray(arr)) return []
+  return arr.map(normalizeCatalogItem).filter(Boolean)
 }
 
 /** @param {CourseCatalogItem[]} items */
-export function saveCourseCatalog(items) {
-  try {
-    localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(items))
-  } catch (e) {
-    console.error('saveCourseCatalog', e)
-  }
+export async function saveCourseCatalog(items) {
+  await apiPutCatalog(Array.isArray(items) ? items : [])
 }
 
 function normalizeCatalogItem(raw) {
@@ -80,86 +69,6 @@ function sumHourFields(c) {
     (Number(c.ind_special) || 0) +
     (Number(c.ind_other) || 0)
   )
-}
-
-function billingShapeLabel(b) {
-  const parts = []
-  if (b.ind1) parts.push(`1人${b.ind1}堂`)
-  if (b.ind2) parts.push(`2人${b.ind2}堂`)
-  if (b.grp34) parts.push(`3-4人${b.grp34}堂`)
-  if (b.ind_special) parts.push(`特殊${b.ind_special}堂`)
-  if (b.ind_other) parts.push(`其他個人${b.ind_other}堂`)
-  if (b.team) parts.push(`團班${b.team}`)
-  if (b.book_fee) parts.push(`書籍${b.book_fee}`)
-  return parts.join(' ')
-}
-
-function catalogDedupeKey(course) {
-  const sub = course.subject || ''
-  const b = normalizeBillingShape({
-    ind1: course.ind1,
-    ind2: course.ind2,
-    grp34: course.grp34,
-    ind_special: course.ind_special,
-    ind_other: course.ind_other,
-    team: course.team,
-    book_fee: course.book_fee,
-  })
-  return `${sub}\t${JSON.stringify(b)}`
-}
-
-function courseRowToCatalogItem(course) {
-  const subject = (course.subject && String(course.subject).trim()) || '未命名'
-  const b = normalizeBillingShape({
-    ind1: course.ind1,
-    ind2: course.ind2,
-    grp34: course.grp34,
-    ind_special: course.ind_special,
-    ind_other: course.ind_other,
-    team: course.team,
-    book_fee: course.book_fee,
-  })
-  const label = billingShapeLabel(b)
-  const subtotal = Number(course.subtotal) || 0
-  const h = Number(course.hours)
-  const hours = Number.isFinite(h) && h >= 0 ? h : sumHourFields(b)
-
-  return {
-    id: createCatalogId(),
-    subject,
-    name: label ? `${subject} · ${label}` : subject,
-    hours,
-    cycleLabel: '一個月',
-    defaultAmount: subtotal,
-    billingShape: b,
-  }
-}
-
-/** 從內建學生資料萃取「不重複」的課程列，供首次建立課程庫 */
-export function buildCatalogFromStudents(students) {
-  const seen = new Set()
-  const items = []
-  for (const s of students) {
-    for (const course of s.courses || []) {
-      const key = catalogDedupeKey(course)
-      if (seen.has(key)) continue
-      const subtotal = Number(course.subtotal) || 0
-      const b = normalizeBillingShape({
-        ind1: course.ind1,
-        ind2: course.ind2,
-        grp34: course.grp34,
-        ind_special: course.ind_special,
-        ind_other: course.ind_other,
-        team: course.team,
-        book_fee: course.book_fee,
-      })
-      const hasBilling = Object.values(b).some(v => v > 0)
-      if (!hasBilling && subtotal === 0) continue
-      seen.add(key)
-      items.push(courseRowToCatalogItem(course))
-    }
-  }
-  return items
 }
 
 /** 依「教材小計」反推各堂單價（多類型並存時假設同一隱含單價） */

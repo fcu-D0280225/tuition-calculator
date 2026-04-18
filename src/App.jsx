@@ -1,10 +1,9 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import { INITIAL_STUDENTS, createEmptyCourse } from './data/students'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { createEmptyCourse } from './data/students'
 import {
   loadCourseCatalog,
   saveCourseCatalog,
   studentCourseFromCatalogItem,
-  buildCatalogFromStudents,
 } from './data/courseCatalog'
 import {
   DEFAULT_UNIT_PRICES,
@@ -24,7 +23,13 @@ import StudentDetail from './components/StudentDetail'
 import CourseCatalogPage from './components/CourseCatalogPage'
 import MonthProjectBar from './components/MonthProjectBar'
 import StudentRosterPage from './components/StudentRosterPage'
-import { attachDisplayNames, createRosterId } from './data/studentRoster'
+import { attachDisplayNames } from './data/studentRoster'
+import {
+  apiListStudents,
+  apiCreateStudent,
+  apiRenameStudent,
+  apiDeleteStudent,
+} from './data/api'
 import './index.css'
 
 function deepClone(obj) {
@@ -41,34 +46,53 @@ function sumHourFields(c) {
   )
 }
 
-function getInitialProjects() {
-  const loaded = loadMonthProjectsState()
-  if (loaded) {
-    return {
-      projects: loaded.projects,
-      activeProjectId: loaded.activeProjectId,
-      studentRoster: loaded.studentRoster ?? [],
-    }
-  }
-  return initialProjectsBootstrap()
-}
-
 export default function App() {
   const [mainView, setMainView] = useState('students')
-  const [courseCatalog, setCourseCatalog] = useState(() => {
-    const stored = loadCourseCatalog()
-    if (stored.length > 0) return stored
-    return buildCatalogFromStudents(INITIAL_STUDENTS)
-  })
+  const [courseCatalog, setCourseCatalog] = useState([])
+  const [projects, setProjects] = useState([])
+  const [activeProjectId, setActiveProjectId] = useState(null)
+  const [studentRoster, setStudentRoster] = useState([])
+  const [loadingState, setLoadingState] = useState('loading') // loading | ready | error
+  const [loadError, setLoadError] = useState(null)
 
-  const initBundleRef = useRef(null)
-  function initBundleOnce() {
-    if (!initBundleRef.current) initBundleRef.current = getInitialProjects()
-    return initBundleRef.current
-  }
-  const [projects, setProjects] = useState(() => initBundleOnce().projects)
-  const [activeProjectId, setActiveProjectId] = useState(() => initBundleOnce().activeProjectId)
-  const [studentRoster, setStudentRoster] = useState(() => initBundleOnce().studentRoster ?? [])
+  const hasHydratedRef = useRef(false)
+
+  const refreshAll = useCallback(async () => {
+    setLoadingState('loading')
+    setLoadError(null)
+    try {
+      const [roster, mp, catalog] = await Promise.all([
+        apiListStudents(),
+        loadMonthProjectsState(),
+        loadCourseCatalog(),
+      ])
+      setStudentRoster(Array.isArray(roster) ? roster : [])
+      setCourseCatalog(Array.isArray(catalog) ? catalog : [])
+      const normalized = mp || initialProjectsBootstrap()
+      setProjects(normalized.projects)
+      setActiveProjectId(normalized.activeProjectId)
+      hasHydratedRef.current = true
+      setLoadingState('ready')
+    } catch (e) {
+      console.error('refreshAll', e)
+      setLoadError(e?.message || '無法連線後端')
+      setLoadingState('error')
+    }
+  }, [])
+
+  const refreshRoster = useCallback(async () => {
+    try {
+      const list = await apiListStudents()
+      setStudentRoster(Array.isArray(list) ? list : [])
+    } catch (e) {
+      console.error('refreshRoster', e)
+      window.alert('重新載入學生名冊失敗')
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshAll()
+  }, [refreshAll])
 
   const [selectedRosterId, setSelectedRosterId] = useState(null)
   const [search, setSearch] = useState('')
@@ -127,12 +151,23 @@ export default function App() {
   const [bundleLoading, setBundleLoading] = useState(false)
 
   useEffect(() => {
-    saveCourseCatalog(courseCatalog)
+    if (!hasHydratedRef.current) return
+    const t = setTimeout(() => {
+      saveCourseCatalog(courseCatalog).catch(e => console.error('saveCourseCatalog', e))
+    }, 400)
+    return () => clearTimeout(t)
   }, [courseCatalog])
 
   useEffect(() => {
-    saveMonthProjectsState({ projects, activeProjectId, studentRoster })
-  }, [projects, activeProjectId, studentRoster])
+    if (!hasHydratedRef.current) return
+    if (!activeProjectId) return
+    const t = setTimeout(() => {
+      saveMonthProjectsState({ projects, activeProjectId }).catch(e =>
+        console.error('saveMonthProjectsState', e)
+      )
+    }, 400)
+    return () => clearTimeout(t)
+  }, [projects, activeProjectId])
 
   useEffect(() => {
     if (projects.length === 0) return
@@ -337,7 +372,7 @@ export default function App() {
     })
   }
 
-  function addStudent(rawName) {
+  async function addStudent(rawName) {
     const name = rawName.trim()
     if (!name) {
       window.alert('請輸入學生姓名')
@@ -351,17 +386,56 @@ export default function App() {
       window.alert('本專案已有相同姓名的學生')
       return
     }
-    const id = createRosterId()
+    let created
+    try {
+      created = await apiCreateStudent(name)
+    } catch (e) {
+      console.error('addStudent', e)
+      window.alert('新增學生失敗，請確認後端連線')
+      return
+    }
     const c = createEmptyCourse()
     c.subtotal = computeCourseSubtotal(c, unitDefaults)
-    setStudentRoster(prev => [...prev, { id, name }])
+    setStudentRoster(prev => [...prev, created])
     mapActiveProject(p => ({
       ...p,
-      students: [...p.students, { rosterId: id, courses: [c] }],
+      students: [...p.students, { rosterId: created.id, courses: [c] }],
     }))
-    setSelectedRosterId(id)
+    setSelectedRosterId(created.id)
     setNewStudentName('')
     setSearch('')
+  }
+
+  async function renameRosterEntry(id, name) {
+    try {
+      const updated = await apiRenameStudent(id, name)
+      setStudentRoster(prev => prev.map(r => (r.id === id ? updated : r)))
+    } catch (e) {
+      console.error('renameRosterEntry', e)
+      window.alert('改名失敗，請確認後端連線')
+    }
+  }
+
+  async function deleteRosterEntry(id) {
+    try {
+      await apiDeleteStudent(id)
+      setStudentRoster(prev => prev.filter(r => r.id !== id))
+    } catch (e) {
+      console.error('deleteRosterEntry', e)
+      window.alert('刪除失敗，請確認後端連線')
+    }
+  }
+
+  async function addRosterOnly(name) {
+    try {
+      const created = await apiCreateStudent(name)
+      setStudentRoster(prev => [...prev, created])
+      return created
+    } catch (e) {
+      console.error('addRosterOnly', e)
+      window.alert('新增名冊失敗，請確認後端連線')
+      return null
+    }
   }
 
   function addCourse(rosterId) {
@@ -425,6 +499,25 @@ export default function App() {
     setSelectedRosterId(null)
   }
 
+  if (loadingState === 'loading') {
+    return (
+      <div className="app app--loading">
+        <p className="app-loading-text">載入中…</p>
+      </div>
+    )
+  }
+
+  if (loadingState === 'error') {
+    return (
+      <div className="app app--loading">
+        <p className="app-loading-text">載入失敗：{loadError}</p>
+        <button type="button" className="app-loading-retry" onClick={refreshAll}>
+          重試
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <header className="app-top-nav" role="navigation">
@@ -459,7 +552,12 @@ export default function App() {
         <main className="main main--roster">
           <StudentRosterPage
             roster={studentRoster}
-            onChangeRoster={setStudentRoster}
+            loading={loadingState === 'loading'}
+            error={loadingState === 'error' ? loadError : null}
+            onRenameRoster={renameRosterEntry}
+            onDeleteRoster={deleteRosterEntry}
+            onAddRoster={addRosterOnly}
+            onRetry={refreshAll}
             projects={projects}
             activeProjectId={activeProjectId}
             onAddRosterToActiveProject={handleAddRosterToActiveProject}

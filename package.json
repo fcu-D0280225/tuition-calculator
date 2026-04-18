@@ -9,12 +9,17 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "server": "node server/index.js",
+    "server:dev": "node --watch server/index.js",
+    "seed": "node server/seed.js"
   },
   "dependencies": {
+    "express": "^4.21.2",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "mysql2": "^3.22.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
