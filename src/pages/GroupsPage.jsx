@@ -159,24 +159,33 @@ export default function GroupsPage() {
       <div className="lesson-form-card" style={{ marginBottom: '32px' }}>
         <div className="form-section-title">團課目錄</div>
 
-        <form className="add-form" onSubmit={handleAddGroup} style={{ marginBottom: '16px', flexWrap: 'wrap' }}>
-          <input
-            className="add-input"
-            placeholder="團課名稱（如：週一晚會話班）"
-            value={newGroup.name}
-            onChange={e => setNewGroup(g => ({ ...g, name: e.target.value }))}
-          />
-          <WeekdayPicker
-            value={newGroup.weekdays}
-            onChange={w => setNewGroup(g => ({ ...g, weekdays: w }))}
-            disabled={saving}
-          />
-          <input
-            className="add-input"
-            placeholder="備註（選填）"
-            value={newGroup.note}
-            onChange={e => setNewGroup(g => ({ ...g, note: e.target.value }))}
-          />
+        <form className="lesson-form" onSubmit={handleAddGroup} style={{ marginBottom: '16px' }}>
+          <div className="lesson-form-row">
+            <label>團課名稱
+              <input
+                type="text"
+                placeholder="如：週一晚會話班"
+                value={newGroup.name}
+                onChange={e => setNewGroup(g => ({ ...g, name: e.target.value }))}
+              />
+            </label>
+            <label>上課星期
+              <WeekdayPicker
+                value={newGroup.weekdays}
+                onChange={w => setNewGroup(g => ({ ...g, weekdays: w }))}
+                disabled={saving}
+              />
+            </label>
+            <label>備註
+              <input
+                type="text"
+                placeholder="（選填）"
+                value={newGroup.note}
+                onChange={e => setNewGroup(g => ({ ...g, note: e.target.value }))}
+                className="note-input"
+              />
+            </label>
+          </div>
           <button className="btn-primary" type="submit" disabled={saving || !newGroup.name.trim()}>新增團課</button>
         </form>
 
