@@ -46,9 +46,16 @@ export async function initSchema() {
   `)
 
   // Migration: add hourly_rate to existing courses table if missing
-  await pool.query(`
-    ALTER TABLE courses ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0
-  `)
+  // (MySQL does not support ALTER TABLE ... ADD COLUMN IF NOT EXISTS)
+  const [cols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'courses' AND COLUMN_NAME = 'hourly_rate'`
+  )
+  if (cols.length === 0) {
+    await pool.query(
+      `ALTER TABLE courses ADD COLUMN hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0`
+    )
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS lesson_records (
