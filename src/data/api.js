@@ -1,10 +1,33 @@
 const API_BASE = '/api'
+const TOKEN_KEY = 'tuition_calc.auth_token'
+
+let onUnauthorized = null
+export function setOnUnauthorized(fn) { onUnauthorized = fn }
+
+export function getToken() {
+  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
+}
+export function setToken(token) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token)
+    else localStorage.removeItem(TOKEN_KEY)
+  } catch { /* ignore storage errors */ }
+}
+export function clearToken() { setToken(null) }
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+  const token = getToken()
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  }
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  if (res.status === 401) {
+    clearToken()
+    if (onUnauthorized) onUnauthorized()
+    throw new Error(`API ${options.method || 'GET'} ${path} failed: 401`)
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`API ${options.method || 'GET'} ${path} failed: ${res.status} ${text}`)
@@ -12,6 +35,36 @@ async function request(path, options = {}) {
   if (res.status === 204) return null
   return res.json()
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export async function apiLogin(username, password) {
+  const res = await fetch(`${API_BASE}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`login failed: ${res.status} ${text}`)
+  }
+  const data = await res.json()
+  if (data?.token) setToken(data.token)
+  return data
+}
+
+export async function apiLogout() {
+  try { await request('/logout', { method: 'POST' }) } catch { /* ignore */ }
+  clearToken()
+}
+
+export const apiMe = () => request('/me')
+
+export const apiChangePassword = (current_password, new_password) =>
+  request('/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password, new_password }),
+  })
 
 // ── Students ──────────────────────────────────────────────────────────────────
 

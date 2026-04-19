@@ -101,6 +101,18 @@ export async function initSchema() {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id             VARCHAR(64)  NOT NULL PRIMARY KEY,
+      username       VARCHAR(64)  NOT NULL UNIQUE,
+      password_hash  VARCHAR(120) NOT NULL,
+      role           VARCHAR(16)  NOT NULL DEFAULT 'teacher',
+      must_change    TINYINT(1)   NOT NULL DEFAULT 0,
+      created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS material_records (
       id           VARCHAR(64)    NOT NULL PRIMARY KEY,
       student_id   VARCHAR(64)    NOT NULL,
@@ -116,6 +128,44 @@ export async function initSchema() {
       INDEX idx_mr_student (student_id, record_date)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+}
+
+// ── Users ────────────────────────────────────────────────────────────────────
+
+export async function getUserByUsername(username) {
+  const [rows] = await pool.query(
+    'SELECT id, username, password_hash, role, must_change FROM users WHERE username = ?',
+    [username]
+  )
+  return rows[0] || null
+}
+
+export async function getUserById(id) {
+  const [rows] = await pool.query(
+    'SELECT id, username, role, must_change FROM users WHERE id = ?',
+    [id]
+  )
+  return rows[0] || null
+}
+
+export async function countUsers() {
+  const [rows] = await pool.query('SELECT COUNT(*) AS n FROM users')
+  return Number(rows[0]?.n ?? 0)
+}
+
+export async function insertUser({ id, username, passwordHash, role, mustChange }) {
+  await pool.query(
+    'INSERT INTO users (id, username, password_hash, role, must_change) VALUES (?, ?, ?, ?, ?)',
+    [id, username, passwordHash, role || 'teacher', mustChange ? 1 : 0]
+  )
+}
+
+export async function updateUserPassword(id, passwordHash) {
+  const [res] = await pool.query(
+    'UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?',
+    [passwordHash, id]
+  )
+  return res.affectedRows > 0
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────

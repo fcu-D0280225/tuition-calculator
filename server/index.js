@@ -15,6 +15,7 @@ import {
   // settlement
   settlementTuition, settlementSalary,
 } from './db.js'
+import { ensureBootstrapUser, mountAuth, requireAuth } from './auth.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
 
@@ -28,6 +29,7 @@ function normalizeName(raw) {
 }
 
 await initSchema()
+await ensureBootstrapUser()
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
@@ -35,6 +37,13 @@ app.use(express.json({ limit: '2mb' }))
 // ── Health ────────────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
+
+// ── Auth (login / logout / me / change-password) ─────────────────────────────
+
+mountAuth(app)
+
+// Everything below requires a valid JWT.
+app.use('/api', requireAuth)
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
