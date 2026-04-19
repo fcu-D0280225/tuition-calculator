@@ -119,12 +119,13 @@ export async function initSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`groups\` (
-      id          VARCHAR(64)   NOT NULL PRIMARY KEY,
-      name        VARCHAR(128)  NOT NULL,
-      weekdays    VARCHAR(15)   NOT NULL DEFAULT '',
-      note        VARCHAR(256)  NOT NULL DEFAULT '',
-      created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      id               VARCHAR(64)   NOT NULL PRIMARY KEY,
+      name             VARCHAR(128)  NOT NULL,
+      weekdays         VARCHAR(15)   NOT NULL DEFAULT '',
+      duration_months  TINYINT       NOT NULL DEFAULT 0,
+      note             VARCHAR(256)  NOT NULL DEFAULT '',
+      created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_groups_name (name)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
@@ -157,6 +158,15 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE group_records ADD COLUMN student_id VARCHAR(64) NOT NULL AFTER group_id`)
     await pool.query(`ALTER TABLE group_records ADD CONSTRAINT fk_gr_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE`)
     await pool.query(`ALTER TABLE group_records ADD INDEX idx_gr_student (student_id, record_date)`)
+  }
+
+  // Migration: add duration_months to existing groups table if missing
+  const [gDurCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'duration_months'`
+  )
+  if (gDurCols.length === 0) {
+    await pool.query(`ALTER TABLE \`groups\` ADD COLUMN duration_months TINYINT NOT NULL DEFAULT 0 AFTER weekdays`)
   }
 }
 
@@ -489,23 +499,24 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, note FROM `groups` ORDER BY created_at ASC, id ASC'
+    'SELECT id, name, weekdays, duration_months, note FROM `groups` ORDER BY created_at ASC, id ASC'
   )
   return rows
 }
 
-export async function insertGroup({ id, name, weekdays, note }) {
+export async function insertGroup({ id, name, weekdays, durationMonths, note }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, note) VALUES (?, ?, ?, ?)',
-    [id, name, weekdays || '', note || '']
+    'INSERT INTO `groups` (id, name, weekdays, duration_months, note) VALUES (?, ?, ?, ?, ?)',
+    [id, name, weekdays || '', durationMonths ?? 0, note || '']
   )
 }
 
-export async function updateGroup(id, { name, weekdays, note }) {
+export async function updateGroup(id, { name, weekdays, durationMonths, note }) {
   const sets = []; const params = []
-  if (name     !== undefined) { sets.push('name = ?');     params.push(name) }
-  if (weekdays !== undefined) { sets.push('weekdays = ?'); params.push(weekdays || '') }
-  if (note     !== undefined) { sets.push('note = ?');     params.push(note || '') }
+  if (name            !== undefined) { sets.push('name = ?');             params.push(name) }
+  if (weekdays        !== undefined) { sets.push('weekdays = ?');         params.push(weekdays || '') }
+  if (durationMonths  !== undefined) { sets.push('duration_months = ?');  params.push(durationMonths) }
+  if (note            !== undefined) { sets.push('note = ?');             params.push(note || '') }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ?`, params)

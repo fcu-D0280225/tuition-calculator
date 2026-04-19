@@ -54,7 +54,7 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP  = { name: '', weekdays: '', note: '' }
+const EMPTY_GROUP  = { name: '', weekdays: '', duration_months: 0, note: '' }
 const EMPTY_RECORD = { group_id: '', student_ids: [], record_date: todayStr(), note: '' }
 
 export default function GroupsPage() {
@@ -79,7 +79,7 @@ export default function GroupsPage() {
     if (!name) return
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, note: newGroup.note })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, note: newGroup.note })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -87,7 +87,7 @@ export default function GroupsPage() {
 
   function startEdit(g) {
     setEditId(g.id)
-    setEditGroup({ name: g.name, weekdays: g.weekdays || '', note: g.note || '' })
+    setEditGroup({ name: g.name, weekdays: g.weekdays || '', duration_months: g.duration_months ?? 0, note: g.note || '' })
   }
 
   async function handleUpdateGroup(id) {
@@ -95,7 +95,7 @@ export default function GroupsPage() {
     if (!name) return
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, note: editGroup.note })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, note: editGroup.note })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -176,6 +176,18 @@ export default function GroupsPage() {
                 disabled={saving}
               />
             </label>
+            <label>持續時間
+              <select
+                value={newGroup.duration_months}
+                onChange={e => setNewGroup(g => ({ ...g, duration_months: parseInt(e.target.value, 10) }))}
+              >
+                <option value={0}>未設定</option>
+                <option value={1}>1 個月</option>
+                <option value={2}>2 個月</option>
+                <option value={3}>3 個月</option>
+                <option value={4}>4 個月</option>
+              </select>
+            </label>
             <label>備註
               <input
                 type="text"
@@ -196,7 +208,7 @@ export default function GroupsPage() {
         ) : (
           <table className="entity-table">
             <thead>
-              <tr><th>團課名稱</th><th>上課星期</th><th>備註</th><th></th></tr>
+              <tr><th>團課名稱</th><th>上課星期</th><th>持續時間</th><th>備註</th><th></th></tr>
             </thead>
             <tbody>
               {groups.map(g => (
@@ -220,6 +232,21 @@ export default function GroupsPage() {
                         disabled={saving}
                       />
                     ) : formatWeekdays(g.weekdays)}
+                  </td>
+                  <td>
+                    {editId === g.id ? (
+                      <select
+                        value={editGroup.duration_months}
+                        onChange={e => setEditGroup(eg => ({ ...eg, duration_months: parseInt(e.target.value, 10) }))}
+                        className="inline-edit-input"
+                      >
+                        <option value={0}>未設定</option>
+                        <option value={1}>1 個月</option>
+                        <option value={2}>2 個月</option>
+                        <option value={3}>3 個月</option>
+                        <option value={4}>4 個月</option>
+                      </select>
+                    ) : (g.duration_months > 0 ? `${g.duration_months} 個月` : '—')}
                   </td>
                   <td className="note-cell">
                     {editId === g.id ? (
