@@ -59,15 +59,16 @@ export async function initSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS lesson_records (
-      id           VARCHAR(64)   NOT NULL PRIMARY KEY,
-      student_id   VARCHAR(64)   NOT NULL,
-      course_id    VARCHAR(64)   NOT NULL,
-      teacher_id   VARCHAR(64)   NOT NULL,
-      hours        DECIMAL(5,2)  NOT NULL,
-      lesson_date  DATE          NOT NULL,
-      note         VARCHAR(256)  NOT NULL DEFAULT '',
-      created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      id           VARCHAR(64)    NOT NULL PRIMARY KEY,
+      student_id   VARCHAR(64)    NOT NULL,
+      course_id    VARCHAR(64)    NOT NULL,
+      teacher_id   VARCHAR(64)    NOT NULL,
+      hours        DECIMAL(5,2)   NOT NULL,
+      lesson_date  DATE           NOT NULL,
+      unit_price   DECIMAL(10,2)  NULL DEFAULT NULL,
+      note         VARCHAR(256)   NOT NULL DEFAULT '',
+      created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
       FOREIGN KEY (course_id)  REFERENCES courses(id)  ON DELETE CASCADE,
       FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
@@ -76,6 +77,17 @@ export async function initSchema() {
       INDEX idx_lesson_teacher (teacher_id, lesson_date)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  // Migration: add unit_price to existing lesson_records table if missing
+  const [lrCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_records' AND COLUMN_NAME = 'unit_price'`
+  )
+  if (lrCols.length === 0) {
+    await pool.query(
+      `ALTER TABLE lesson_records ADD COLUMN unit_price DECIMAL(10,2) NULL DEFAULT NULL`
+    )
+  }
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────
@@ -171,7 +183,8 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
     `SELECT lr.id, lr.student_id, s.name AS student_name,
             lr.course_id, c.name AS course_name,
             lr.teacher_id, t.name AS teacher_name,
-            lr.hours, lr.lesson_date, lr.note
+            lr.hours, lr.lesson_date, lr.unit_price, lr.note,
+            c.hourly_rate AS course_hourly_rate
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
@@ -183,23 +196,24 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
   return rows
 }
 
-export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, note }) {
+export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, unitPrice, note }) {
   await pool.query(
-    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, courseId, teacherId, hours, lessonDate, note || '']
+    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, unit_price, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, studentId, courseId, teacherId, hours, lessonDate, unitPrice ?? null, note || '']
   )
 }
 
-export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, note }) {
+export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, unitPrice, note }) {
   const sets = []
   const params = []
-  if (studentId !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
-  if (courseId  !== undefined) { sets.push('course_id = ?');   params.push(courseId) }
-  if (teacherId !== undefined) { sets.push('teacher_id = ?');  params.push(teacherId) }
-  if (hours     !== undefined) { sets.push('hours = ?');       params.push(hours) }
-  if (lessonDate !== undefined){ sets.push('lesson_date = ?'); params.push(lessonDate) }
-  if (note      !== undefined) { sets.push('note = ?');        params.push(note) }
+  if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
+  if (courseId   !== undefined) { sets.push('course_id = ?');   params.push(courseId) }
+  if (teacherId  !== undefined) { sets.push('teacher_id = ?');  params.push(teacherId) }
+  if (hours      !== undefined) { sets.push('hours = ?');       params.push(hours) }
+  if (lessonDate !== undefined) { sets.push('lesson_date = ?'); params.push(lessonDate) }
+  if (unitPrice  !== undefined) { sets.push('unit_price = ?');  params.push(unitPrice) }
+  if (note       !== undefined) { sets.push('note = ?');        params.push(note) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE lesson_records SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -214,52 +228,62 @@ export async function deleteLesson(id) {
 // ── Settlement ────────────────────────────────────────────────────────────────
 
 export async function settlementTuition(from, to) {
+  // 逐筆取出，讓每筆紀錄的 unit_price 覆蓋優先於課程預設
   const [rows] = await pool.query(
     `SELECT
        lr.student_id,
-       s.name         AS student_name,
+       s.name                                        AS student_name,
        lr.course_id,
-       c.name         AS course_name,
-       c.hourly_rate  AS unit_price,
-       SUM(lr.hours)  AS total_hours
+       c.name                                        AS course_name,
+       lr.hours,
+       COALESCE(lr.unit_price, c.hourly_rate)        AS unit_price
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
      WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
-     GROUP BY lr.student_id, lr.course_id, s.name, c.name, c.hourly_rate
      ORDER BY s.name ASC, c.name ASC`,
     [from, to]
   )
 
+  // 先依 student + course + unit_price 合算，再彙整
   const map = new Map()
   for (const row of rows) {
     if (!map.has(row.student_id)) {
-      map.set(row.student_id, { student_id: row.student_id, student_name: row.student_name, courses: [], total: 0 })
+      map.set(row.student_id, { student_id: row.student_id, student_name: row.student_name, courses: new Map(), total: 0 })
     }
-    const student = map.get(row.student_id)
-    const totalHours = parseFloat(row.total_hours)
-    const unitPrice  = parseFloat(row.unit_price)
-    const amount     = Math.round(totalHours * unitPrice)
-    student.courses.push({ course_id: row.course_id, course_name: row.course_name, total_hours: totalHours, unit_price: unitPrice, amount })
-    student.total += amount
+    const student  = map.get(row.student_id)
+    const key      = `${row.course_id}::${row.unit_price}`
+    if (!student.courses.has(key)) {
+      student.courses.set(key, { course_id: row.course_id, course_name: row.course_name, total_hours: 0, unit_price: parseFloat(row.unit_price), amount: 0 })
+    }
+    const entry = student.courses.get(key)
+    const h = parseFloat(row.hours)
+    entry.total_hours = Math.round((entry.total_hours + h) * 100) / 100
+    entry.amount = Math.round(entry.total_hours * entry.unit_price)
+    student.total += Math.round(h * entry.unit_price)
   }
-  return Array.from(map.values())
+
+  return Array.from(map.values()).map(s => ({
+    student_id: s.student_id,
+    student_name: s.student_name,
+    courses: Array.from(s.courses.values()),
+    total: s.total,
+  }))
 }
 
 export async function settlementSalary(from, to) {
   const [rows] = await pool.query(
     `SELECT
        lr.teacher_id,
-       t.name         AS teacher_name,
+       t.name                                        AS teacher_name,
        lr.course_id,
-       c.name         AS course_name,
-       c.hourly_rate,
-       SUM(lr.hours)  AS total_hours
+       c.name                                        AS course_name,
+       lr.hours,
+       COALESCE(lr.unit_price, c.hourly_rate)        AS hourly_rate
      FROM lesson_records lr
      JOIN teachers t ON t.id = lr.teacher_id
      JOIN courses  c ON c.id = lr.course_id
      WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
-     GROUP BY lr.teacher_id, lr.course_id, t.name, c.name, c.hourly_rate
      ORDER BY t.name ASC, c.name ASC`,
     [from, to]
   )
@@ -267,14 +291,24 @@ export async function settlementSalary(from, to) {
   const map = new Map()
   for (const row of rows) {
     if (!map.has(row.teacher_id)) {
-      map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: [], total: 0 })
+      map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: new Map(), total: 0 })
     }
-    const teacher    = map.get(row.teacher_id)
-    const totalHours = parseFloat(row.total_hours)
-    const hourlyRate = parseFloat(row.hourly_rate)
-    const amount     = Math.round(totalHours * hourlyRate)
-    teacher.courses.push({ course_id: row.course_id, course_name: row.course_name, total_hours: totalHours, hourly_rate: hourlyRate, amount })
-    teacher.total += amount
+    const teacher = map.get(row.teacher_id)
+    const key     = `${row.course_id}::${row.hourly_rate}`
+    if (!teacher.courses.has(key)) {
+      teacher.courses.set(key, { course_id: row.course_id, course_name: row.course_name, total_hours: 0, hourly_rate: parseFloat(row.hourly_rate), amount: 0 })
+    }
+    const entry = teacher.courses.get(key)
+    const h = parseFloat(row.hours)
+    entry.total_hours = Math.round((entry.total_hours + h) * 100) / 100
+    entry.amount = Math.round(entry.total_hours * entry.hourly_rate)
+    teacher.total += Math.round(h * entry.hourly_rate)
   }
-  return Array.from(map.values())
+
+  return Array.from(map.values()).map(t => ({
+    teacher_id: t.teacher_id,
+    teacher_name: t.teacher_name,
+    courses: Array.from(t.courses.values()),
+    total: t.total,
+  }))
 }
