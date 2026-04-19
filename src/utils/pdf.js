@@ -260,10 +260,7 @@ function singleSalaryHtml(teacher, period, dateStr) {
 // ── 公開 API ──────────────────────────────────────────────────────────────────
 
 /**
- * 下載學費 PDF（彙總 + 各學生明細）
- * @param {Array} tuition — 來自 /api/settlement/tuition
- * @param {string} from
- * @param {string} to
+ * 下載學費 PDF（彙總 + 各學生明細，合併一份）
  */
 export async function generateTuitionPDF(tuition, from, to) {
   const dateStr = todayStr()
@@ -280,10 +277,21 @@ export async function generateTuitionPDF(tuition, from, to) {
 }
 
 /**
- * 下載薪資 PDF（彙總 + 各老師明細）
- * @param {Array} salary — 來自 /api/settlement/salary
- * @param {string} from
- * @param {string} to
+ * 下載單一學生學費 PDF
+ */
+export async function generateStudentTuitionPDF(student, from, to) {
+  const dateStr = todayStr()
+  const period  = periodLabel(from, to)
+  const pdf     = new jsPDF('p', 'mm', 'a4')
+
+  await appendHtmlRasterToPdf(pdf, singleTuitionHtml(student, period, dateStr), { startOnNewPage: false })
+
+  const safeName = student.student_name.replace(/[\\/:*?"<>|]/g, '_')
+  pdf.save(`學費單_${safeName}_${from}_${to}.pdf`)
+}
+
+/**
+ * 下載薪資 PDF（彙總 + 各老師明細，合併一份）
  */
 export async function generateSalaryPDF(salary, from, to) {
   const dateStr = todayStr()
@@ -297,4 +305,18 @@ export async function generateSalaryPDF(salary, from, to) {
   }
 
   pdf.save(`薪資單_${from}_${to}.pdf`)
+}
+
+/**
+ * 下載單一老師薪資 PDF
+ */
+export async function generateTeacherSalaryPDF(teacher, from, to) {
+  const dateStr = todayStr()
+  const period  = periodLabel(from, to)
+  const pdf     = new jsPDF('p', 'mm', 'a4')
+
+  await appendHtmlRasterToPdf(pdf, singleSalaryHtml(teacher, period, dateStr), { startOnNewPage: false })
+
+  const safeName = teacher.teacher_name.replace(/[\\/:*?"<>|]/g, '_')
+  pdf.save(`薪資單_${safeName}_${from}_${to}.pdf`)
 }

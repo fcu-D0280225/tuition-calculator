@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { apiSettlementTuition, apiSettlementSalary } from '../data/api.js'
-import { generateTuitionPDF, generateSalaryPDF } from '../utils/pdf.js'
+import { generateTuitionPDF, generateSalaryPDF, generateStudentTuitionPDF, generateTeacherSalaryPDF } from '../utils/pdf.js'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -20,7 +20,7 @@ export default function SettlementPage() {
   const [salary, setSalary]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
-  const [pdfLoading, setPdfLoading] = useState('')
+  const [pdfLoading, setPdfLoading] = useState('')   // 'tuition' | 'salary' | student_id | teacher_id
 
   async function handleGenerate(e) {
     e.preventDefault()
@@ -43,6 +43,20 @@ export default function SettlementPage() {
   async function handleDownloadSalary() {
     setPdfLoading('salary')
     try { await generateSalaryPDF(salary, from, to) }
+    catch (e) { alert('PDF 產生失敗：' + e.message) }
+    finally { setPdfLoading('') }
+  }
+
+  async function handleStudentPDF(student) {
+    setPdfLoading(student.student_id)
+    try { await generateStudentTuitionPDF(student, from, to) }
+    catch (e) { alert('PDF 產生失敗：' + e.message) }
+    finally { setPdfLoading('') }
+  }
+
+  async function handleTeacherPDF(teacher) {
+    setPdfLoading(teacher.teacher_id)
+    try { await generateTeacherSalaryPDF(teacher, from, to) }
     catch (e) { alert('PDF 產生失敗：' + e.message) }
     finally { setPdfLoading('') }
   }
@@ -83,7 +97,7 @@ export default function SettlementPage() {
           ) : (
             <table className="settlement-table">
               <thead>
-                <tr><th>學生</th><th>課程</th><th>總時數</th><th>單價</th><th>金額</th></tr>
+                <tr><th>學生</th><th>課程</th><th>總時數</th><th>單價</th><th>金額</th><th></th></tr>
               </thead>
               <tbody>
                 {tuition.map(student => (
@@ -95,12 +109,25 @@ export default function SettlementPage() {
                         <td className="num-cell">{c.total_hours}</td>
                         <td className="num-cell">{c.unit_price.toLocaleString()}</td>
                         <td className="num-cell">{c.amount.toLocaleString()}</td>
+                        {i === 0 && (
+                          <td rowSpan={student.courses.length} style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+                            <button
+                              className="btn-sm"
+                              onClick={() => handleStudentPDF(student)}
+                              disabled={!!pdfLoading}
+                              title={`下載 ${student.student_name} 學費單 PDF`}
+                            >
+                              {pdfLoading === student.student_id ? '…' : 'PDF'}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr className="subtotal-row" key={`${student.student_id}-total`}>
                       <td colSpan={3}></td>
                       <td className="subtotal-label">小計</td>
                       <td className="num-cell subtotal-amount">{student.total.toLocaleString()}</td>
+                      <td></td>
                     </tr>
                   </>
                 ))}
@@ -109,6 +136,7 @@ export default function SettlementPage() {
                   <td className="num-cell grand-total-amount">
                     {tuition.reduce((sum, s) => sum + s.total, 0).toLocaleString()}
                   </td>
+                  <td></td>
                 </tr>
               </tbody>
             </table>
@@ -130,7 +158,7 @@ export default function SettlementPage() {
           ) : (
             <table className="settlement-table">
               <thead>
-                <tr><th>老師</th><th>課程</th><th>總時數</th><th>時薪</th><th>金額</th></tr>
+                <tr><th>老師</th><th>課程</th><th>總時數</th><th>時薪</th><th>金額</th><th></th></tr>
               </thead>
               <tbody>
                 {salary.map(teacher => (
@@ -142,12 +170,25 @@ export default function SettlementPage() {
                         <td className="num-cell">{c.total_hours}</td>
                         <td className="num-cell">{c.hourly_rate.toLocaleString()}</td>
                         <td className="num-cell">{c.amount.toLocaleString()}</td>
+                        {i === 0 && (
+                          <td rowSpan={teacher.courses.length} style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+                            <button
+                              className="btn-sm"
+                              onClick={() => handleTeacherPDF(teacher)}
+                              disabled={!!pdfLoading}
+                              title={`下載 ${teacher.teacher_name} 薪資單 PDF`}
+                            >
+                              {pdfLoading === teacher.teacher_id ? '…' : 'PDF'}
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr className="subtotal-row" key={`${teacher.teacher_id}-total`}>
                       <td colSpan={3}></td>
                       <td className="subtotal-label">小計</td>
                       <td className="num-cell subtotal-amount">{teacher.total.toLocaleString()}</td>
+                      <td></td>
                     </tr>
                   </>
                 ))}
@@ -156,6 +197,7 @@ export default function SettlementPage() {
                   <td className="num-cell grand-total-amount">
                     {salary.reduce((sum, t) => sum + t.total, 0).toLocaleString()}
                   </td>
+                  <td></td>
                 </tr>
               </tbody>
             </table>
