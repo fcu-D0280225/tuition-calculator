@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
 import CoursesPage       from './pages/CoursesPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
@@ -6,141 +6,101 @@ import TeachersPage      from './pages/TeachersPage.jsx'
 import LessonRecordsPage from './pages/LessonRecordsPage.jsx'
 import SettlementPage    from './pages/SettlementPage.jsx'
 import MaterialsPage     from './pages/MaterialsPage.jsx'
-import LoginPage from './components/LoginPage.jsx'
-import ChangePasswordDialog from './components/ChangePasswordDialog.jsx'
-import { apiLogout, apiMe, clearToken, getToken, setOnUnauthorized } from './data/api.js'
+import GroupsPage        from './pages/GroupsPage.jsx'
 
-const TABS = [
-  { id: 'lessons',    label: '上課紀錄' },
-  { id: 'settlement', label: '結算'     },
-  { id: 'students',   label: '學生'     },
-  { id: 'teachers',   label: '老師'     },
-  { id: 'courses',    label: '課程'     },
-  { id: 'materials',  label: '教材'     },
+const NAV = [
+  { type: 'group', key: 'courses', label: '課程', children: [
+    { id: 'courses', label: '家教課' },
+    { id: 'groups',  label: '團課' },
+  ]},
+  { type: 'group', key: 'records', label: '紀錄', children: [
+    { id: 'lessons',   label: '上課紀錄' },
+    { id: 'materials', label: '教材' },
+  ]},
+  { type: 'tab', id: 'settlement', label: '結算' },
+  { type: 'group', key: 'people', label: '人員', children: [
+    { id: 'students', label: '學生' },
+    { id: 'teachers', label: '老師' },
+  ]},
 ]
 
-function AppShell({ user, onLogout, onChangePassword }) {
-  const [tab, setTab] = useState('lessons')
-  const [menuOpen, setMenuOpen] = useState(false)
+function NavGroup({ label, children, currentTab, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const activeChild = children.find(c => c.id === currentTab)
+
+  useEffect(() => {
+    if (!open) return
+    function onDocClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
 
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="app-title">補習班管理系統</div>
-        <nav className="app-nav">
-          {TABS.map(t => (
+    <div className="nav-group" ref={ref}>
+      <button
+        type="button"
+        className={`nav-tab ${activeChild ? 'active' : ''}`}
+        onClick={() => setOpen(v => !v)}
+      >
+        {label} ▾
+      </button>
+      {open && (
+        <div className="nav-group-menu">
+          {children.map(c => (
             <button
-              key={t.id}
-              className={`nav-tab ${tab === t.id ? 'active' : ''}`}
-              onClick={() => setTab(t.id)}
+              key={c.id}
+              type="button"
+              className={`nav-group-item ${currentTab === c.id ? 'active' : ''}`}
+              onClick={() => { onSelect(c.id); setOpen(false) }}
             >
-              {t.label}
+              {c.label}
             </button>
           ))}
-        </nav>
-        <div className="app-user">
-          <button
-            type="button"
-            className="app-user-btn"
-            onClick={() => setMenuOpen(v => !v)}
-          >
-            {user.username}{user.role === 'admin' ? '（管理員）' : ''} ▾
-          </button>
-          {menuOpen && (
-            <div className="app-user-menu" onMouseLeave={() => setMenuOpen(false)}>
-              <button type="button" onClick={() => { setMenuOpen(false); onChangePassword() }}>變更密碼</button>
-              <button type="button" onClick={() => { setMenuOpen(false); onLogout() }}>登出</button>
-            </div>
-          )}
         </div>
-      </header>
-      <main className="app-main">
-        {tab === 'lessons'    && <LessonRecordsPage />}
-        {tab === 'settlement' && <SettlementPage />}
-        {tab === 'students'   && <StudentsPage />}
-        {tab === 'teachers'   && <TeachersPage />}
-        {tab === 'courses'    && <CoursesPage />}
-        {tab === 'materials'  && <MaterialsPage />}
-      </main>
+      )}
     </div>
   )
 }
 
 export default function App() {
-  const [authState, setAuthState] = useState('loading') // 'loading' | 'out' | 'in'
-  const [user, setUser] = useState(null)
-  const [showChangePassword, setShowChangePassword] = useState(false)
+  const [tab, setTab] = useState('lessons')
 
-  useEffect(() => {
-    setOnUnauthorized(() => {
-      clearToken()
-      setUser(null)
-      setAuthState('out')
-      setShowChangePassword(false)
-    })
-
-    let cancelled = false
-    async function bootstrap() {
-      if (!getToken()) { setAuthState('out'); return }
-      try {
-        const me = await apiMe()
-        if (cancelled) return
-        setUser(me)
-        setAuthState('in')
-        if (me.must_change) setShowChangePassword(true)
-      } catch {
-        if (cancelled) return
-        clearToken()
-        setAuthState('out')
-      }
-    }
-    bootstrap()
-    return () => { cancelled = true }
-  }, [])
-
-  async function handleLogout() {
-    await apiLogout()
-    setUser(null)
-    setAuthState('out')
-    setShowChangePassword(false)
-  }
-
-  function handleLoggedIn(me) {
-    setUser(me)
-    setAuthState('in')
-    if (me?.must_change) setShowChangePassword(true)
-  }
-
-  async function handleChangePasswordDone() {
-    setShowChangePassword(false)
-    try {
-      const me = await apiMe()
-      setUser(me)
-    } catch { /* 401 handled by interceptor */ }
-  }
-
-  if (authState === 'loading') {
-    return <div className="app--loading">載入中…</div>
-  }
-  if (authState === 'out') {
-    return <LoginPage onLoggedIn={handleLoggedIn} />
-  }
-  if (showChangePassword && user?.must_change) {
-    return <ChangePasswordDialog forced onDone={handleChangePasswordDone} />
-  }
   return (
     <AppProviders>
-      <AppShell
-        user={user}
-        onLogout={handleLogout}
-        onChangePassword={() => setShowChangePassword(true)}
-      />
-      {showChangePassword && !user?.must_change && (
-        <ChangePasswordDialog
-          onDone={handleChangePasswordDone}
-          onCancel={() => setShowChangePassword(false)}
-        />
-      )}
+      <div className="app-shell">
+        <header className="app-header">
+          <div className="app-title">補習班管理系統</div>
+          <nav className="app-nav">
+            {NAV.map(item => item.type === 'group' ? (
+              <NavGroup
+                key={item.key}
+                label={item.label}
+                children={item.children}
+                currentTab={tab}
+                onSelect={setTab}
+              />
+            ) : (
+              <button
+                key={item.id}
+                className={`nav-tab ${tab === item.id ? 'active' : ''}`}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </header>
+        <main className="app-main">
+          {tab === 'lessons'    && <LessonRecordsPage />}
+          {tab === 'settlement' && <SettlementPage />}
+          {tab === 'students'   && <StudentsPage />}
+          {tab === 'teachers'   && <TeachersPage />}
+          {tab === 'courses'    && <CoursesPage />}
+          {tab === 'materials'  && <MaterialsPage />}
+          {tab === 'groups'     && <GroupsPage />}
+        </main>
+      </div>
     </AppProviders>
   )
 }

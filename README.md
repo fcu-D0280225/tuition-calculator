@@ -32,6 +32,4 @@ npm run build
 
 ## 待辦
 
-- `AUTH-001` 新增 Express 後端 + JWT 登入系統（保護學生資料）
-
 詳見 [backlog](https://github.com/fcu-D0280225/claude-cron/blob/main/backlog/autonomous-tasks.md)。

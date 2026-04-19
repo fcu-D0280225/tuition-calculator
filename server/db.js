@@ -101,18 +101,6 @@ export async function initSchema() {
   `)
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id             VARCHAR(64)  NOT NULL PRIMARY KEY,
-      username       VARCHAR(64)  NOT NULL UNIQUE,
-      password_hash  VARCHAR(120) NOT NULL,
-      role           VARCHAR(16)  NOT NULL DEFAULT 'teacher',
-      must_change    TINYINT(1)   NOT NULL DEFAULT 0,
-      created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-  `)
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS material_records (
       id           VARCHAR(64)    NOT NULL PRIMARY KEY,
       student_id   VARCHAR(64)    NOT NULL,
@@ -128,44 +116,48 @@ export async function initSchema() {
       INDEX idx_mr_student (student_id, record_date)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
-}
 
-// ── Users ────────────────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS \`groups\` (
+      id          VARCHAR(64)   NOT NULL PRIMARY KEY,
+      name        VARCHAR(128)  NOT NULL,
+      weekdays    VARCHAR(15)   NOT NULL DEFAULT '',
+      note        VARCHAR(256)  NOT NULL DEFAULT '',
+      created_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_groups_name (name)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
 
-export async function getUserByUsername(username) {
-  const [rows] = await pool.query(
-    'SELECT id, username, password_hash, role, must_change FROM users WHERE username = ?',
-    [username]
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS group_records (
+      id           VARCHAR(64)   NOT NULL PRIMARY KEY,
+      group_id     VARCHAR(64)   NOT NULL,
+      student_id   VARCHAR(64)   NOT NULL,
+      record_date  DATE          NOT NULL,
+      note         VARCHAR(256)  NOT NULL DEFAULT '',
+      created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id)   REFERENCES \`groups\`(id)  ON DELETE CASCADE,
+      FOREIGN KEY (student_id) REFERENCES students(id)   ON DELETE CASCADE,
+      INDEX idx_gr_date    (record_date),
+      INDEX idx_gr_group   (group_id, record_date),
+      INDEX idx_gr_student (student_id, record_date)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  // Migration: add student_id to existing group_records table if missing
+  const [grCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'group_records' AND COLUMN_NAME = 'student_id'`
   )
-  return rows[0] || null
-}
-
-export async function getUserById(id) {
-  const [rows] = await pool.query(
-    'SELECT id, username, role, must_change FROM users WHERE id = ?',
-    [id]
-  )
-  return rows[0] || null
-}
-
-export async function countUsers() {
-  const [rows] = await pool.query('SELECT COUNT(*) AS n FROM users')
-  return Number(rows[0]?.n ?? 0)
-}
-
-export async function insertUser({ id, username, passwordHash, role, mustChange }) {
-  await pool.query(
-    'INSERT INTO users (id, username, password_hash, role, must_change) VALUES (?, ?, ?, ?, ?)',
-    [id, username, passwordHash, role || 'teacher', mustChange ? 1 : 0]
-  )
-}
-
-export async function updateUserPassword(id, passwordHash) {
-  const [res] = await pool.query(
-    'UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?',
-    [passwordHash, id]
-  )
-  return res.affectedRows > 0
+  if (grCols.length === 0) {
+    // Existing rows would lack a student → drop them; this table only landed in the previous schema bump.
+    await pool.query(`DELETE FROM group_records`)
+    await pool.query(`ALTER TABLE group_records ADD COLUMN student_id VARCHAR(64) NOT NULL AFTER group_id`)
+    await pool.query(`ALTER TABLE group_records ADD CONSTRAINT fk_gr_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE`)
+    await pool.query(`ALTER TABLE group_records ADD INDEX idx_gr_student (student_id, record_date)`)
+  }
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────
@@ -490,5 +482,85 @@ export async function updateMaterialRecord(id, { studentId, materialId, quantity
 
 export async function deleteMaterialRecord(id) {
   const [res] = await pool.query('DELETE FROM material_records WHERE id = ?', [id])
+  return res.affectedRows > 0
+}
+
+// ── Groups ───────────────────────────────────────────────────────────────────
+
+export async function listGroups() {
+  const [rows] = await pool.query(
+    'SELECT id, name, weekdays, note FROM `groups` ORDER BY created_at ASC, id ASC'
+  )
+  return rows
+}
+
+export async function insertGroup({ id, name, weekdays, note }) {
+  await pool.query(
+    'INSERT INTO `groups` (id, name, weekdays, note) VALUES (?, ?, ?, ?)',
+    [id, name, weekdays || '', note || '']
+  )
+}
+
+export async function updateGroup(id, { name, weekdays, note }) {
+  const sets = []; const params = []
+  if (name     !== undefined) { sets.push('name = ?');     params.push(name) }
+  if (weekdays !== undefined) { sets.push('weekdays = ?'); params.push(weekdays || '') }
+  if (note     !== undefined) { sets.push('note = ?');     params.push(note || '') }
+  if (!sets.length) return false
+  params.push(id)
+  const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ?`, params)
+  return res.affectedRows > 0
+}
+
+export async function deleteGroup(id) {
+  const [res] = await pool.query('DELETE FROM `groups` WHERE id = ?', [id])
+  return res.affectedRows > 0
+}
+
+// ── Group Records ────────────────────────────────────────────────────────────
+
+export async function listGroupRecords({ from, to, groupId, studentId } = {}) {
+  const conditions = []; const params = []
+  if (from)      { conditions.push('gr.record_date >= ?'); params.push(from) }
+  if (to)        { conditions.push('gr.record_date <= ?'); params.push(to) }
+  if (groupId)   { conditions.push('gr.group_id = ?');     params.push(groupId) }
+  if (studentId) { conditions.push('gr.student_id = ?');   params.push(studentId) }
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+  const [rows] = await pool.query(
+    `SELECT gr.id, gr.group_id, g.name AS group_name,
+            gr.student_id, s.name AS student_name,
+            gr.record_date, gr.note
+     FROM group_records gr
+     JOIN \`groups\`  g ON g.id = gr.group_id
+     JOIN students   s ON s.id = gr.student_id
+     ${where}
+     ORDER BY gr.record_date DESC, gr.created_at DESC`,
+    params
+  )
+  return rows
+}
+
+export async function insertGroupRecord({ id, groupId, studentId, recordDate, note }) {
+  await pool.query(
+    `INSERT INTO group_records (id, group_id, student_id, record_date, note)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, groupId, studentId, recordDate, note || '']
+  )
+}
+
+export async function updateGroupRecord(id, { groupId, studentId, recordDate, note }) {
+  const sets = []; const params = []
+  if (groupId    !== undefined) { sets.push('group_id = ?');    params.push(groupId) }
+  if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
+  if (recordDate !== undefined) { sets.push('record_date = ?'); params.push(recordDate) }
+  if (note       !== undefined) { sets.push('note = ?');        params.push(note || '') }
+  if (!sets.length) return false
+  params.push(id)
+  const [res] = await pool.query(`UPDATE group_records SET ${sets.join(', ')} WHERE id = ?`, params)
+  return res.affectedRows > 0
+}
+
+export async function deleteGroupRecord(id) {
+  const [res] = await pool.query('DELETE FROM group_records WHERE id = ?', [id])
   return res.affectedRows > 0
 }

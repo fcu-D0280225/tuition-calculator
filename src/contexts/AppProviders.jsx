@@ -3,6 +3,7 @@ import { TeachersProvider } from './TeachersContext.jsx'
 import { CoursesProvider } from './CoursesContext.jsx'
 import { LessonsProvider } from './LessonsContext.jsx'
 import { MaterialsProvider } from './MaterialsContext.jsx'
+import { GroupsProvider } from './GroupsContext.jsx'
 
 export function AppProviders({ children }) {
   return (
@@ -11,7 +12,9 @@ export function AppProviders({ children }) {
         <CoursesProvider>
           <LessonsProvider>
             <MaterialsProvider>
-              {children}
+              <GroupsProvider>
+                {children}
+              </GroupsProvider>
             </MaterialsProvider>
           </LessonsProvider>
         </CoursesProvider>

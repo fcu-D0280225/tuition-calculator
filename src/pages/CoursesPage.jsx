@@ -38,23 +38,23 @@ export default function CoursesPage() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('確定要刪除此課程？（若有上課紀錄使用此課程，刪除將失敗）')) return
+    if (!window.confirm('確定要刪除此家教課？（若有上課紀錄使用此家教課，刪除將失敗）')) return
     setSaving(true); setError('')
     try { await removeCourse(id) }
-    catch (e) { setError(e.message.includes('foreign key') ? '此課程有關聯資料，無法刪除' : '刪除失敗') }
+    catch (e) { setError(e.message.includes('foreign key') ? '此家教課有關聯資料，無法刪除' : '刪除失敗') }
     finally { setSaving(false) }
   }
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>課程目錄</h1>
+        <h1>家教課目錄</h1>
       </div>
 
       <form className="add-form" onSubmit={handleAdd}>
         <input
           className="add-input"
-          placeholder="課程名稱（如：國中英文）"
+          placeholder="家教課名稱（如：國中英文）"
           value={newName}
           onChange={e => setNewName(e.target.value)}
         />
@@ -68,7 +68,7 @@ export default function CoursesPage() {
           value={newRate}
           onChange={e => setNewRate(e.target.value)}
         />
-        <button className="btn-primary" type="submit" disabled={saving || !newName.trim()}>新增課程</button>
+        <button className="btn-primary" type="submit" disabled={saving || !newName.trim()}>新增家教課</button>
       </form>
 
       {error && <div className="error-msg">{error}</div>}
@@ -76,11 +76,11 @@ export default function CoursesPage() {
       {loading ? (
         <div className="loading">載入中⋯</div>
       ) : courses.length === 0 ? (
-        <div className="empty-hint">尚未新增任何課程</div>
+        <div className="empty-hint">尚未新增任何家教課</div>
       ) : (
         <table className="entity-table">
           <thead>
-            <tr><th>課程名稱</th><th>時薪（元/小時）</th><th></th></tr>
+            <tr><th>家教課名稱</th><th>時薪（元/小時）</th><th></th></tr>
           </thead>
           <tbody>
             {courses.map(c => (

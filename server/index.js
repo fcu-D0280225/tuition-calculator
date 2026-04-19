@@ -12,10 +12,12 @@ import {
   // materials
   listMaterials, insertMaterial, updateMaterial, deleteMaterial,
   listMaterialRecords, insertMaterialRecord, updateMaterialRecord, deleteMaterialRecord,
+  // groups
+  listGroups, insertGroup, updateGroup, deleteGroup,
+  listGroupRecords, insertGroupRecord, updateGroupRecord, deleteGroupRecord,
   // settlement
   settlementTuition, settlementSalary,
 } from './db.js'
-import { ensureBootstrapUser, mountAuth, requireAuth } from './auth.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
 
@@ -29,7 +31,6 @@ function normalizeName(raw) {
 }
 
 await initSchema()
-await ensureBootstrapUser()
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
@@ -37,13 +38,6 @@ app.use(express.json({ limit: '2mb' }))
 // ── Health ────────────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
-
-// ── Auth (login / logout / me / change-password) ─────────────────────────────
-
-mountAuth(app)
-
-// Everything below requires a valid JWT.
-app.use('/api', requireAuth)
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
@@ -292,6 +286,116 @@ app.patch('/api/material-records/:id', async (req, res) => {
 app.delete('/api/material-records/:id', async (req, res) => {
   try {
     const ok = await deleteMaterialRecord(req.params.id)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+function normalizeWeekdays(raw) {
+  if (raw === undefined || raw === null) return ''
+  const arr = Array.isArray(raw)
+    ? raw
+    : String(raw).split(',').map(s => s.trim()).filter(Boolean)
+  const cleaned = []
+  const seen = new Set()
+  for (const v of arr) {
+    const n = parseInt(v, 10)
+    if (!Number.isInteger(n) || n < 0 || n > 6) return null
+    if (seen.has(n)) continue
+    seen.add(n)
+    cleaned.push(n)
+  }
+  cleaned.sort((a, b) => a - b)
+  return cleaned.join(',')
+}
+
+app.get('/api/groups', async (_req, res) => {
+  try { res.json(await listGroups()) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.post('/api/groups', async (req, res) => {
+  const name = normalizeName(req.body?.name)
+  if (!name) return res.status(400).json({ error: 'name_required' })
+  const weekdays = normalizeWeekdays(req.body?.weekdays)
+  if (weekdays === null) return res.status(400).json({ error: 'invalid_weekdays' })
+  const note = typeof req.body?.note === 'string' ? req.body.note : ''
+  const id = genId('gr')
+  try {
+    await insertGroup({ id, name, weekdays, note })
+    res.status(201).json({ id, name, weekdays, note })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.patch('/api/groups/:id', async (req, res) => {
+  const update = {}
+  if (req.body?.name !== undefined) {
+    const name = normalizeName(req.body.name)
+    if (!name) return res.status(400).json({ error: 'name_required' })
+    update.name = name
+  }
+  if (req.body?.weekdays !== undefined) {
+    const weekdays = normalizeWeekdays(req.body.weekdays)
+    if (weekdays === null) return res.status(400).json({ error: 'invalid_weekdays' })
+    update.weekdays = weekdays
+  }
+  if (req.body?.note !== undefined) {
+    update.note = typeof req.body.note === 'string' ? req.body.note : ''
+  }
+  if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
+  try {
+    const ok = await updateGroup(req.params.id, update)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.json({ id: req.params.id, ...update })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.delete('/api/groups/:id', async (req, res) => {
+  try {
+    const ok = await deleteGroup(req.params.id)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Group Records ─────────────────────────────────────────────────────────────
+
+app.get('/api/group-records', async (req, res) => {
+  const { from, to, group_id, student_id } = req.query
+  try { res.json(await listGroupRecords({ from, to, groupId: group_id, studentId: student_id })) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.post('/api/group-records', async (req, res) => {
+  const { group_id, student_id, record_date, note } = req.body || {}
+  if (!group_id || !student_id) return res.status(400).json({ error: 'group_id_and_student_id_required' })
+  if (!record_date || !/^\d{4}-\d{2}-\d{2}$/.test(record_date)) return res.status(400).json({ error: 'invalid_record_date' })
+  const id = genId('grr')
+  try {
+    await insertGroupRecord({ id, groupId: group_id, studentId: student_id, recordDate: record_date, note })
+    res.status(201).json({ id, group_id, student_id, record_date, note: note || '' })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.patch('/api/group-records/:id', async (req, res) => {
+  const { group_id, student_id, record_date, note } = req.body || {}
+  const update = {}
+  if (group_id    !== undefined) update.groupId    = group_id
+  if (student_id  !== undefined) update.studentId  = student_id
+  if (record_date !== undefined) update.recordDate = record_date
+  if (note        !== undefined) update.note       = note
+  try {
+    const ok = await updateGroupRecord(req.params.id, update)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.json({ id: req.params.id, ...req.body })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.delete('/api/group-records/:id', async (req, res) => {
+  try {
+    const ok = await deleteGroupRecord(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }

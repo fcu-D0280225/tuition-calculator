@@ -2,17 +2,6 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-.app--loading {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #555;
-  font-size: 16px;
-}
-
 .app-loading-retry {
   padding: 8px 16px;
   border: 1px solid #bbb;
@@ -2293,6 +2282,46 @@ select.catalog-input.catalog-select {
   border-color: var(--accent);
 }
 
+.nav-group {
+  position: relative;
+  display: inline-block;
+}
+
+.nav-group-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+}
+
+.nav-group-item {
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.nav-group-item:hover { background: var(--bg); }
+
+.nav-group-item.active {
+  background: var(--accent);
+  color: white;
+}
+
 .app-main {
   flex: 1;
   padding: var(--space-6) var(--space-4);
@@ -2805,150 +2834,74 @@ select.catalog-input.catalog-select {
 .grand-total-label  { text-align: right; }
 .grand-total-amount { font-size: 15px; font-weight: 800; }
 
-/* ── Login / Auth ─────────────────────────────────────────────────────────── */
+/* ── Weekday picker ──────────────────────────────────────────────────────── */
 
-.login-shell {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
-  padding: 24px;
+.weekday-picker {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
-.login-card {
-  width: 100%;
-  max-width: 360px;
-  background: var(--surface);
+.weekday-chip {
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 28px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.login-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
-  text-align: center;
-}
-
-.login-subtitle {
-  font-size: 13px;
-  color: var(--muted);
-  text-align: center;
-  margin-top: -8px;
-}
-
-.login-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text);
-}
-
-.login-field input {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 14px;
+  border-radius: 50%;
   background: #fff;
-}
-
-.login-field input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.login-error {
-  background: var(--danger-light);
-  border: 1px solid var(--danger-border);
-  color: var(--danger);
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  color: var(--text);
   font-size: 13px;
-}
-
-.login-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.login-submit {
-  flex: 1;
-  padding: 10px 14px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: white;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.login-submit:hover { background: var(--accent-dark); }
-.login-submit:disabled { background: var(--disabled); cursor: not-allowed; }
-
-.login-secondary {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: #fff;
-  color: var(--text);
-  cursor: pointer;
+.weekday-chip:hover:not(:disabled) {
+  background: var(--bg);
 }
 
-.login-hint {
-  text-align: center;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 4px;
+.weekday-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
-.app-user {
-  position: relative;
-  margin-left: auto;
+.weekday-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-.app-user-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
-}
+/* ── Chip list (multi-select tags) ──────────────────────────────────────── */
 
-.app-user-btn:hover { background: var(--bg); }
-
-.app-user-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+.chip-list {
   display: flex;
-  flex-direction: column;
-  min-width: 140px;
-  z-index: 50;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
 
-.app-user-menu button {
-  padding: 8px 12px;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 10px;
+  background: var(--accent-light);
+  color: var(--accent-dark);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chip-remove {
   background: transparent;
   border: none;
-  text-align: left;
+  color: var(--accent-dark);
   cursor: pointer;
-  font-size: 13px;
-  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
 }
 
-.app-user-menu button:hover { background: var(--bg); }
+.chip-remove:hover { color: var(--danger); }

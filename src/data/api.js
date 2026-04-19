@@ -1,33 +1,11 @@
 const API_BASE = '/api'
-const TOKEN_KEY = 'tuition_calc.auth_token'
-
-let onUnauthorized = null
-export function setOnUnauthorized(fn) { onUnauthorized = fn }
-
-export function getToken() {
-  try { return localStorage.getItem(TOKEN_KEY) } catch { return null }
-}
-export function setToken(token) {
-  try {
-    if (token) localStorage.setItem(TOKEN_KEY, token)
-    else localStorage.removeItem(TOKEN_KEY)
-  } catch { /* ignore storage errors */ }
-}
-export function clearToken() { setToken(null) }
 
 async function request(path, options = {}) {
-  const token = getToken()
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   }
-  if (token) headers.Authorization = `Bearer ${token}`
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
-  if (res.status === 401) {
-    clearToken()
-    if (onUnauthorized) onUnauthorized()
-    throw new Error(`API ${options.method || 'GET'} ${path} failed: 401`)
-  }
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`API ${options.method || 'GET'} ${path} failed: ${res.status} ${text}`)
@@ -35,36 +13,6 @@ async function request(path, options = {}) {
   if (res.status === 204) return null
   return res.json()
 }
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-
-export async function apiLogin(username, password) {
-  const res = await fetch(`${API_BASE}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`login failed: ${res.status} ${text}`)
-  }
-  const data = await res.json()
-  if (data?.token) setToken(data.token)
-  return data
-}
-
-export async function apiLogout() {
-  try { await request('/logout', { method: 'POST' }) } catch { /* ignore */ }
-  clearToken()
-}
-
-export const apiMe = () => request('/me')
-
-export const apiChangePassword = (current_password, new_password) =>
-  request('/change-password', {
-    method: 'POST',
-    body: JSON.stringify({ current_password, new_password }),
-  })
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
@@ -107,6 +55,28 @@ export const apiListMaterialRecords = ({ from, to, student_id } = {}) => {
 export const apiCreateMaterialRecord = (record) => request('/material-records', { method: 'POST', body: JSON.stringify(record) })
 export const apiUpdateMaterialRecord = (id, patch) => request(`/material-records/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteMaterialRecord = (id) => request(`/material-records/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+// ── Groups ────────────────────────────────────────────────────────────────────
+
+export const apiListGroups   = ()         => request('/groups')
+export const apiCreateGroup  = (group)    => request('/groups', { method: 'POST', body: JSON.stringify(group) })
+export const apiUpdateGroup  = (id, patch) => request(`/groups/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiDeleteGroup  = (id)       => request(`/groups/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+// ── Group Records ─────────────────────────────────────────────────────────────
+
+export const apiListGroupRecords = ({ from, to, group_id, student_id } = {}) => {
+  const params = new URLSearchParams()
+  if (from)       params.set('from', from)
+  if (to)         params.set('to', to)
+  if (group_id)   params.set('group_id', group_id)
+  if (student_id) params.set('student_id', student_id)
+  const qs = params.toString()
+  return request(`/group-records${qs ? '?' + qs : ''}`)
+}
+export const apiCreateGroupRecord = (record) => request('/group-records', { method: 'POST', body: JSON.stringify(record) })
+export const apiUpdateGroupRecord = (id, patch) => request(`/group-records/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiDeleteGroupRecord = (id) => request(`/group-records/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
 // ── Lesson Records ────────────────────────────────────────────────────────────
 
