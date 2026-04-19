@@ -2530,6 +2530,61 @@ select.catalog-input.catalog-select {
   width: 160px;
 }
 
+/* ── Combobox（可輸入搜尋下拉）──────────────────────────────── */
+
+.combobox {
+  position: relative;
+  display: inline-block;
+}
+
+.combobox-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  transition: border-color 0.12s;
+  width: 100%;
+}
+.combobox-input:focus { outline: none; border-color: var(--accent); }
+
+.combobox-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.10);
+  list-style: none;
+  z-index: 200;
+  padding: 4px 0;
+}
+
+.combobox-item {
+  padding: 8px 14px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.08s;
+  white-space: nowrap;
+}
+.combobox-item:hover { background: var(--bg); }
+.combobox-item--selected { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+.combobox-item--selected:hover { background: var(--accent-light); }
+
+.combobox-empty {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: default;
+}
+
 /* ── 上課紀錄頁 ──────────────────────────────────────────────── */
 
 /* 新增表單卡片：沿用 billing-setup 卡片感 */
@@ -2612,6 +2667,9 @@ select.catalog-input.catalog-select {
 }
 .filter-bar select:focus,
 .filter-bar input:focus { outline: none; border-color: var(--accent); }
+
+.filter-bar .combobox { width: 140px; }
+.filter-bar .combobox .combobox-input { font-size: 13px; padding: 6px 10px; }
 
 /* 上課紀錄表格 */
 .lesson-table {

@@ -3,6 +3,7 @@ import { useLessons } from '../contexts/LessonsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
+import Combobox from '../components/Combobox.jsx'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -23,8 +24,8 @@ export default function LessonRecordsPage() {
   const [saving, setSaving]       = useState(false)
 
   // Filters
-  const [filterFrom, setFilterFrom]     = useState('')
-  const [filterTo, setFilterTo]         = useState('')
+  const [filterFrom, setFilterFrom]       = useState('')
+  const [filterTo, setFilterTo]           = useState('')
   const [filterStudent, setFilterStudent] = useState('')
   const [filterTeacher, setFilterTeacher] = useState('')
   const [filterCourse, setFilterCourse]   = useState('')
@@ -100,22 +101,28 @@ export default function LessonRecordsPage() {
         <form className="lesson-form" onSubmit={handleCreate}>
           <div className="lesson-form-row">
             <label>學生
-              <select value={form.student_id} onChange={e => setForm(f => ({ ...f, student_id: e.target.value }))}>
-                <option value="">— 選擇 —</option>
-                {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <Combobox
+                items={students}
+                value={form.student_id}
+                onChange={id => setForm(f => ({ ...f, student_id: id }))}
+                placeholder="搜尋學生…"
+              />
             </label>
             <label>課程
-              <select value={form.course_id} onChange={e => setForm(f => ({ ...f, course_id: e.target.value }))}>
-                <option value="">— 選擇 —</option>
-                {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <Combobox
+                items={courses}
+                value={form.course_id}
+                onChange={id => setForm(f => ({ ...f, course_id: id }))}
+                placeholder="搜尋課程…"
+              />
             </label>
             <label>老師
-              <select value={form.teacher_id} onChange={e => setForm(f => ({ ...f, teacher_id: e.target.value }))}>
-                <option value="">— 選擇 —</option>
-                {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <Combobox
+                items={teachers}
+                value={form.teacher_id}
+                onChange={id => setForm(f => ({ ...f, teacher_id: id }))}
+                placeholder="搜尋老師…"
+              />
             </label>
             <label>時數
               <input type="number" min="0.5" step="0.5" placeholder="1.5"
@@ -142,18 +149,27 @@ export default function LessonRecordsPage() {
 
       {/* 篩選 */}
       <form className="filter-bar" onSubmit={handleFilter}>
-        <select value={filterStudent} onChange={e => setFilterStudent(e.target.value)}>
-          <option value="">全部學生</option>
-          {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-        <select value={filterCourse} onChange={e => setFilterCourse(e.target.value)}>
-          <option value="">全部課程</option>
-          {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={filterTeacher} onChange={e => setFilterTeacher(e.target.value)}>
-          <option value="">全部老師</option>
-          {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <Combobox
+          items={students}
+          value={filterStudent}
+          onChange={setFilterStudent}
+          placeholder="全部學生"
+          allLabel="全部學生"
+        />
+        <Combobox
+          items={courses}
+          value={filterCourse}
+          onChange={setFilterCourse}
+          placeholder="全部課程"
+          allLabel="全部課程"
+        />
+        <Combobox
+          items={teachers}
+          value={filterTeacher}
+          onChange={setFilterTeacher}
+          placeholder="全部老師"
+          allLabel="全部老師"
+        />
         <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} title="開始日期" />
         <span>—</span>
         <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} title="結束日期" />
@@ -186,19 +202,28 @@ export default function LessonRecordsPage() {
                   <>
                     <td><input type="date" value={editForm.lesson_date} onChange={e => setEditForm(f => ({ ...f, lesson_date: e.target.value }))} /></td>
                     <td>
-                      <select value={editForm.student_id} onChange={e => setEditForm(f => ({ ...f, student_id: e.target.value }))}>
-                        {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
+                      <Combobox
+                        items={students}
+                        value={editForm.student_id}
+                        onChange={id => setEditForm(f => ({ ...f, student_id: id }))}
+                        placeholder="搜尋學生…"
+                      />
                     </td>
                     <td>
-                      <select value={editForm.course_id} onChange={e => setEditForm(f => ({ ...f, course_id: e.target.value }))}>
-                        {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
+                      <Combobox
+                        items={courses}
+                        value={editForm.course_id}
+                        onChange={id => setEditForm(f => ({ ...f, course_id: id }))}
+                        placeholder="搜尋課程…"
+                      />
                     </td>
                     <td>
-                      <select value={editForm.teacher_id} onChange={e => setEditForm(f => ({ ...f, teacher_id: e.target.value }))}>
-                        {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
+                      <Combobox
+                        items={teachers}
+                        value={editForm.teacher_id}
+                        onChange={id => setEditForm(f => ({ ...f, teacher_id: id }))}
+                        placeholder="搜尋老師…"
+                      />
                     </td>
                     <td><input type="number" min="0.5" step="0.5" value={editForm.hours} onChange={e => setEditForm(f => ({ ...f, hours: e.target.value }))} className="hours-input" /></td>
                     <td><input type="text" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} /></td>
