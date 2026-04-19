@@ -20,12 +20,6 @@ export const apiCreateStudent   = (name)       => request('/students', { method:
 export const apiRenameStudent   = (id, name)   => request(`/students/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 export const apiDeleteStudent   = (id)         => request(`/students/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
-// ── Student prices ────────────────────────────────────────────────────────────
-
-export const apiListStudentPrices    = (studentId)              => request(`/students/${encodeURIComponent(studentId)}/prices`)
-export const apiSetStudentPrice      = (studentId, courseId, unit_price) => request(`/students/${encodeURIComponent(studentId)}/prices/${encodeURIComponent(courseId)}`, { method: 'PUT', body: JSON.stringify({ unit_price }) })
-export const apiDeleteStudentPrice   = (studentId, courseId)    => request(`/students/${encodeURIComponent(studentId)}/prices/${encodeURIComponent(courseId)}`, { method: 'DELETE' })
-
 // ── Teachers ──────────────────────────────────────────────────────────────────
 
 export const apiListTeachers    = ()           => request('/teachers')
@@ -33,18 +27,12 @@ export const apiCreateTeacher   = (name)       => request('/teachers', { method:
 export const apiRenameTeacher   = (id, name)   => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 export const apiDeleteTeacher   = (id)         => request(`/teachers/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
-// ── Teacher rates ─────────────────────────────────────────────────────────────
-
-export const apiListTeacherRates     = (teacherId)              => request(`/teachers/${encodeURIComponent(teacherId)}/rates`)
-export const apiSetTeacherRate       = (teacherId, courseId, hourly_rate) => request(`/teachers/${encodeURIComponent(teacherId)}/rates/${encodeURIComponent(courseId)}`, { method: 'PUT', body: JSON.stringify({ hourly_rate }) })
-export const apiDeleteTeacherRate    = (teacherId, courseId)    => request(`/teachers/${encodeURIComponent(teacherId)}/rates/${encodeURIComponent(courseId)}`, { method: 'DELETE' })
-
 // ── Courses ───────────────────────────────────────────────────────────────────
 
-export const apiListCourses     = ()           => request('/courses')
-export const apiCreateCourse    = (name)       => request('/courses', { method: 'POST', body: JSON.stringify({ name }) })
-export const apiRenameCourse    = (id, name)   => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-export const apiDeleteCourse    = (id)         => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiListCourses     = ()                        => request('/courses')
+export const apiCreateCourse    = (name, hourly_rate = 0)  => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate }) })
+export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
 // ── Lesson Records ────────────────────────────────────────────────────────────
 

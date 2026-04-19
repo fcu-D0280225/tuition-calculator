@@ -17,14 +17,12 @@
 |---|-------|------|
 | 1 | `students` | 學生 |
 | 2 | `teachers` | 教師 |
-| 3 | `courses` | 課程 |
-| 4 | `student_course_prices` | 學生-課程單價 |
-| 5 | `teacher_course_rates` | 教師-課程時薪 |
-| 6 | `lesson_records` | 上課紀錄 |
+| 3 | `courses` | 課程（含時薪） |
+| 4 | `lesson_records` | 上課紀錄 |
 
 所有 PK 採用 `VARCHAR(64)`（前端產生的 UUID / nanoid）。
 
-### 1. students / teachers / courses（同結構）
+### 1. students / teachers
 | 欄位 | 型別 |
 |------|------|
 | id | VARCHAR(64) PK |
@@ -32,30 +30,22 @@
 | created_at | DATETIME default CURRENT_TIMESTAMP |
 | updated_at | DATETIME ON UPDATE CURRENT_TIMESTAMP |
 
-索引：`idx_students_name` / `idx_teachers_name` / `idx_courses_name`（各表對應 `name`）
+索引：`idx_students_name` / `idx_teachers_name`
 
-### 2. student_course_prices
+### 2. courses
 | 欄位 | 型別 |
 |------|------|
 | id | VARCHAR(64) PK |
-| student_id | VARCHAR(64) FK CASCADE → students |
-| course_id | VARCHAR(64) FK CASCADE → courses |
-| unit_price | DECIMAL(10,2) NOT NULL |
-| created_at / updated_at | DATETIME |
+| name | VARCHAR(128) NOT NULL |
+| hourly_rate | DECIMAL(10,2) NOT NULL DEFAULT 0 |
+| created_at | DATETIME default CURRENT_TIMESTAMP |
+| updated_at | DATETIME ON UPDATE CURRENT_TIMESTAMP |
 
-UNIQUE `uq_student_course (student_id, course_id)`
+索引：`idx_courses_name`
 
-### 3. teacher_course_rates
-| 欄位 | 型別 |
-|------|------|
-| id | VARCHAR(64) PK |
-| teacher_id | VARCHAR(64) FK CASCADE → teachers |
-| course_id | VARCHAR(64) FK CASCADE → courses |
-| hourly_rate | DECIMAL(10,2) NOT NULL |
+時薪設定直接存於課程，結算時學費與薪資皆使用同一費率。
 
-UNIQUE `uq_teacher_course (teacher_id, course_id)`
-
-### 4. lesson_records
+### 3. lesson_records
 | 欄位 | 型別 |
 |------|------|
 | id | VARCHAR(64) PK |
@@ -193,10 +183,8 @@ npx playwright test
 | 模組 | 函式 |
 |------|------|
 | 學生 | `apiListStudents` / `apiCreateStudent` / `apiRenameStudent` / `apiDeleteStudent` |
-| 學生單價 | `apiListStudentPrices` / `apiSetStudentPrice` / `apiDeleteStudentPrice` |
 | 教師 | `apiListTeachers` / `apiCreateTeacher` / `apiRenameTeacher` / `apiDeleteTeacher` |
-| 教師時薪 | `apiListTeacherRates` / `apiSetTeacherRate` / `apiDeleteTeacherRate` |
-| 課程 | `apiListCourses` / `apiCreateCourse` / `apiRenameCourse` / `apiDeleteCourse` |
+| 課程 | `apiListCourses` / `apiCreateCourse` / `apiUpdateCourse` / `apiDeleteCourse` |
 | 上課紀錄 | `apiListLessons` / `apiCreateLesson` / `apiUpdateLesson` / `apiDeleteLesson` |
 | 結算 | `apiSettlementTuition` / `apiSettlementSalary` |
 

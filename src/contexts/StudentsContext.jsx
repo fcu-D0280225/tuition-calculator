@@ -1,8 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import {
-  apiListStudents, apiCreateStudent, apiRenameStudent, apiDeleteStudent,
-  apiListStudentPrices, apiSetStudentPrice, apiDeleteStudentPrice,
-} from '../data/api.js'
+import { apiListStudents, apiCreateStudent, apiRenameStudent, apiDeleteStudent } from '../data/api.js'
 
 const StudentsContext = createContext(null)
 
@@ -16,8 +13,6 @@ function reducer(state, action) {
       return { ...state, students: state.students.map(s => s.id === action.student.id ? { ...s, ...action.student } : s) }
     case 'REMOVE_STUDENT':
       return { ...state, students: state.students.filter(s => s.id !== action.id) }
-    case 'SET_PRICES':
-      return { ...state, prices: { ...state.prices, [action.studentId]: action.prices } }
     case 'SET_LOADING':
       return { ...state, loading: action.loading }
     default:
@@ -26,7 +21,7 @@ function reducer(state, action) {
 }
 
 export function StudentsProvider({ children }) {
-  const [state, dispatch] = useReducer(reducer, { students: [], prices: {}, loading: false })
+  const [state, dispatch] = useReducer(reducer, { students: [], loading: false })
 
   const loadStudents = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', loading: true })
@@ -50,27 +45,8 @@ export function StudentsProvider({ children }) {
     dispatch({ type: 'REMOVE_STUDENT', id })
   }, [])
 
-  const loadPrices = useCallback(async (studentId) => {
-    const prices = await apiListStudentPrices(studentId)
-    dispatch({ type: 'SET_PRICES', studentId, prices })
-    return prices
-  }, [])
-
-  const setPrice = useCallback(async (studentId, courseId, unitPrice) => {
-    await apiSetStudentPrice(studentId, courseId, unitPrice)
-    // Refresh prices for this student
-    const prices = await apiListStudentPrices(studentId)
-    dispatch({ type: 'SET_PRICES', studentId, prices })
-  }, [])
-
-  const deletePrice = useCallback(async (studentId, courseId) => {
-    await apiDeleteStudentPrice(studentId, courseId)
-    const prices = await apiListStudentPrices(studentId)
-    dispatch({ type: 'SET_PRICES', studentId, prices })
-  }, [])
-
   return (
-    <StudentsContext.Provider value={{ state, loadStudents, createStudent, renameStudent, removeStudent, loadPrices, setPrice, deletePrice }}>
+    <StudentsContext.Provider value={{ state, loadStudents, createStudent, renameStudent, removeStudent }}>
       {children}
     </StudentsContext.Provider>
   )

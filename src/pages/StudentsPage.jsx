@@ -1,21 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useStudents } from '../contexts/StudentsContext.jsx'
-import { useCourses } from '../contexts/CoursesContext.jsx'
-import PriceManager from '../components/PriceManager.jsx'
 
 export default function StudentsPage() {
-  const { state, loadStudents, createStudent, renameStudent, removeStudent, loadPrices, setPrice, deletePrice } = useStudents()
-  const { state: courseState, loadCourses } = useCourses()
-  const { students, prices, loading } = state
+  const { state, loadStudents, createStudent, renameStudent, removeStudent } = useStudents()
+  const { students, loading } = state
 
-  const [newName, setNewName]         = useState('')
-  const [editId, setEditId]           = useState(null)
-  const [editVal, setEditVal]         = useState('')
-  const [expandedId, setExpandedId]   = useState(null)
-  const [error, setError]             = useState('')
-  const [saving, setSaving]           = useState(false)
+  const [newName, setNewName]   = useState('')
+  const [editId, setEditId]     = useState(null)
+  const [editVal, setEditVal]   = useState('')
+  const [error, setError]       = useState('')
+  const [saving, setSaving]     = useState(false)
 
-  useEffect(() => { loadStudents(); loadCourses() }, [loadStudents, loadCourses])
+  useEffect(() => { loadStudents() }, [loadStudents])
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -42,12 +38,6 @@ export default function StudentsPage() {
     try { await removeStudent(id) }
     catch { setError('刪除失敗') }
     finally { setSaving(false) }
-  }
-
-  async function handleExpand(id) {
-    if (expandedId === id) { setExpandedId(null); return }
-    setExpandedId(id)
-    if (!prices[id]) await loadPrices(id)
   }
 
   return (
@@ -79,60 +69,34 @@ export default function StudentsPage() {
           </thead>
           <tbody>
             {students.map(s => (
-              <>
-                <tr key={s.id}>
-                  <td>
-                    {editId === s.id ? (
-                      <input
-                        autoFocus
-                        className="inline-edit-input"
-                        value={editVal}
-                        onChange={e => setEditVal(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleRename(s.id); if (e.key === 'Escape') setEditId(null) }}
-                      />
-                    ) : (
-                      <span
-                        className="expandable-name"
-                        onClick={() => handleExpand(s.id)}
-                        title="點擊展開學費單價"
-                      >
-                        {s.name}
-                        <span className="expand-icon">{expandedId === s.id ? '▲' : '▼'}</span>
-                      </span>
-                    )}
-                  </td>
-                  <td className="row-actions">
-                    {editId === s.id ? (
-                      <>
-                        <button className="btn-sm btn-primary" onClick={() => handleRename(s.id)} disabled={saving}>儲存</button>
-                        <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
-                      </>
-                    ) : (
-                      <>
-                        <button className="btn-sm" onClick={() => { setEditId(s.id); setEditVal(s.name) }}>改名</button>
-                        <button className="btn-sm btn-danger" onClick={() => handleDelete(s.id)} disabled={saving}>刪除</button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-                {expandedId === s.id && (
-                  <tr key={`${s.id}-prices`} className="expanded-row">
-                    <td colSpan={2}>
-                      <div className="expanded-section">
-                        <div className="expanded-label">學費單價設定（元 / 小時）</div>
-                        <PriceManager
-                          rows={prices[s.id] || []}
-                          courses={courseState.courses}
-                          priceLabel="單價 (元/時)"
-                          priceKey="unit_price"
-                          onSet={(courseId, val) => setPrice(s.id, courseId, val)}
-                          onDelete={(courseId) => deletePrice(s.id, courseId)}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </>
+              <tr key={s.id}>
+                <td>
+                  {editId === s.id ? (
+                    <input
+                      autoFocus
+                      className="inline-edit-input"
+                      value={editVal}
+                      onChange={e => setEditVal(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRename(s.id); if (e.key === 'Escape') setEditId(null) }}
+                    />
+                  ) : (
+                    s.name
+                  )}
+                </td>
+                <td className="row-actions">
+                  {editId === s.id ? (
+                    <>
+                      <button className="btn-sm btn-primary" onClick={() => handleRename(s.id)} disabled={saving}>儲存</button>
+                      <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
+                    </>
+                  ) : (
+                    <>
+                      <button className="btn-sm" onClick={() => { setEditId(s.id); setEditVal(s.name) }}>改名</button>
+                      <button className="btn-sm btn-danger" onClick={() => handleDelete(s.id)} disabled={saving}>刪除</button>
+                    </>
+                  )}
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>

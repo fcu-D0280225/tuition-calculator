@@ -6,11 +6,7 @@ import {
   // teachers
   listTeachers, insertTeacher, updateTeacherName, deleteTeacher,
   // courses
-  listCourses, insertCourse, updateCourseName, deleteCourse,
-  // student prices
-  listStudentPrices, upsertStudentPrice, deleteStudentPrice,
-  // teacher rates
-  listTeacherRates, upsertTeacherRate, deleteTeacherRate,
+  listCourses, insertCourse, updateCourse, deleteCourse,
   // lessons
   listLessons, insertLesson, updateLesson, deleteLesson,
   // settlement
@@ -70,30 +66,6 @@ app.delete('/api/students/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
-// ── Student prices ────────────────────────────────────────────────────────────
-
-app.get('/api/students/:studentId/prices', async (req, res) => {
-  try { res.json(await listStudentPrices(req.params.studentId)) }
-  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-app.put('/api/students/:studentId/prices/:courseId', async (req, res) => {
-  const unitPrice = parseFloat(req.body?.unit_price)
-  if (isNaN(unitPrice) || unitPrice < 0) return res.status(400).json({ error: 'invalid_unit_price' })
-  const id = genId('scp')
-  try {
-    await upsertStudentPrice({ id, studentId: req.params.studentId, courseId: req.params.courseId, unitPrice })
-    res.json({ student_id: req.params.studentId, course_id: req.params.courseId, unit_price: unitPrice })
-  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-app.delete('/api/students/:studentId/prices/:courseId', async (req, res) => {
-  try {
-    const ok = await deleteStudentPrice(req.params.studentId, req.params.courseId)
-    if (!ok) return res.status(404).json({ error: 'not_found' })
-    res.status(204).end()
-  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
 
 // ── Teachers ──────────────────────────────────────────────────────────────────
 
@@ -128,30 +100,6 @@ app.delete('/api/teachers/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
-// ── Teacher rates ─────────────────────────────────────────────────────────────
-
-app.get('/api/teachers/:teacherId/rates', async (req, res) => {
-  try { res.json(await listTeacherRates(req.params.teacherId)) }
-  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-app.put('/api/teachers/:teacherId/rates/:courseId', async (req, res) => {
-  const hourlyRate = parseFloat(req.body?.hourly_rate)
-  if (isNaN(hourlyRate) || hourlyRate < 0) return res.status(400).json({ error: 'invalid_hourly_rate' })
-  const id = genId('tcr')
-  try {
-    await upsertTeacherRate({ id, teacherId: req.params.teacherId, courseId: req.params.courseId, hourlyRate })
-    res.json({ teacher_id: req.params.teacherId, course_id: req.params.courseId, hourly_rate: hourlyRate })
-  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-app.delete('/api/teachers/:teacherId/rates/:courseId', async (req, res) => {
-  try {
-    const ok = await deleteTeacherRate(req.params.teacherId, req.params.courseId)
-    if (!ok) return res.status(404).json({ error: 'not_found' })
-    res.status(204).end()
-  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
 
 // ── Courses ───────────────────────────────────────────────────────────────────
 
@@ -163,18 +111,30 @@ app.get('/api/courses', async (_req, res) => {
 app.post('/api/courses', async (req, res) => {
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
+  const hourlyRate = req.body?.hourly_rate !== undefined ? parseFloat(req.body.hourly_rate) : 0
+  if (isNaN(hourlyRate) || hourlyRate < 0) return res.status(400).json({ error: 'invalid_hourly_rate' })
   const id = genId('cr')
-  try { await insertCourse({ id, name }); res.status(201).json({ id, name }) }
+  try { await insertCourse({ id, name, hourlyRate }); res.status(201).json({ id, name, hourly_rate: hourlyRate }) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/courses/:id', async (req, res) => {
-  const name = normalizeName(req.body?.name)
-  if (!name) return res.status(400).json({ error: 'name_required' })
+  const update = {}
+  if (req.body?.name !== undefined) {
+    const name = normalizeName(req.body.name)
+    if (!name) return res.status(400).json({ error: 'name_required' })
+    update.name = name
+  }
+  if (req.body?.hourly_rate !== undefined) {
+    const hourlyRate = parseFloat(req.body.hourly_rate)
+    if (isNaN(hourlyRate) || hourlyRate < 0) return res.status(400).json({ error: 'invalid_hourly_rate' })
+    update.hourlyRate = hourlyRate
+  }
+  if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
-    const ok = await updateCourseName(req.params.id, name)
+    const ok = await updateCourse(req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
-    res.json({ id: req.params.id, name })
+    res.json({ id: req.params.id, ...req.body })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

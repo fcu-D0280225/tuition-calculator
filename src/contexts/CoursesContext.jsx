@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import { apiListCourses, apiCreateCourse, apiRenameCourse, apiDeleteCourse } from '../data/api.js'
+import { apiListCourses, apiCreateCourse, apiUpdateCourse, apiDeleteCourse } from '../data/api.js'
 
 const CoursesContext = createContext(null)
 
@@ -29,15 +29,15 @@ export function CoursesProvider({ children }) {
     dispatch({ type: 'SET_COURSES', courses })
   }, [])
 
-  const createCourse = useCallback(async (name) => {
-    const course = await apiCreateCourse(name)
+  const createCourse = useCallback(async (name, hourlyRate = 0) => {
+    const course = await apiCreateCourse(name, hourlyRate)
     dispatch({ type: 'ADD_COURSE', course })
     return course
   }, [])
 
-  const renameCourse = useCallback(async (id, name) => {
-    const course = await apiRenameCourse(id, name)
-    dispatch({ type: 'UPDATE_COURSE', course })
+  const updateCourse = useCallback(async (id, patch) => {
+    const course = await apiUpdateCourse(id, patch)
+    dispatch({ type: 'UPDATE_COURSE', course: { id, ...patch } })
   }, [])
 
   const removeCourse = useCallback(async (id) => {
@@ -46,7 +46,7 @@ export function CoursesProvider({ children }) {
   }, [])
 
   return (
-    <CoursesContext.Provider value={{ state, loadCourses, createCourse, renameCourse, removeCourse }}>
+    <CoursesContext.Provider value={{ state, loadCourses, createCourse, updateCourse, removeCourse }}>
       {children}
     </CoursesContext.Provider>
   )

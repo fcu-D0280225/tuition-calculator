@@ -36,40 +36,18 @@ export async function initSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS courses (
-      id          VARCHAR(64)  NOT NULL PRIMARY KEY,
-      name        VARCHAR(128) NOT NULL,
-      created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      id          VARCHAR(64)    NOT NULL PRIMARY KEY,
+      name        VARCHAR(128)   NOT NULL,
+      hourly_rate DECIMAL(10,2)  NOT NULL DEFAULT 0,
+      created_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_courses_name (name)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
 
+  // Migration: add hourly_rate to existing courses table if missing
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS student_course_prices (
-      id          VARCHAR(64)    NOT NULL PRIMARY KEY,
-      student_id  VARCHAR(64)    NOT NULL,
-      course_id   VARCHAR(64)    NOT NULL,
-      unit_price  DECIMAL(10,2)  NOT NULL,
-      created_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uq_student_course (student_id, course_id),
-      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-      FOREIGN KEY (course_id)  REFERENCES courses(id)  ON DELETE CASCADE
-    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-  `)
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS teacher_course_rates (
-      id          VARCHAR(64)    NOT NULL PRIMARY KEY,
-      teacher_id  VARCHAR(64)    NOT NULL,
-      course_id   VARCHAR(64)    NOT NULL,
-      hourly_rate DECIMAL(10,2)  NOT NULL,
-      created_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at  DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uq_teacher_course (teacher_id, course_id),
-      FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
-      FOREIGN KEY (course_id)  REFERENCES courses(id)  ON DELETE CASCADE
-    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+    ALTER TABLE courses ADD COLUMN IF NOT EXISTS hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0
   `)
 
   await pool.query(`
@@ -143,84 +121,28 @@ export async function deleteTeacher(id) {
 
 export async function listCourses() {
   const [rows] = await pool.query(
-    'SELECT id, name FROM courses ORDER BY created_at ASC, id ASC'
+    'SELECT id, name, hourly_rate FROM courses ORDER BY created_at ASC, id ASC'
   )
   return rows
 }
 
-export async function insertCourse({ id, name }) {
-  await pool.query('INSERT INTO courses (id, name) VALUES (?, ?)', [id, name])
+export async function insertCourse({ id, name, hourlyRate }) {
+  await pool.query('INSERT INTO courses (id, name, hourly_rate) VALUES (?, ?, ?)', [id, name, hourlyRate ?? 0])
 }
 
-export async function updateCourseName(id, name) {
-  const [res] = await pool.query('UPDATE courses SET name = ? WHERE id = ?', [name, id])
+export async function updateCourse(id, { name, hourlyRate }) {
+  const sets = []
+  const params = []
+  if (name       !== undefined) { sets.push('name = ?');        params.push(name) }
+  if (hourlyRate !== undefined) { sets.push('hourly_rate = ?'); params.push(hourlyRate) }
+  if (!sets.length) return false
+  params.push(id)
+  const [res] = await pool.query(`UPDATE courses SET ${sets.join(', ')} WHERE id = ?`, params)
   return res.affectedRows > 0
 }
 
 export async function deleteCourse(id) {
   const [res] = await pool.query('DELETE FROM courses WHERE id = ?', [id])
-  return res.affectedRows > 0
-}
-
-// ── Student-Course Prices ─────────────────────────────────────────────────────
-
-export async function listStudentPrices(studentId) {
-  const [rows] = await pool.query(
-    `SELECT scp.id, scp.course_id, c.name AS course_name, scp.unit_price
-     FROM student_course_prices scp
-     JOIN courses c ON c.id = scp.course_id
-     WHERE scp.student_id = ?
-     ORDER BY c.name ASC`,
-    [studentId]
-  )
-  return rows
-}
-
-export async function upsertStudentPrice({ id, studentId, courseId, unitPrice }) {
-  await pool.query(
-    `INSERT INTO student_course_prices (id, student_id, course_id, unit_price)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE unit_price = VALUES(unit_price), id = IF(id IS NOT NULL, id, VALUES(id))`,
-    [id, studentId, courseId, unitPrice]
-  )
-}
-
-export async function deleteStudentPrice(studentId, courseId) {
-  const [res] = await pool.query(
-    'DELETE FROM student_course_prices WHERE student_id = ? AND course_id = ?',
-    [studentId, courseId]
-  )
-  return res.affectedRows > 0
-}
-
-// ── Teacher-Course Rates ──────────────────────────────────────────────────────
-
-export async function listTeacherRates(teacherId) {
-  const [rows] = await pool.query(
-    `SELECT tcr.id, tcr.course_id, c.name AS course_name, tcr.hourly_rate
-     FROM teacher_course_rates tcr
-     JOIN courses c ON c.id = tcr.course_id
-     WHERE tcr.teacher_id = ?
-     ORDER BY c.name ASC`,
-    [teacherId]
-  )
-  return rows
-}
-
-export async function upsertTeacherRate({ id, teacherId, courseId, hourlyRate }) {
-  await pool.query(
-    `INSERT INTO teacher_course_rates (id, teacher_id, course_id, hourly_rate)
-     VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE hourly_rate = VALUES(hourly_rate), id = IF(id IS NOT NULL, id, VALUES(id))`,
-    [id, teacherId, courseId, hourlyRate]
-  )
-}
-
-export async function deleteTeacherRate(teacherId, courseId) {
-  const [res] = await pool.query(
-    'DELETE FROM teacher_course_rates WHERE teacher_id = ? AND course_id = ?',
-    [teacherId, courseId]
-  )
   return res.affectedRows > 0
 }
 
@@ -291,20 +213,17 @@ export async function settlementTuition(from, to) {
        s.name         AS student_name,
        lr.course_id,
        c.name         AS course_name,
-       SUM(lr.hours)  AS total_hours,
-       COALESCE(scp.unit_price, 0) AS unit_price
+       c.hourly_rate  AS unit_price,
+       SUM(lr.hours)  AS total_hours
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
-     LEFT JOIN student_course_prices scp
-       ON scp.student_id = lr.student_id AND scp.course_id = lr.course_id
      WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
-     GROUP BY lr.student_id, lr.course_id, s.name, c.name, scp.unit_price
+     GROUP BY lr.student_id, lr.course_id, s.name, c.name, c.hourly_rate
      ORDER BY s.name ASC, c.name ASC`,
     [from, to]
   )
 
-  // Group by student
   const map = new Map()
   for (const row of rows) {
     if (!map.has(row.student_id)) {
@@ -327,20 +246,17 @@ export async function settlementSalary(from, to) {
        t.name         AS teacher_name,
        lr.course_id,
        c.name         AS course_name,
-       SUM(lr.hours)  AS total_hours,
-       COALESCE(tcr.hourly_rate, 0) AS hourly_rate
+       c.hourly_rate,
+       SUM(lr.hours)  AS total_hours
      FROM lesson_records lr
      JOIN teachers t ON t.id = lr.teacher_id
      JOIN courses  c ON c.id = lr.course_id
-     LEFT JOIN teacher_course_rates tcr
-       ON tcr.teacher_id = lr.teacher_id AND tcr.course_id = lr.course_id
      WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
-     GROUP BY lr.teacher_id, lr.course_id, t.name, c.name, tcr.hourly_rate
+     GROUP BY lr.teacher_id, lr.course_id, t.name, c.name, c.hourly_rate
      ORDER BY t.name ASC, c.name ASC`,
     [from, to]
   )
 
-  // Group by teacher
   const map = new Map()
   for (const row of rows) {
     if (!map.has(row.teacher_id)) {
