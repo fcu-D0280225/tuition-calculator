@@ -97,40 +97,52 @@ export default function SettlementPage() {
           ) : (
             <table className="settlement-table">
               <thead>
-                <tr><th>學生</th><th>課程</th><th>總時數</th><th>單價</th><th>金額</th><th></th></tr>
+                <tr><th>學生</th><th>項目</th><th>數量／時數</th><th>單價</th><th>金額</th><th></th></tr>
               </thead>
               <tbody>
-                {tuition.map(student => (
-                  <>
-                    {student.courses.map((c, i) => (
-                      <tr key={`${student.student_id}-${c.course_id}`}>
-                        {i === 0 && <td rowSpan={student.courses.length} className="student-cell">{student.student_name}</td>}
-                        <td>{c.course_name}</td>
-                        <td className="num-cell">{c.total_hours}</td>
-                        <td className="num-cell">{c.unit_price.toLocaleString()}</td>
-                        <td className="num-cell">{c.amount.toLocaleString()}</td>
-                        {i === 0 && (
-                          <td rowSpan={student.courses.length} style={{ verticalAlign: 'middle', textAlign: 'center' }}>
-                            <button
-                              className="btn-sm"
-                              onClick={() => handleStudentPDF(student)}
-                              disabled={!!pdfLoading}
-                              title={`下載 ${student.student_name} 學費單 PDF`}
-                            >
-                              {pdfLoading === student.student_id ? '…' : 'PDF'}
-                            </button>
-                          </td>
-                        )}
+                {tuition.map(student => {
+                  const matLen = (student.materials || []).length
+                  const totalRows = student.courses.length + matLen
+                  return (
+                    <>
+                      {student.courses.map((c, i) => (
+                        <tr key={`${student.student_id}-c-${c.course_id}-${c.unit_price}`}>
+                          {i === 0 && <td rowSpan={totalRows} className="student-cell">{student.student_name}</td>}
+                          <td>{c.course_name}</td>
+                          <td className="num-cell">{c.total_hours} 時</td>
+                          <td className="num-cell">{c.unit_price.toLocaleString()}</td>
+                          <td className="num-cell">{c.amount.toLocaleString()}</td>
+                          {i === 0 && (
+                            <td rowSpan={totalRows} style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+                              <button
+                                className="btn-sm"
+                                onClick={() => handleStudentPDF(student)}
+                                disabled={!!pdfLoading}
+                                title={`下載 ${student.student_name} 學費單 PDF`}
+                              >
+                                {pdfLoading === student.student_id ? '…' : 'PDF'}
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                      {(student.materials || []).map(m => (
+                        <tr key={`${student.student_id}-m-${m.material_id}`} style={{ background: '#fefce8' }}>
+                          <td style={{ color: '#a16207' }}>教材：{m.material_name}</td>
+                          <td className="num-cell">{m.total_qty} 本</td>
+                          <td className="num-cell">{m.unit_price.toLocaleString()}</td>
+                          <td className="num-cell">{m.amount.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr className="subtotal-row" key={`${student.student_id}-total`}>
+                        <td colSpan={3}></td>
+                        <td className="subtotal-label">小計</td>
+                        <td className="num-cell subtotal-amount">{student.total.toLocaleString()}</td>
+                        <td></td>
                       </tr>
-                    ))}
-                    <tr className="subtotal-row" key={`${student.student_id}-total`}>
-                      <td colSpan={3}></td>
-                      <td className="subtotal-label">小計</td>
-                      <td className="num-cell subtotal-amount">{student.total.toLocaleString()}</td>
-                      <td></td>
-                    </tr>
-                  </>
-                ))}
+                    </>
+                  )
+                })}
                 <tr className="grand-total-row">
                   <td colSpan={4} className="grand-total-label">合計</td>
                   <td className="num-cell grand-total-amount">

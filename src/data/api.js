@@ -34,6 +34,27 @@ export const apiCreateCourse    = (name, hourly_rate = 0)  => request('/courses'
 export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
+// ── Materials ─────────────────────────────────────────────────────────────────
+
+export const apiListMaterials   = ()              => request('/materials')
+export const apiCreateMaterial  = (name, unit_price = 0) => request('/materials', { method: 'POST', body: JSON.stringify({ name, unit_price }) })
+export const apiUpdateMaterial  = (id, patch)     => request(`/materials/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiDeleteMaterial  = (id)            => request(`/materials/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+// ── Material Records ──────────────────────────────────────────────────────────
+
+export const apiListMaterialRecords = ({ from, to, student_id } = {}) => {
+  const params = new URLSearchParams()
+  if (from)       params.set('from', from)
+  if (to)         params.set('to', to)
+  if (student_id) params.set('student_id', student_id)
+  const qs = params.toString()
+  return request(`/material-records${qs ? '?' + qs : ''}`)
+}
+export const apiCreateMaterialRecord = (record) => request('/material-records', { method: 'POST', body: JSON.stringify(record) })
+export const apiUpdateMaterialRecord = (id, patch) => request(`/material-records/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiDeleteMaterialRecord = (id) => request(`/material-records/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
 // ── Lesson Records ────────────────────────────────────────────────────────────
 
 export const apiListLessons = ({ from, to, student_id, teacher_id, course_id } = {}) => {

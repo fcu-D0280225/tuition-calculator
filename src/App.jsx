@@ -5,6 +5,7 @@ import StudentsPage      from './pages/StudentsPage.jsx'
 import TeachersPage      from './pages/TeachersPage.jsx'
 import LessonRecordsPage from './pages/LessonRecordsPage.jsx'
 import SettlementPage    from './pages/SettlementPage.jsx'
+import MaterialsPage     from './pages/MaterialsPage.jsx'
 
 const TABS = [
   { id: 'lessons',    label: '上課紀錄' },
@@ -12,6 +13,7 @@ const TABS = [
   { id: 'students',   label: '學生'     },
   { id: 'teachers',   label: '老師'     },
   { id: 'courses',    label: '課程'     },
+  { id: 'materials',  label: '教材'     },
 ]
 
 function AppShell() {
@@ -39,6 +41,7 @@ function AppShell() {
         {tab === 'students'   && <StudentsPage />}
         {tab === 'teachers'   && <TeachersPage />}
         {tab === 'courses'    && <CoursesPage />}
+        {tab === 'materials'  && <MaterialsPage />}
       </main>
     </div>
   )

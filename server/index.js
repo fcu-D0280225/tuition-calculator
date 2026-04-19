@@ -9,6 +9,9 @@ import {
   listCourses, insertCourse, updateCourse, deleteCourse,
   // lessons
   listLessons, insertLesson, updateLesson, deleteLesson,
+  // materials
+  listMaterials, insertMaterial, updateMaterial, deleteMaterial,
+  listMaterialRecords, insertMaterialRecord, updateMaterialRecord, deleteMaterialRecord,
   // settlement
   settlementTuition, settlementSalary,
 } from './db.js'
@@ -191,6 +194,95 @@ app.patch('/api/lessons/:id', async (req, res) => {
 app.delete('/api/lessons/:id', async (req, res) => {
   try {
     const ok = await deleteLesson(req.params.id)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Materials ─────────────────────────────────────────────────────────────────
+
+app.get('/api/materials', async (_req, res) => {
+  try { res.json(await listMaterials()) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.post('/api/materials', async (req, res) => {
+  const name = normalizeName(req.body?.name)
+  if (!name) return res.status(400).json({ error: 'name_required' })
+  const unitPrice = req.body?.unit_price !== undefined ? parseFloat(req.body.unit_price) : 0
+  if (isNaN(unitPrice) || unitPrice < 0) return res.status(400).json({ error: 'invalid_unit_price' })
+  const id = genId('mat')
+  try { await insertMaterial({ id, name, unitPrice }); res.status(201).json({ id, name, unit_price: unitPrice }) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.patch('/api/materials/:id', async (req, res) => {
+  const update = {}
+  if (req.body?.name !== undefined) {
+    const name = normalizeName(req.body.name)
+    if (!name) return res.status(400).json({ error: 'name_required' })
+    update.name = name
+  }
+  if (req.body?.unit_price !== undefined) {
+    const unitPrice = parseFloat(req.body.unit_price)
+    if (isNaN(unitPrice) || unitPrice < 0) return res.status(400).json({ error: 'invalid_unit_price' })
+    update.unitPrice = unitPrice
+  }
+  if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
+  try {
+    const ok = await updateMaterial(req.params.id, update)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.json({ id: req.params.id, ...req.body })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.delete('/api/materials/:id', async (req, res) => {
+  try {
+    const ok = await deleteMaterial(req.params.id)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Material Records ──────────────────────────────────────────────────────────
+
+app.get('/api/material-records', async (req, res) => {
+  const { from, to, student_id } = req.query
+  try { res.json(await listMaterialRecords({ from, to, studentId: student_id })) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.post('/api/material-records', async (req, res) => {
+  const { student_id, material_id, quantity, record_date, note } = req.body || {}
+  if (!student_id || !material_id) return res.status(400).json({ error: 'student_id_and_material_id_required' })
+  const qty = quantity !== undefined ? parseFloat(quantity) : 1
+  if (isNaN(qty) || qty <= 0) return res.status(400).json({ error: 'invalid_quantity' })
+  if (!record_date || !/^\d{4}-\d{2}-\d{2}$/.test(record_date)) return res.status(400).json({ error: 'invalid_record_date' })
+  const id = genId('mr')
+  try {
+    await insertMaterialRecord({ id, studentId: student_id, materialId: material_id, quantity: qty, recordDate: record_date, note })
+    res.status(201).json({ id, student_id, material_id, quantity: qty, record_date, note: note || '' })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.patch('/api/material-records/:id', async (req, res) => {
+  const { student_id, material_id, quantity, record_date, note } = req.body || {}
+  const update = {}
+  if (student_id  !== undefined) update.studentId  = student_id
+  if (material_id !== undefined) update.materialId = material_id
+  if (quantity    !== undefined) update.quantity   = parseFloat(quantity)
+  if (record_date !== undefined) update.recordDate = record_date
+  if (note        !== undefined) update.note       = note
+  try {
+    const ok = await updateMaterialRecord(req.params.id, update)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.json({ id: req.params.id, ...req.body })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.delete('/api/material-records/:id', async (req, res) => {
+  try {
+    const ok = await deleteMaterialRecord(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }

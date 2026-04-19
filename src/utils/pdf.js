@@ -104,14 +104,26 @@ function tuitionSummaryHtml(tuition, period, dateStr) {
 }
 
 function singleTuitionHtml(student, period, dateStr) {
-  const rows = student.courses.map((c, i) => `
+  const courseRows = student.courses.map((c, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600; color:#2563eb;">${escapeHtml(c.course_name)}</td>
-      <td style="padding:10px 12px; text-align:right;">${c.total_hours}</td>
+      <td style="padding:10px 12px; text-align:right;">${c.total_hours} 時</td>
       <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${c.unit_price.toLocaleString()}</td>
       <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${c.amount.toLocaleString()}</td>
     </tr>
   `).join('')
+
+  const materials = student.materials || []
+  const matRows = materials.map((m, i) => `
+    <tr style="border-bottom:1px solid #f1f5f9; background:#fefce8;">
+      <td style="padding:10px 12px; font-weight:600; color:#a16207;">教材：${escapeHtml(m.material_name)}</td>
+      <td style="padding:10px 12px; text-align:right;">${m.total_qty} 本</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${m.unit_price.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${m.amount.toLocaleString()}</td>
+    </tr>
+  `).join('')
+
+  const rows = courseRows + matRows
 
   return `
     <div style="border-bottom:3px solid #2563eb; padding-bottom:24px; margin-bottom:32px;">
@@ -138,9 +150,9 @@ function singleTuitionHtml(student, period, dateStr) {
     <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
       <thead>
         <tr style="background:#f1f5f9;">
-          <th style="padding:10px 12px; text-align:left; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">課程</th>
-          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">時數</th>
-          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">單價(元/時)</th>
+          <th style="padding:10px 12px; text-align:left; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">課程／教材</th>
+          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">時數／數量</th>
+          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">單價</th>
           <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">金額</th>
         </tr>
       </thead>
