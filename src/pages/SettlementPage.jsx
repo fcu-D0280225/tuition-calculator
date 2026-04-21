@@ -163,52 +163,63 @@ export default function SettlementPage() {
                   const grpLen = (student.groups || []).length
                   const matLen = (student.materials || []).length
                   const totalRows = student.courses.length + grpLen + matLen
+                  const firstKind = student.courses.length > 0 ? 'course'
+                                  : grpLen > 0 ? 'group'
+                                  : 'material'
+                  const nameCell = (
+                    <td rowSpan={totalRows} className="student-cell">{student.student_name}</td>
+                  )
+                  const actionCell = (
+                    <td rowSpan={totalRows} style={{ verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <button
+                        className="btn-sm"
+                        onClick={() => handleStudentPDF(student)}
+                        disabled={!!pdfLoading}
+                        title={`下載 ${student.student_name} 學費單 PDF`}
+                      >
+                        {pdfLoading === student.student_id ? '…' : 'PDF'}
+                      </button>
+                      <button
+                        className="btn-sm"
+                        style={{ marginLeft: 4 }}
+                        onClick={() => handleShareStudent(student)}
+                        disabled={!!shareLoading}
+                        title={`產生 ${student.student_name} 的家長分享連結`}
+                      >
+                        {shareLoading === student.student_id ? '…' : '分享'}
+                      </button>
+                    </td>
+                  )
                   return (
                     <>
                       {student.courses.map((c, i) => (
                         <tr key={`${student.student_id}-c-${c.course_id}-${c.unit_price}`}>
-                          {i === 0 && <td rowSpan={totalRows} className="student-cell">{student.student_name}</td>}
+                          {i === 0 && firstKind === 'course' && nameCell}
                           <td>{c.course_name}</td>
                           <td className="num-cell">{c.total_hours} 時</td>
                           <td className="num-cell">{c.unit_price.toLocaleString()}</td>
                           <td className="num-cell">{c.amount.toLocaleString()}</td>
-                          {i === 0 && (
-                            <td rowSpan={totalRows} style={{ verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                              <button
-                                className="btn-sm"
-                                onClick={() => handleStudentPDF(student)}
-                                disabled={!!pdfLoading}
-                                title={`下載 ${student.student_name} 學費單 PDF`}
-                              >
-                                {pdfLoading === student.student_id ? '…' : 'PDF'}
-                              </button>
-                              <button
-                                className="btn-sm"
-                                style={{ marginLeft: 4 }}
-                                onClick={() => handleShareStudent(student)}
-                                disabled={!!shareLoading}
-                                title={`產生 ${student.student_name} 的家長分享連結`}
-                              >
-                                {shareLoading === student.student_id ? '…' : '分享'}
-                              </button>
-                            </td>
-                          )}
+                          {i === 0 && firstKind === 'course' && actionCell}
                         </tr>
                       ))}
-                      {(student.groups || []).map(g => (
+                      {(student.groups || []).map((g, i) => (
                         <tr key={`${student.student_id}-g-${g.group_id}`} style={{ background: '#ecfdf5' }}>
+                          {i === 0 && firstKind === 'group' && nameCell}
                           <td style={{ color: '#166534' }}>團課：{g.group_name}</td>
                           <td className="num-cell">{g.billable_months} 月</td>
                           <td className="num-cell">{g.monthly_fee.toLocaleString()}/月</td>
                           <td className="num-cell">{g.amount.toLocaleString()}</td>
+                          {i === 0 && firstKind === 'group' && actionCell}
                         </tr>
                       ))}
-                      {(student.materials || []).map(m => (
+                      {(student.materials || []).map((m, i) => (
                         <tr key={`${student.student_id}-m-${m.material_id}`} style={{ background: '#fefce8' }}>
+                          {i === 0 && firstKind === 'material' && nameCell}
                           <td style={{ color: '#a16207' }}>教材：{m.material_name}</td>
                           <td className="num-cell">{m.total_qty} 本</td>
                           <td className="num-cell">{m.unit_price.toLocaleString()}</td>
                           <td className="num-cell">{m.amount.toLocaleString()}</td>
+                          {i === 0 && firstKind === 'material' && actionCell}
                         </tr>
                       ))}
                       <tr className="subtotal-row" key={`${student.student_id}-total`}>
