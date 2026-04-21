@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import express from 'express'
 import {
   initSchema,
@@ -17,6 +18,8 @@ import {
   listGroupRecords, insertGroupRecord, updateGroupRecord, deleteGroupRecord,
   // settlement
   settlementTuition, settlementSalary,
+  // share tokens
+  insertShareToken, getShareTokenByToken, getStudentBill,
 } from './db.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
@@ -429,6 +432,45 @@ app.get('/api/settlement/salary', async (req, res) => {
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   try { res.json(await settlementSalary(from, to)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Share Tokens ──────────────────────────────────────────────────────────────
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+app.post('/api/students/:id/share-token', async (req, res) => {
+  const { from, to, expires_days } = req.body || {}
+  if (!from || !DATE_RE.test(from)) return res.status(400).json({ error: 'invalid_from' })
+  if (!to   || !DATE_RE.test(to))   return res.status(400).json({ error: 'invalid_to' })
+  if (from > to) return res.status(400).json({ error: 'from_after_to' })
+  const days = expires_days !== undefined ? parseInt(expires_days, 10) : 30
+  if (!Number.isFinite(days) || days <= 0 || days > 365) return res.status(400).json({ error: 'invalid_expires_days' })
+
+  const students = await listStudents()
+  if (!students.some(s => s.id === req.params.id)) return res.status(404).json({ error: 'student_not_found' })
+
+  const id      = genId('stk')
+  const token   = crypto.randomBytes(24).toString('base64url')
+  const expires = new Date(Date.now() + days * 86400_000).toISOString().slice(0, 19).replace('T', ' ')
+  try {
+    await insertShareToken({ id, token, studentId: req.params.id, periodFrom: from, periodTo: to, expiresAt: expires })
+    res.status(201).json({ token, from, to, expires_at: expires })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.get('/api/share/:token', async (req, res) => {
+  try {
+    const row = await getShareTokenByToken(req.params.token)
+    if (!row) return res.status(404).json({ error: 'not_found' })
+    if (new Date(row.expires_at) < new Date()) return res.status(410).json({ error: 'expired' })
+    const bill = await getStudentBill(row.student_id, row.period_from, row.period_to)
+    res.json({
+      student: { id: row.student_id, name: row.student_name },
+      period:  { from: row.period_from, to: row.period_to },
+      expires_at: row.expires_at,
+      ...bill,
+    })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

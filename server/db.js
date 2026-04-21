@@ -178,6 +178,20 @@ export async function initSchema() {
   if (gFeeCols.length === 0) {
     await pool.query(`ALTER TABLE \`groups\` ADD COLUMN monthly_fee DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER duration_months`)
   }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS share_tokens (
+      id          VARCHAR(64)  NOT NULL PRIMARY KEY,
+      token       VARCHAR(64)  NOT NULL UNIQUE,
+      student_id  VARCHAR(64)  NOT NULL,
+      period_from DATE         NOT NULL,
+      period_to   DATE         NOT NULL,
+      expires_at  DATETIME     NOT NULL,
+      created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+      INDEX idx_share_tokens_token (token)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────
@@ -617,4 +631,115 @@ export async function updateGroupRecord(id, { groupId, studentId, recordDate, no
 export async function deleteGroupRecord(id) {
   const [res] = await pool.query('DELETE FROM group_records WHERE id = ?', [id])
   return res.affectedRows > 0
+}
+
+// ── Share Tokens ──────────────────────────────────────────────────────────────
+
+export async function insertShareToken({ id, token, studentId, periodFrom, periodTo, expiresAt }) {
+  await pool.query(
+    `INSERT INTO share_tokens (id, token, student_id, period_from, period_to, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, token, studentId, periodFrom, periodTo, expiresAt]
+  )
+}
+
+export async function getShareTokenByToken(token) {
+  const [rows] = await pool.query(
+    `SELECT st.id, st.token, st.student_id, s.name AS student_name,
+            st.period_from, st.period_to, st.expires_at
+     FROM share_tokens st
+     JOIN students s ON s.id = st.student_id
+     WHERE st.token = ?`,
+    [token]
+  )
+  return rows[0] || null
+}
+
+export async function getStudentBill(studentId, from, to) {
+  // 家教課
+  const [lessonRows] = await pool.query(
+    `SELECT lr.lesson_date, lr.hours, lr.unit_price, lr.note,
+            c.id AS course_id, c.name AS course_name, c.hourly_rate,
+            t.name AS teacher_name
+     FROM lesson_records lr
+     JOIN courses  c ON c.id = lr.course_id
+     JOIN teachers t ON t.id = lr.teacher_id
+     WHERE lr.student_id = ? AND lr.lesson_date >= ? AND lr.lesson_date <= ?
+     ORDER BY lr.lesson_date ASC`,
+    [studentId, from, to]
+  )
+
+  const courseMap = new Map()
+  let total = 0
+  const lessons = lessonRows.map(row => {
+    const unit = row.unit_price !== null ? parseFloat(row.unit_price) : parseFloat(row.hourly_rate)
+    const hours = parseFloat(row.hours)
+    const amount = Math.round(hours * unit)
+    total += amount
+    const key = `${row.course_id}::${unit}`
+    if (!courseMap.has(key)) {
+      courseMap.set(key, { course_id: row.course_id, course_name: row.course_name, total_hours: 0, unit_price: unit, amount: 0 })
+    }
+    const entry = courseMap.get(key)
+    entry.total_hours = Math.round((entry.total_hours + hours) * 100) / 100
+    entry.amount = Math.round(entry.total_hours * entry.unit_price)
+    return {
+      lesson_date: row.lesson_date,
+      course_name: row.course_name,
+      teacher_name: row.teacher_name,
+      hours, unit_price: unit, amount,
+      note: row.note,
+    }
+  })
+
+  // 團課（鏡像 settlementTuition：按出席月份數 × 月費）
+  const [groupRows] = await pool.query(
+    `SELECT gr.group_id, g.name AS group_name, g.monthly_fee,
+            COUNT(DISTINCT DATE_FORMAT(gr.record_date, '%Y-%m')) AS billable_months
+     FROM group_records gr
+     JOIN \`groups\` g ON g.id = gr.group_id
+     WHERE gr.student_id = ? AND gr.record_date >= ? AND gr.record_date <= ?
+     GROUP BY gr.group_id, g.name, g.monthly_fee
+     ORDER BY g.name ASC`,
+    [studentId, from, to]
+  )
+  const groups = groupRows.map(row => {
+    const months = parseInt(row.billable_months, 10)
+    const monthly = parseFloat(row.monthly_fee)
+    const amount = Math.round(months * monthly)
+    total += amount
+    return { group_id: row.group_id, group_name: row.group_name, billable_months: months, monthly_fee: monthly, amount }
+  })
+
+  // 教材
+  const [materialRows] = await pool.query(
+    `SELECT mr.record_date, mr.quantity, mr.note,
+            m.id AS material_id, m.name AS material_name, m.unit_price
+     FROM material_records mr
+     JOIN materials m ON m.id = mr.material_id
+     WHERE mr.student_id = ? AND mr.record_date >= ? AND mr.record_date <= ?
+     ORDER BY mr.record_date ASC`,
+    [studentId, from, to]
+  )
+  const materialMap = new Map()
+  for (const row of materialRows) {
+    const qty = parseFloat(row.quantity)
+    const price = parseFloat(row.unit_price)
+    const amount = Math.round(qty * price)
+    total += amount
+    if (!materialMap.has(row.material_id)) {
+      materialMap.set(row.material_id, { material_id: row.material_id, material_name: row.material_name, total_qty: 0, unit_price: price, amount: 0 })
+    }
+    const entry = materialMap.get(row.material_id)
+    entry.total_qty = Math.round((entry.total_qty + qty) * 100) / 100
+    entry.amount = Math.round(entry.total_qty * entry.unit_price)
+  }
+
+  return {
+    courses: Array.from(courseMap.values()),
+    groups,
+    materials: Array.from(materialMap.values()),
+    lessons,
+    total,
+  }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiSettlementTuition, apiSettlementSalary } from '../data/api.js'
+import { apiSettlementTuition, apiSettlementSalary, apiCreateShareToken } from '../data/api.js'
 import { generateTuitionPDF, generateSalaryPDF, generateStudentTuitionPDF, generateTeacherSalaryPDF } from '../utils/pdf.js'
 
 function firstDayOfMonth() {
@@ -21,6 +21,9 @@ export default function SettlementPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
   const [pdfLoading, setPdfLoading] = useState('')   // 'tuition' | 'salary' | student_id | teacher_id
+  const [shareLoading, setShareLoading] = useState('')
+  const [shareUrl, setShareUrl] = useState(null)     // { studentName, url, expiresAt }
+  const [copied, setCopied] = useState(false)
 
   async function handleGenerate(e) {
     e.preventDefault()
@@ -54,6 +57,44 @@ export default function SettlementPage() {
     finally { setPdfLoading('') }
   }
 
+  async function handleShareStudent(student) {
+    setShareLoading(student.student_id)
+    try {
+      const { token, expires_at } = await apiCreateShareToken(student.student_id, { from, to })
+      const url = `${window.location.origin}/view/${token}`
+      setShareUrl({ studentName: student.student_name, url, expiresAt: expires_at })
+      setCopied(false)
+    } catch (e) { alert('產生連結失敗：' + e.message) }
+    finally { setShareLoading('') }
+  }
+
+  async function handleCopyLink(url) {
+    // navigator.clipboard 只在 HTTPS / localhost 可用；以 IP HTTP 開時 fallback 用 execCommand
+    let ok = false
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url)
+        ok = true
+      }
+    } catch { /* fallthrough */ }
+    if (!ok) {
+      const ta = document.createElement('textarea')
+      ta.value = url
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.focus(); ta.select()
+      try { ok = document.execCommand('copy') } catch { ok = false }
+      document.body.removeChild(ta)
+    }
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } else {
+      alert('自動複製失敗，請長按或手動選取連結複製')
+    }
+  }
+
   async function handleTeacherPDF(teacher) {
     setPdfLoading(teacher.teacher_id)
     try { await generateTeacherSalaryPDF(teacher, from, to) }
@@ -82,6 +123,24 @@ export default function SettlementPage() {
       </form>
 
       {error && <div className="error-msg">{error}</div>}
+
+      {shareUrl && (
+        <div className="settlement-section">
+          <div className="settlement-section-header">
+            <h2>{shareUrl.studentName} 的家長分享連結</h2>
+            <button className="btn-sm" onClick={() => setShareUrl(null)}>關閉</button>
+          </div>
+          <div className="share-link-box">
+            <input type="text" readOnly value={shareUrl.url} onFocus={e => e.target.select()} />
+            <button className="btn-sm" onClick={() => handleCopyLink(shareUrl.url)}>
+              {copied ? '已複製 ✓' : '複製'}
+            </button>
+          </div>
+          <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 8 }}>
+            連結於 {shareUrl.expiresAt?.slice(0, 10)} 失效
+          </div>
+        </div>
+      )}
 
       {tuition && (
         <div className="settlement-section">
@@ -114,7 +173,7 @@ export default function SettlementPage() {
                           <td className="num-cell">{c.unit_price.toLocaleString()}</td>
                           <td className="num-cell">{c.amount.toLocaleString()}</td>
                           {i === 0 && (
-                            <td rowSpan={totalRows} style={{ verticalAlign: 'middle', textAlign: 'center' }}>
+                            <td rowSpan={totalRows} style={{ verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
                               <button
                                 className="btn-sm"
                                 onClick={() => handleStudentPDF(student)}
@@ -122,6 +181,15 @@ export default function SettlementPage() {
                                 title={`下載 ${student.student_name} 學費單 PDF`}
                               >
                                 {pdfLoading === student.student_id ? '…' : 'PDF'}
+                              </button>
+                              <button
+                                className="btn-sm"
+                                style={{ marginLeft: 4 }}
+                                onClick={() => handleShareStudent(student)}
+                                disabled={!!shareLoading}
+                                title={`產生 ${student.student_name} 的家長分享連結`}
+                              >
+                                {shareLoading === student.student_id ? '…' : '分享'}
                               </button>
                             </td>
                           )}

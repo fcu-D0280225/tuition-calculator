@@ -107,3 +107,14 @@ export const apiSettlementTuition = (from, to) =>
 
 export const apiSettlementSalary = (from, to) =>
   request(`/settlement/salary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+
+// ── Share Tokens ──────────────────────────────────────────────────────────────
+
+export const apiCreateShareToken = (studentId, { from, to, expires_days } = {}) =>
+  request(`/students/${encodeURIComponent(studentId)}/share-token`, {
+    method: 'POST',
+    body: JSON.stringify({ from, to, expires_days }),
+  })
+
+export const apiGetShare = (token) =>
+  request(`/share/${encodeURIComponent(token)}`)

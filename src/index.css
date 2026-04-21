@@ -2905,3 +2905,54 @@ select.catalog-input.catalog-select {
 }
 
 .chip-remove:hover { color: var(--danger); }
+
+/* ── Share view（家長分享連結）─────────────────────────────── */
+
+.share-view {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+}
+.share-header {
+  text-align: center;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.share-header h1 {
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.share-period {
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.share-footer {
+  margin-top: var(--space-6);
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.share-link-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.share-link-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+}
