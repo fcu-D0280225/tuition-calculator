@@ -113,6 +113,16 @@ function singleTuitionHtml(student, period, dateStr) {
     </tr>
   `).join('')
 
+  const groups = student.groups || []
+  const groupRows = groups.map(g => `
+    <tr style="border-bottom:1px solid #f1f5f9; background:#ecfdf5;">
+      <td style="padding:10px 12px; font-weight:600; color:#166534;">團課：${escapeHtml(g.group_name)}</td>
+      <td style="padding:10px 12px; text-align:right;">${g.billable_months} 月</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${g.monthly_fee.toLocaleString()}/月</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${g.amount.toLocaleString()}</td>
+    </tr>
+  `).join('')
+
   const materials = student.materials || []
   const matRows = materials.map((m, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; background:#fefce8;">
@@ -123,7 +133,7 @@ function singleTuitionHtml(student, period, dateStr) {
     </tr>
   `).join('')
 
-  const rows = courseRows + matRows
+  const rows = courseRows + groupRows + matRows
 
   return `
     <div style="border-bottom:3px solid #2563eb; padding-bottom:24px; margin-bottom:32px;">
@@ -150,8 +160,8 @@ function singleTuitionHtml(student, period, dateStr) {
     <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
       <thead>
         <tr style="background:#f1f5f9;">
-          <th style="padding:10px 12px; text-align:left; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">課程／教材</th>
-          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">時數／數量</th>
+          <th style="padding:10px 12px; text-align:left; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">課程／團課／教材</th>
+          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">時數／月數／數量</th>
           <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">單價</th>
           <th style="padding:10px 12px; text-align:right; font-size:12px; color:#64748b; font-weight:600; border-bottom:2px solid #e2e8f0;">金額</th>
         </tr>

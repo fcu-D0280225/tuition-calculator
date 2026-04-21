@@ -97,12 +97,13 @@ export default function SettlementPage() {
           ) : (
             <table className="settlement-table">
               <thead>
-                <tr><th>學生</th><th>項目</th><th>數量／時數</th><th>單價</th><th>金額</th><th></th></tr>
+                <tr><th>學生</th><th>項目</th><th>時數／月數／數量</th><th>單價</th><th>金額</th><th></th></tr>
               </thead>
               <tbody>
                 {tuition.map(student => {
+                  const grpLen = (student.groups || []).length
                   const matLen = (student.materials || []).length
-                  const totalRows = student.courses.length + matLen
+                  const totalRows = student.courses.length + grpLen + matLen
                   return (
                     <>
                       {student.courses.map((c, i) => (
@@ -124,6 +125,14 @@ export default function SettlementPage() {
                               </button>
                             </td>
                           )}
+                        </tr>
+                      ))}
+                      {(student.groups || []).map(g => (
+                        <tr key={`${student.student_id}-g-${g.group_id}`} style={{ background: '#ecfdf5' }}>
+                          <td style={{ color: '#166534' }}>團課：{g.group_name}</td>
+                          <td className="num-cell">{g.billable_months} 月</td>
+                          <td className="num-cell">{g.monthly_fee.toLocaleString()}/月</td>
+                          <td className="num-cell">{g.amount.toLocaleString()}</td>
                         </tr>
                       ))}
                       {(student.materials || []).map(m => (

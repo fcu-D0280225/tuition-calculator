@@ -323,11 +323,13 @@ app.post('/api/groups', async (req, res) => {
   if (weekdays === null) return res.status(400).json({ error: 'invalid_weekdays' })
   const durationMonths = req.body?.duration_months !== undefined ? parseInt(req.body.duration_months, 10) : 0
   if (isNaN(durationMonths) || durationMonths < 0 || durationMonths > 4) return res.status(400).json({ error: 'invalid_duration_months' })
+  const monthlyFee = req.body?.monthly_fee !== undefined ? parseFloat(req.body.monthly_fee) : 0
+  if (isNaN(monthlyFee) || monthlyFee < 0) return res.status(400).json({ error: 'invalid_monthly_fee' })
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const id = genId('gr')
   try {
-    await insertGroup({ id, name, weekdays, durationMonths, note })
-    res.status(201).json({ id, name, weekdays, duration_months: durationMonths, note })
+    await insertGroup({ id, name, weekdays, durationMonths, monthlyFee, note })
+    res.status(201).json({ id, name, weekdays, duration_months: durationMonths, monthly_fee: monthlyFee, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -347,6 +349,11 @@ app.patch('/api/groups/:id', async (req, res) => {
     const dm = parseInt(req.body.duration_months, 10)
     if (isNaN(dm) || dm < 0 || dm > 4) return res.status(400).json({ error: 'invalid_duration_months' })
     update.durationMonths = dm
+  }
+  if (req.body?.monthly_fee !== undefined) {
+    const mf = parseFloat(req.body.monthly_fee)
+    if (isNaN(mf) || mf < 0) return res.status(400).json({ error: 'invalid_monthly_fee' })
+    update.monthlyFee = mf
   }
   if (req.body?.note !== undefined) {
     update.note = typeof req.body.note === 'string' ? req.body.note : ''

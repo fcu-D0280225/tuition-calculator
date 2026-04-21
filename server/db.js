@@ -119,13 +119,14 @@ export async function initSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS \`groups\` (
-      id               VARCHAR(64)   NOT NULL PRIMARY KEY,
-      name             VARCHAR(128)  NOT NULL,
-      weekdays         VARCHAR(15)   NOT NULL DEFAULT '',
-      duration_months  TINYINT       NOT NULL DEFAULT 0,
-      note             VARCHAR(256)  NOT NULL DEFAULT '',
-      created_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      id               VARCHAR(64)    NOT NULL PRIMARY KEY,
+      name             VARCHAR(128)   NOT NULL,
+      weekdays         VARCHAR(15)    NOT NULL DEFAULT '',
+      duration_months  TINYINT        NOT NULL DEFAULT 0,
+      monthly_fee      DECIMAL(10,2)  NOT NULL DEFAULT 0,
+      note             VARCHAR(256)   NOT NULL DEFAULT '',
+      created_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_groups_name (name)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
@@ -167,6 +168,15 @@ export async function initSchema() {
   )
   if (gDurCols.length === 0) {
     await pool.query(`ALTER TABLE \`groups\` ADD COLUMN duration_months TINYINT NOT NULL DEFAULT 0 AFTER weekdays`)
+  }
+
+  // Migration: add monthly_fee to existing groups table if missing
+  const [gFeeCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'monthly_fee'`
+  )
+  if (gFeeCols.length === 0) {
+    await pool.query(`ALTER TABLE \`groups\` ADD COLUMN monthly_fee DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER duration_months`)
   }
 }
 
@@ -343,6 +353,37 @@ export async function settlementTuition(from, to) {
     student.total += Math.round(h * entry.unit_price)
   }
 
+  // 合併團課費（按出席月份數 × 月費）
+  const [grRows] = await pool.query(
+    `SELECT
+       gr.student_id,
+       s.name                                        AS student_name,
+       gr.group_id,
+       g.name                                        AS group_name,
+       g.monthly_fee,
+       COUNT(DISTINCT DATE_FORMAT(gr.record_date, '%Y-%m')) AS billable_months
+     FROM group_records gr
+     JOIN \`groups\`  g ON g.id = gr.group_id
+     JOIN students   s ON s.id = gr.student_id
+     WHERE gr.record_date >= ? AND gr.record_date <= ?
+     GROUP BY gr.student_id, s.name, gr.group_id, g.name, g.monthly_fee
+     ORDER BY s.name ASC, g.name ASC`,
+    [from, to]
+  )
+  for (const row of grRows) {
+    if (!map.has(row.student_id)) {
+      // 只上團課、沒有家教課的學生也要出現在帳單
+      map.set(row.student_id, { student_id: row.student_id, student_name: row.student_name, courses: new Map(), total: 0 })
+    }
+    const student = map.get(row.student_id)
+    if (!student.groups) student.groups = []
+    const months     = parseInt(row.billable_months, 10)
+    const monthlyFee = parseFloat(row.monthly_fee)
+    const amount     = Math.round(months * monthlyFee)
+    student.groups.push({ group_id: row.group_id, group_name: row.group_name, billable_months: months, monthly_fee: monthlyFee, amount })
+    student.total += amount
+  }
+
   // 合併教材費
   const [mrRows] = await pool.query(
     `SELECT
@@ -358,7 +399,7 @@ export async function settlementTuition(from, to) {
     [from, to]
   )
   for (const row of mrRows) {
-    if (!map.has(row.student_id)) continue // 只補既有學生（沒上課的教材費不列入）
+    if (!map.has(row.student_id)) continue // 只補既有學生（沒上課且沒上團課的教材費不列入）
     const student = map.get(row.student_id)
     if (!student.materials) student.materials = []
     const qty    = parseFloat(row.total_qty)
@@ -372,6 +413,7 @@ export async function settlementTuition(from, to) {
     student_id: s.student_id,
     student_name: s.student_name,
     courses: Array.from(s.courses.values()),
+    groups: s.groups || [],
     materials: s.materials || [],
     total: s.total,
   }))
@@ -499,23 +541,24 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, note FROM `groups` ORDER BY created_at ASC, id ASC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, note FROM `groups` ORDER BY created_at ASC, id ASC'
   )
   return rows
 }
 
-export async function insertGroup({ id, name, weekdays, durationMonths, note }) {
+export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, note }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, duration_months, note) VALUES (?, ?, ?, ?, ?)',
-    [id, name, weekdays || '', durationMonths ?? 0, note || '']
+    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, note) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, note || '']
   )
 }
 
-export async function updateGroup(id, { name, weekdays, durationMonths, note }) {
+export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, note }) {
   const sets = []; const params = []
   if (name            !== undefined) { sets.push('name = ?');             params.push(name) }
   if (weekdays        !== undefined) { sets.push('weekdays = ?');         params.push(weekdays || '') }
   if (durationMonths  !== undefined) { sets.push('duration_months = ?');  params.push(durationMonths) }
+  if (monthlyFee      !== undefined) { sets.push('monthly_fee = ?');      params.push(monthlyFee) }
   if (note            !== undefined) { sets.push('note = ?');             params.push(note || '') }
   if (!sets.length) return false
   params.push(id)
