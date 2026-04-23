@@ -13,6 +13,20 @@ function lastDayOfMonth() {
   return last.toISOString().slice(0, 10)
 }
 
+function EyeIcon({ open }) {
+  return open ? (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  ) : (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+      <line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  )
+}
+
 export default function SettlementPage() {
   const [from, setFrom] = useState(firstDayOfMonth)
   const [to, setTo]     = useState(lastDayOfMonth)
@@ -24,6 +38,12 @@ export default function SettlementPage() {
   const [shareLoading, setShareLoading] = useState('')
   const [shareUrl, setShareUrl] = useState(null)     // { studentName, url, expiresAt }
   const [copied, setCopied] = useState(false)
+  const [showAmounts, setShowAmounts] = useState(false)
+
+  function amt(value, suffix = '') {
+    if (!showAmounts) return '••••'
+    return value.toLocaleString() + suffix
+  }
 
   async function handleGenerate(e) {
     e.preventDefault()
@@ -108,6 +128,15 @@ export default function SettlementPage() {
     <div className="page">
       <div className="page-header">
         <h1>結算</h1>
+        <button
+          className="btn-sm"
+          onClick={() => setShowAmounts(v => !v)}
+          title={showAmounts ? '隱藏金額' : '顯示金額'}
+          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+        >
+          <EyeIcon open={showAmounts} />
+          {showAmounts ? '隱藏金額' : '顯示金額'}
+        </button>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>
@@ -197,8 +226,8 @@ export default function SettlementPage() {
                           {i === 0 && firstKind === 'course' && nameCell}
                           <td>{c.course_name}</td>
                           <td className="num-cell">{c.total_hours} 時</td>
-                          <td className="num-cell">{c.unit_price.toLocaleString()}</td>
-                          <td className="num-cell">{c.amount.toLocaleString()}</td>
+                          <td className="num-cell">{amt(c.unit_price)}</td>
+                          <td className="num-cell">{amt(c.amount)}</td>
                           {i === 0 && firstKind === 'course' && actionCell}
                         </tr>
                       ))}
@@ -207,8 +236,8 @@ export default function SettlementPage() {
                           {i === 0 && firstKind === 'group' && nameCell}
                           <td style={{ color: '#166534' }}>團課：{g.group_name}</td>
                           <td className="num-cell">{g.billable_months} 月</td>
-                          <td className="num-cell">{g.monthly_fee.toLocaleString()}/月</td>
-                          <td className="num-cell">{g.amount.toLocaleString()}</td>
+                          <td className="num-cell">{amt(g.monthly_fee, '/月')}</td>
+                          <td className="num-cell">{amt(g.amount)}</td>
                           {i === 0 && firstKind === 'group' && actionCell}
                         </tr>
                       ))}
@@ -217,15 +246,15 @@ export default function SettlementPage() {
                           {i === 0 && firstKind === 'material' && nameCell}
                           <td style={{ color: '#a16207' }}>教材：{m.material_name}</td>
                           <td className="num-cell">{m.total_qty} 本</td>
-                          <td className="num-cell">{m.unit_price.toLocaleString()}</td>
-                          <td className="num-cell">{m.amount.toLocaleString()}</td>
+                          <td className="num-cell">{amt(m.unit_price)}</td>
+                          <td className="num-cell">{amt(m.amount)}</td>
                           {i === 0 && firstKind === 'material' && actionCell}
                         </tr>
                       ))}
                       <tr className="subtotal-row" key={`${student.student_id}-total`}>
                         <td colSpan={3}></td>
                         <td className="subtotal-label">小計</td>
-                        <td className="num-cell subtotal-amount">{student.total.toLocaleString()}</td>
+                        <td className="num-cell subtotal-amount">{amt(student.total)}</td>
                         <td></td>
                       </tr>
                     </>
@@ -234,7 +263,7 @@ export default function SettlementPage() {
                 <tr className="grand-total-row">
                   <td colSpan={4} className="grand-total-label">合計</td>
                   <td className="num-cell grand-total-amount">
-                    {tuition.reduce((sum, s) => sum + s.total, 0).toLocaleString()}
+                    {amt(tuition.reduce((sum, s) => sum + s.total, 0))}
                   </td>
                   <td></td>
                 </tr>
@@ -268,8 +297,8 @@ export default function SettlementPage() {
                         {i === 0 && <td rowSpan={teacher.courses.length} className="student-cell">{teacher.teacher_name}</td>}
                         <td>{c.course_name}</td>
                         <td className="num-cell">{c.total_hours}</td>
-                        <td className="num-cell">{c.hourly_rate.toLocaleString()}</td>
-                        <td className="num-cell">{c.amount.toLocaleString()}</td>
+                        <td className="num-cell">{amt(c.hourly_rate)}</td>
+                        <td className="num-cell">{amt(c.amount)}</td>
                         {i === 0 && (
                           <td rowSpan={teacher.courses.length} style={{ verticalAlign: 'middle', textAlign: 'center' }}>
                             <button
@@ -287,7 +316,7 @@ export default function SettlementPage() {
                     <tr className="subtotal-row" key={`${teacher.teacher_id}-total`}>
                       <td colSpan={3}></td>
                       <td className="subtotal-label">小計</td>
-                      <td className="num-cell subtotal-amount">{teacher.total.toLocaleString()}</td>
+                      <td className="num-cell subtotal-amount">{amt(teacher.total)}</td>
                       <td></td>
                     </tr>
                   </>
@@ -295,7 +324,7 @@ export default function SettlementPage() {
                 <tr className="grand-total-row">
                   <td colSpan={4} className="grand-total-label">合計</td>
                   <td className="num-cell grand-total-amount">
-                    {salary.reduce((sum, t) => sum + t.total, 0).toLocaleString()}
+                    {amt(salary.reduce((sum, t) => sum + t.total, 0))}
                   </td>
                   <td></td>
                 </tr>
