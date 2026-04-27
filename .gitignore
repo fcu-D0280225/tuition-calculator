@@ -3,3 +3,6 @@ dist/
 .DS_Store
 *.local
 .gstack/
+.gstack-*/
+test-results/
+.env
