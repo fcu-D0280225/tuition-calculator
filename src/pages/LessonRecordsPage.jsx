@@ -19,13 +19,15 @@ export default function LessonRecordsPage() {
   const { state: studentState, loadStudents } = useStudents()
   const { state: teacherState, loadTeachers } = useTeachers()
   const { state: courseState, loadCourses }   = useCourses()
-  const { state: groupState, loadGroups, loadRecords: loadGroupRecords, createRecord: createGroupRecord, removeRecord: removeGroupRecord } = useGroups()
+  const { state: groupState, loadGroups, loadRecords: loadGroupRecords, createRecord: createGroupRecord, updateRecord: updateGroupRecord, removeRecord: removeGroupRecord } = useGroups()
 
   const [form, setForm]                 = useState(EMPTY_FORM)
   const [groupForm, setGroupForm]       = useState(EMPTY_GROUP_RECORD)
   const [addMode, setAddMode]           = useState(null) // 'lesson' | 'group' | null
   const [editId, setEditId]             = useState(null)
   const [editForm, setEditForm]         = useState(null)
+  const [editGroupRecId, setEditGroupRecId] = useState(null)
+  const [editGroupRec, setEditGroupRec]     = useState(null)
   const [error, setError]               = useState('')
   const [saving, setSaving]             = useState(false)
   const [showAmounts, setShowAmounts]   = useState(false)
@@ -131,6 +133,29 @@ export default function LessonRecordsPage() {
     setSaving(true); setError('')
     try { await removeGroupRecord(id) }
     catch { setError('刪除失敗') }
+    finally { setSaving(false) }
+  }
+
+  function startEditGroupRec(r) {
+    setEditGroupRecId(r.id)
+    setEditGroupRec({
+      group_id: r.group_id,
+      student_id: r.student_id,
+      record_date: r.record_date,
+      note: r.note || '',
+    })
+  }
+
+  async function handleSaveEditGroupRec(id) {
+    if (!editGroupRec.group_id) { setError('請選擇團課'); return }
+    if (!editGroupRec.student_id) { setError('請選擇學生'); return }
+    if (!editGroupRec.record_date) { setError('請選擇日期'); return }
+    setSaving(true); setError('')
+    try {
+      await updateGroupRecord(id, { ...editGroupRec })
+      await loadGroupRecords()
+      setEditGroupRecId(null); setEditGroupRec(null)
+    } catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
 
@@ -435,13 +460,52 @@ export default function LessonRecordsPage() {
             <tbody>
               {groupRecords.map(r => (
                 <tr key={r.id}>
-                  <td>{r.record_date}</td>
-                  <td>{r.group_name}</td>
-                  <td>{r.student_name}</td>
-                  <td className="note-cell">{r.note}</td>
-                  <td className="row-actions">
-                    <button className="btn-sm btn-danger" onClick={() => handleDeleteGroupRecord(r.id)} disabled={saving}>刪除</button>
-                  </td>
+                  {editGroupRecId === r.id ? (
+                    <>
+                      <td>
+                        <input type="date" value={editGroupRec.record_date}
+                          onChange={e => setEditGroupRec(f => ({ ...f, record_date: e.target.value }))}
+                        />
+                      </td>
+                      <td>
+                        <Combobox
+                          items={groups}
+                          value={editGroupRec.group_id}
+                          onChange={id => setEditGroupRec(f => ({ ...f, group_id: id }))}
+                          placeholder="搜尋團課…"
+                        />
+                      </td>
+                      <td>
+                        <Combobox
+                          items={students}
+                          value={editGroupRec.student_id}
+                          onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
+                          placeholder="搜尋學生…"
+                        />
+                      </td>
+                      <td>
+                        <input type="text"
+                          value={editGroupRec.note}
+                          onChange={e => setEditGroupRec(f => ({ ...f, note: e.target.value }))}
+                        />
+                      </td>
+                      <td className="row-actions">
+                        <button className="btn-sm btn-primary" onClick={() => handleSaveEditGroupRec(r.id)} disabled={saving}>儲存</button>
+                        <button className="btn-sm" onClick={() => { setEditGroupRecId(null); setEditGroupRec(null) }}>取消</button>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{r.record_date}</td>
+                      <td>{r.group_name}</td>
+                      <td>{r.student_name}</td>
+                      <td className="note-cell">{r.note}</td>
+                      <td className="row-actions">
+                        <button className="btn-sm" onClick={() => startEditGroupRec(r)}>編輯</button>
+                        <button className="btn-sm btn-danger" onClick={() => handleDeleteGroupRecord(r.id)} disabled={saving}>刪除</button>
+                      </td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
