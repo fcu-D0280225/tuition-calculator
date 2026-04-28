@@ -7,7 +7,7 @@
 #
 # 依賴：
 #   - Node.js（建議 LTS）
-#   - MySQL，且已建立 tuition_calculator DB，授權給 app_user
+#   - MySQL，且已建立 tuition_calculator DB，授權給 user
 #     （可用環境變數覆寫：MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE）
 #
 # Ctrl+C 會同時關閉後端與前端。
@@ -63,7 +63,7 @@ done
 
 if [ "$ready" -ne 1 ]; then
   echo "[start-dev] 後端未就緒。常見原因：" >&2
-  echo "  - MySQL 未啟動，或 tuition_calculator DB / app_user 未建立" >&2
+  echo "  - MySQL 未啟動，或 tuition_calculator DB / user 未建立" >&2
   echo "  - 連線參數需覆寫：MYSQL_HOST / MYSQL_PORT / MYSQL_USER / MYSQL_PASSWORD / MYSQL_DATABASE" >&2
   exit 1
 fi

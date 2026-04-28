@@ -3,8 +3,8 @@ import mysql from 'mysql2/promise'
 const config = {
   host: process.env.MYSQL_HOST || 'localhost',
   port: parseInt(process.env.MYSQL_PORT || '3306', 10),
-  user: process.env.MYSQL_USER || 'app_user',
-  password: process.env.MYSQL_PASSWORD || 'AppUser@2026!',
+  user: process.env.MYSQL_USER || 'user',
+  password: process.env.MYSQL_PASSWORD || '!Sqluser2026',
   database: process.env.MYSQL_DATABASE || 'tuition_calculator',
   connectionLimit: 10,
   waitForConnections: true,

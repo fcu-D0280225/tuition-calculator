@@ -92,8 +92,8 @@ npm run seed
 # 後端連線 MySQL（server/db.js）
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
-MYSQL_USER=app_user
-MYSQL_PASSWORD=AppUser@2026!
+MYSQL_USER=user
+MYSQL_PASSWORD=!Sqluser2026
 MYSQL_DATABASE=tuition_calculator
 
 # 後端 Port

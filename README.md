@@ -69,8 +69,8 @@ npm install
 ```
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
-MYSQL_USER=app_user
-MYSQL_PASSWORD=AppUser@2026!
+MYSQL_USER=user
+MYSQL_PASSWORD=!Sqluser2026
 MYSQL_DATABASE=tuition_calculator
 PORT=3100
 ```
@@ -79,8 +79,8 @@ PORT=3100
 
 ```sql
 CREATE DATABASE tuition_calculator CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'app_user'@'localhost' IDENTIFIED BY 'AppUser@2026!';
-GRANT ALL PRIVILEGES ON tuition_calculator.* TO 'app_user'@'localhost';
+CREATE USER 'user'@'localhost' IDENTIFIED BY '!Sqluser2026';
+GRANT ALL PRIVILEGES ON tuition_calculator.* TO 'user'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
