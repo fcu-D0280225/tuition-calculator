@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
+import EyeIcon from '../components/EyeIcon.jsx'
 
 export default function CoursesPage() {
   const { state, loadCourses, createCourse, updateCourse, removeCourse } = useCourses()
@@ -12,6 +13,12 @@ export default function CoursesPage() {
   const [editRate, setEditRate]       = useState('')
   const [error, setError]             = useState('')
   const [saving, setSaving]           = useState(false)
+  const [showAmounts, setShowAmounts] = useState(false)
+
+  function amt(value) {
+    if (!showAmounts) return '••••'
+    return parseFloat(value).toLocaleString()
+  }
 
   useEffect(() => { loadCourses() }, [loadCourses])
 
@@ -49,6 +56,9 @@ export default function CoursesPage() {
     <div className="page">
       <div className="page-header">
         <h1>家教課目錄</h1>
+        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
+          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
+        </button>
       </div>
 
       <form className="add-form" onSubmit={handleAdd}>
@@ -110,7 +120,7 @@ export default function CoursesPage() {
                       onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
                     />
                   ) : (
-                    parseFloat(c.hourly_rate).toLocaleString()
+                    amt(c.hourly_rate)
                   )}
                 </td>
                 <td className="row-actions">

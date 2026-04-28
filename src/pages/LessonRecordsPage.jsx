@@ -4,6 +4,7 @@ import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import Combobox from '../components/Combobox.jsx'
+import EyeIcon from '../components/EyeIcon.jsx'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -22,6 +23,12 @@ export default function LessonRecordsPage() {
   const [editForm, setEditForm]   = useState(null)
   const [error, setError]         = useState('')
   const [saving, setSaving]       = useState(false)
+  const [showAmounts, setShowAmounts] = useState(false)
+
+  function amt(value) {
+    if (!showAmounts) return '••••'
+    return parseFloat(value).toLocaleString()
+  }
 
   // Filters
   const [filterFrom, setFilterFrom]       = useState('')
@@ -106,6 +113,9 @@ export default function LessonRecordsPage() {
     <div className="page">
       <div className="page-header">
         <h1>上課紀錄</h1>
+        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
+          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
+        </button>
       </div>
 
       {/* 新增表單 */}
@@ -263,8 +273,8 @@ export default function LessonRecordsPage() {
                     <td>{l.hours}</td>
                     <td className="num-cell">
                       {l.unit_price != null
-                        ? parseFloat(l.unit_price).toLocaleString()
-                        : <span style={{ color: 'var(--muted)', fontSize: '12px' }}>{parseFloat(l.course_hourly_rate).toLocaleString()}（預設）</span>
+                        ? amt(l.unit_price)
+                        : <span style={{ color: 'var(--muted)', fontSize: '12px' }}>{amt(l.course_hourly_rate)}（預設）</span>
                       }
                     </td>
                     <td className="note-cell">{l.note}</td>

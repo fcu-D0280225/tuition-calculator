@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import Combobox from '../components/Combobox.jsx'
+import EyeIcon from '../components/EyeIcon.jsx'
 
 const WEEKDAYS = [
   { value: 0, label: '日' },
@@ -68,6 +69,12 @@ export default function GroupsPage() {
   const [form, setForm]     = useState(EMPTY_RECORD)
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
+  const [showAmounts, setShowAmounts] = useState(false)
+
+  function amt(value) {
+    if (!showAmounts) return '••••'
+    return parseFloat(value).toLocaleString()
+  }
 
   useEffect(() => { loadGroups(); loadStudents(); loadRecords() }, [loadGroups, loadStudents, loadRecords])
 
@@ -151,6 +158,9 @@ export default function GroupsPage() {
     <div className="page">
       <div className="page-header">
         <h1>團課管理</h1>
+        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
+          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
+        </button>
       </div>
 
       {error && <div className="error-msg">{error}</div>}
@@ -268,7 +278,7 @@ export default function GroupsPage() {
                         value={editGroup.monthly_fee}
                         onChange={e => setEditGroup(eg => ({ ...eg, monthly_fee: parseFloat(e.target.value) || 0 }))}
                       />
-                    ) : (g.monthly_fee > 0 ? g.monthly_fee.toLocaleString() : '—')}
+                    ) : (g.monthly_fee > 0 ? amt(g.monthly_fee) : '—')}
                   </td>
                   <td className="note-cell">
                     {editId === g.id ? (

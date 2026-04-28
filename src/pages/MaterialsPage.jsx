@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useMaterials } from '../contexts/MaterialsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import Combobox from '../components/Combobox.jsx'
+import EyeIcon from '../components/EyeIcon.jsx'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -27,6 +28,12 @@ export default function MaterialsPage() {
 
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
+  const [showAmounts, setShowAmounts] = useState(false)
+
+  function amt(value) {
+    if (!showAmounts) return '••••'
+    return parseFloat(value).toLocaleString()
+  }
 
   useEffect(() => { loadMaterials(); loadStudents(); loadRecords() }, [loadMaterials, loadStudents, loadRecords])
 
@@ -96,6 +103,9 @@ export default function MaterialsPage() {
     <div className="page">
       <div className="page-header">
         <h1>教材管理</h1>
+        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
+          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
+        </button>
       </div>
 
       {error && <div className="error-msg">{error}</div>}
@@ -157,7 +167,7 @@ export default function MaterialsPage() {
                         onChange={e => setEditMatPrice(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') handleUpdateMaterial(m.id); if (e.key === 'Escape') setEditMatId(null) }}
                       />
-                    ) : parseFloat(m.unit_price).toLocaleString()}
+                    ) : amt(m.unit_price)}
                   </td>
                   <td className="row-actions">
                     {editMatId === m.id ? (
@@ -245,9 +255,9 @@ export default function MaterialsPage() {
                 <td>{r.record_date}</td>
                 <td>{r.student_name}</td>
                 <td>{r.material_name}</td>
-                <td className="num-cell">{parseFloat(r.unit_price).toLocaleString()}</td>
+                <td className="num-cell">{amt(r.unit_price)}</td>
                 <td className="num-cell">{parseFloat(r.quantity)}</td>
-                <td className="num-cell">{Math.round(parseFloat(r.unit_price) * parseFloat(r.quantity)).toLocaleString()}</td>
+                <td className="num-cell">{showAmounts ? Math.round(parseFloat(r.unit_price) * parseFloat(r.quantity)).toLocaleString() : '••••'}</td>
                 <td className="note-cell">{r.note}</td>
                 <td className="row-actions">
                   <button className="btn-sm btn-danger" onClick={() => handleDeleteRecord(r.id)} disabled={saving}>刪除</button>
