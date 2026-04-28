@@ -3,6 +3,7 @@ import { useLessons } from '../contexts/LessonsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
+import { useGroups } from '../contexts/GroupsContext.jsx'
 import Combobox from '../components/Combobox.jsx'
 import EyeIcon from '../components/EyeIcon.jsx'
 
@@ -11,19 +12,22 @@ function todayStr() {
 }
 
 const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), unit_price: '', note: '' }
+const EMPTY_GROUP_RECORD = { group_id: '', student_ids: [], record_date: todayStr(), note: '' }
 
 export default function LessonRecordsPage() {
   const { state: lessonState, loadLessons, createLesson, updateLesson, removeLesson } = useLessons()
   const { state: studentState, loadStudents } = useStudents()
   const { state: teacherState, loadTeachers } = useTeachers()
   const { state: courseState, loadCourses }   = useCourses()
+  const { state: groupState, loadGroups, loadRecords: loadGroupRecords, createRecord: createGroupRecord, removeRecord: removeGroupRecord } = useGroups()
 
-  const [form, setForm]           = useState(EMPTY_FORM)
-  const [editId, setEditId]       = useState(null)
-  const [editForm, setEditForm]   = useState(null)
-  const [error, setError]         = useState('')
-  const [saving, setSaving]       = useState(false)
-  const [showAmounts, setShowAmounts] = useState(false)
+  const [form, setForm]                 = useState(EMPTY_FORM)
+  const [groupForm, setGroupForm]       = useState(EMPTY_GROUP_RECORD)
+  const [editId, setEditId]             = useState(null)
+  const [editForm, setEditForm]         = useState(null)
+  const [error, setError]               = useState('')
+  const [saving, setSaving]             = useState(false)
+  const [showAmounts, setShowAmounts]   = useState(false)
 
   function amt(value) {
     if (!showAmounts) return '••••'
@@ -39,8 +43,9 @@ export default function LessonRecordsPage() {
 
   useEffect(() => {
     loadStudents(); loadTeachers(); loadCourses()
+    loadGroups(); loadGroupRecords()
     loadLessons({})
-  }, [loadStudents, loadTeachers, loadCourses, loadLessons])
+  }, [loadStudents, loadTeachers, loadCourses, loadGroups, loadGroupRecords, loadLessons])
 
   function handleFilter(e) {
     e.preventDefault()
@@ -63,10 +68,11 @@ export default function LessonRecordsPage() {
     const hours = parseFloat(form.hours)
     if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
+    const unit_price = parseFloat(form.unit_price)
+    if (isNaN(unit_price) || unit_price <= 0) { setError('請輸入金額'); return }
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
     setSaving(true); setError('')
     try {
-      const unit_price = form.unit_price !== '' ? parseFloat(form.unit_price) : null
       await createLesson({ ...form, hours, unit_price })
       setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date })
     } catch { setError('新增失敗') }
@@ -93,10 +99,45 @@ export default function LessonRecordsPage() {
     finally { setSaving(false) }
   }
 
+  // ── 團課上課紀錄 ─────────────────────────────────────────────
+  async function handleAddGroupRecord(e) {
+    e.preventDefault()
+    if (!groupForm.group_id) { setError('請選擇團課'); return }
+    if (groupForm.student_ids.length === 0) { setError('請至少選一位學生'); return }
+    if (!groupForm.record_date) { setError('請選擇日期'); return }
+    setSaving(true); setError('')
+    try {
+      const { group_id, record_date, note, student_ids } = groupForm
+      await Promise.all(student_ids.map(student_id =>
+        createGroupRecord({ group_id, student_id, record_date, note })
+      ))
+      await loadGroupRecords()
+      setGroupForm({ ...EMPTY_GROUP_RECORD, record_date: groupForm.record_date })
+    } catch { setError('新增失敗') }
+    finally { setSaving(false) }
+  }
+
+  function addGroupStudent(id) {
+    if (!id) return
+    setGroupForm(f => f.student_ids.includes(id) ? f : { ...f, student_ids: [...f.student_ids, id] })
+  }
+  function removeGroupStudent(id) {
+    setGroupForm(f => ({ ...f, student_ids: f.student_ids.filter(x => x !== id) }))
+  }
+
+  async function handleDeleteGroupRecord(id) {
+    if (!window.confirm('確定要刪除此筆團課上課紀錄？')) return
+    setSaving(true); setError('')
+    try { await removeGroupRecord(id) }
+    catch { setError('刪除失敗') }
+    finally { setSaving(false) }
+  }
+
   const { students } = studentState
   const { teachers } = teacherState
   const { courses }  = courseState
   const { lessons, loading } = lessonState
+  const { groups, records: groupRecords } = groupState
 
   // 選課程時自動帶入預設時薪
   function handleCourseChange(id, isEdit = false) {
@@ -175,6 +216,58 @@ export default function LessonRecordsPage() {
           <button className="btn-primary" type="submit" disabled={saving}>新增</button>
         </form>
         {error && <div className="error-msg">{error}</div>}
+      </div>
+
+      {/* 新增團課上課紀錄 */}
+      <div className="lesson-form-card">
+        <div className="form-section-title">新增團課上課紀錄</div>
+        <form className="lesson-form" onSubmit={handleAddGroupRecord}>
+          <div className="lesson-form-row">
+            <label>團課
+              <Combobox
+                items={groups}
+                value={groupForm.group_id}
+                onChange={id => setGroupForm(f => ({ ...f, group_id: id }))}
+                placeholder="搜尋團課…"
+              />
+            </label>
+            <label>日期
+              <input type="date" value={groupForm.record_date}
+                onChange={e => setGroupForm(f => ({ ...f, record_date: e.target.value }))}
+              />
+            </label>
+            <label>備註
+              <input type="text" placeholder="（選填）"
+                value={groupForm.note}
+                onChange={e => setGroupForm(f => ({ ...f, note: e.target.value }))}
+                className="note-input"
+              />
+            </label>
+          </div>
+          <label>學生（可複選）
+            <Combobox
+              key={groupForm.student_ids.length}
+              items={students.filter(s => !groupForm.student_ids.includes(s.id))}
+              value=""
+              onChange={addGroupStudent}
+              placeholder="搜尋學生加入…"
+            />
+            {groupForm.student_ids.length > 0 && (
+              <div className="chip-list">
+                {groupForm.student_ids.map(id => {
+                  const s = students.find(x => x.id === id)
+                  return (
+                    <span className="chip" key={id}>
+                      {s?.name ?? id}
+                      <button type="button" className="chip-remove" onClick={() => removeGroupStudent(id)} aria-label="移除">×</button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </label>
+          <button className="btn-primary" type="submit" disabled={saving}>新增</button>
+        </form>
       </div>
 
       {/* 篩選 */}
@@ -299,6 +392,37 @@ export default function LessonRecordsPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* 團課上課紀錄列表 */}
+      {groupRecords.length > 0 && (
+        <>
+          <div className="form-section-title" style={{ marginTop: '32px', marginBottom: '12px' }}>團課上課紀錄</div>
+          <table className="lesson-table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>團課</th>
+                <th>學生</th>
+                <th>備註</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupRecords.map(r => (
+                <tr key={r.id}>
+                  <td>{r.record_date}</td>
+                  <td>{r.group_name}</td>
+                  <td>{r.student_name}</td>
+                  <td className="note-cell">{r.note}</td>
+                  <td className="row-actions">
+                    <button className="btn-sm btn-danger" onClick={() => handleDeleteGroupRecord(r.id)} disabled={saving}>刪除</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
     </div>
   )

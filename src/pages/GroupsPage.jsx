@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
-import { useStudents } from '../contexts/StudentsContext.jsx'
-import Combobox from '../components/Combobox.jsx'
 import EyeIcon from '../components/EyeIcon.jsx'
 
 const WEEKDAYS = [
@@ -13,10 +11,6 @@ const WEEKDAYS = [
   { value: 5, label: '五' },
   { value: 6, label: '六' },
 ]
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function parseWeekdays(raw) {
   if (!raw) return []
@@ -55,18 +49,15 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP  = { name: '', weekdays: '', duration_months: 0, monthly_fee: 0, note: '' }
-const EMPTY_RECORD = { group_id: '', student_ids: [], record_date: todayStr(), note: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: 0, note: '' }
 
 export default function GroupsPage() {
-  const { state, loadGroups, createGroup, updateGroup, removeGroup, loadRecords, createRecord, removeRecord } = useGroups()
-  const { state: ss, loadStudents } = useStudents()
+  const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
 
-  const [newGroup, setNewGroup] = useState(EMPTY_GROUP)
-  const [editId, setEditId]     = useState(null)
+  const [newGroup, setNewGroup]   = useState(EMPTY_GROUP)
+  const [editId, setEditId]       = useState(null)
   const [editGroup, setEditGroup] = useState(EMPTY_GROUP)
 
-  const [form, setForm]     = useState(EMPTY_RECORD)
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
   const [showAmounts, setShowAmounts] = useState(false)
@@ -76,14 +67,15 @@ export default function GroupsPage() {
     return parseFloat(value).toLocaleString()
   }
 
-  useEffect(() => { loadGroups(); loadStudents(); loadRecords() }, [loadGroups, loadStudents, loadRecords])
-
-  // ── 團課目錄 ──────────────────────────────────────────────────
+  useEffect(() => { loadGroups() }, [loadGroups])
 
   async function handleAddGroup(e) {
     e.preventDefault()
     const name = newGroup.name.trim()
-    if (!name) return
+    if (!name) { setError('請輸入團課名稱'); return }
+    if (!parseWeekdays(newGroup.weekdays).length) { setError('請選擇上課星期'); return }
+    if (!Number.isInteger(newGroup.duration_months) || newGroup.duration_months <= 0) { setError('請選擇持續時間'); return }
+    if (isNaN(newGroup.monthly_fee) || newGroup.monthly_fee <= 0) { setError('請輸入月費'); return }
     setSaving(true); setError('')
     try {
       await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: newGroup.monthly_fee, note: newGroup.note })
@@ -116,43 +108,7 @@ export default function GroupsPage() {
     finally { setSaving(false) }
   }
 
-  // ── 團課上課紀錄 ─────────────────────────────────────────────
-
-  async function handleAddRecord(e) {
-    e.preventDefault()
-    if (!form.group_id) { setError('請選擇團課'); return }
-    if (form.student_ids.length === 0) { setError('請至少選一位學生'); return }
-    if (!form.record_date) { setError('請選擇日期'); return }
-    setSaving(true); setError('')
-    try {
-      const { group_id, record_date, note, student_ids } = form
-      await Promise.all(student_ids.map(student_id =>
-        createRecord({ group_id, student_id, record_date, note })
-      ))
-      await loadRecords()
-      setForm({ ...EMPTY_RECORD, record_date: form.record_date })
-    } catch { setError('新增失敗') }
-    finally { setSaving(false) }
-  }
-
-  function addStudent(id) {
-    if (!id) return
-    setForm(f => f.student_ids.includes(id) ? f : { ...f, student_ids: [...f.student_ids, id] })
-  }
-  function removeStudent(id) {
-    setForm(f => ({ ...f, student_ids: f.student_ids.filter(x => x !== id) }))
-  }
-
-  async function handleDeleteRecord(id) {
-    if (!window.confirm('確定要刪除此筆團課上課紀錄？')) return
-    setSaving(true); setError('')
-    try { await removeRecord(id) }
-    catch { setError('刪除失敗') }
-    finally { setSaving(false) }
-  }
-
-  const { groups, loading, records } = state
-  const { students } = ss
+  const { groups, loading } = state
 
   return (
     <div className="page">
@@ -166,7 +122,7 @@ export default function GroupsPage() {
       {error && <div className="error-msg">{error}</div>}
 
       {/* ── 團課目錄 ── */}
-      <div className="lesson-form-card" style={{ marginBottom: '32px' }}>
+      <div className="lesson-form-card">
         <div className="form-section-title">團課目錄</div>
 
         <form className="lesson-form" onSubmit={handleAddGroup} style={{ marginBottom: '16px' }}>
@@ -218,7 +174,17 @@ export default function GroupsPage() {
               />
             </label>
           </div>
-          <button className="btn-primary" type="submit" disabled={saving || !newGroup.name.trim()}>新增團課</button>
+          <button
+            className="btn-primary"
+            type="submit"
+            disabled={
+              saving
+              || !newGroup.name.trim()
+              || !parseWeekdays(newGroup.weekdays).length
+              || !(newGroup.duration_months > 0)
+              || !(newGroup.monthly_fee > 0)
+            }
+          >新增團課</button>
         </form>
 
         {loading ? (
@@ -309,85 +275,6 @@ export default function GroupsPage() {
           </table>
         )}
       </div>
-
-      {/* ── 團課上課紀錄 ── */}
-      <div className="lesson-form-card">
-        <div className="form-section-title">新增團課上課紀錄</div>
-        <form className="lesson-form" onSubmit={handleAddRecord}>
-          <div className="lesson-form-row">
-            <label>團課
-              <Combobox
-                items={groups}
-                value={form.group_id}
-                onChange={id => setForm(f => ({ ...f, group_id: id }))}
-                placeholder="搜尋團課…"
-              />
-            </label>
-            <label>日期
-              <input type="date" value={form.record_date}
-                onChange={e => setForm(f => ({ ...f, record_date: e.target.value }))}
-              />
-            </label>
-            <label>備註
-              <input type="text" placeholder="（選填）"
-                value={form.note}
-                onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
-                className="note-input"
-              />
-            </label>
-          </div>
-          <label>學生（可複選）
-            <Combobox
-              key={form.student_ids.length}
-              items={students.filter(s => !form.student_ids.includes(s.id))}
-              value=""
-              onChange={addStudent}
-              placeholder="搜尋學生加入…"
-            />
-            {form.student_ids.length > 0 && (
-              <div className="chip-list">
-                {form.student_ids.map(id => {
-                  const s = students.find(x => x.id === id)
-                  return (
-                    <span className="chip" key={id}>
-                      {s?.name ?? id}
-                      <button type="button" className="chip-remove" onClick={() => removeStudent(id)} aria-label="移除">×</button>
-                    </span>
-                  )
-                })}
-              </div>
-            )}
-          </label>
-          <button className="btn-primary" type="submit" disabled={saving}>新增</button>
-        </form>
-      </div>
-
-      {records.length > 0 && (
-        <table className="lesson-table" style={{ marginTop: '24px' }}>
-          <thead>
-            <tr>
-              <th>日期</th>
-              <th>團課</th>
-              <th>學生</th>
-              <th>備註</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {records.map(r => (
-              <tr key={r.id}>
-                <td>{r.record_date}</td>
-                <td>{r.group_name}</td>
-                <td>{r.student_name}</td>
-                <td className="note-cell">{r.note}</td>
-                <td className="row-actions">
-                  <button className="btn-sm btn-danger" onClick={() => handleDeleteRecord(r.id)} disabled={saving}>刪除</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
     </div>
   )
 }

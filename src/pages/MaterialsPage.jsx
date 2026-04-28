@@ -42,8 +42,9 @@ export default function MaterialsPage() {
   async function handleAddMaterial(e) {
     e.preventDefault()
     const name = newName.trim()
-    if (!name) return
-    const price = parseFloat(newPrice) || 0
+    if (!name) { setError('請輸入教材名稱'); return }
+    const price = parseFloat(newPrice)
+    if (isNaN(price) || price <= 0) { setError('請輸入單價'); return }
     setSaving(true); setError('')
     try { await createMaterial(name, price); setNewName(''); setNewPrice('') }
     catch { setError('新增失敗') }
@@ -131,7 +132,7 @@ export default function MaterialsPage() {
             value={newPrice}
             onChange={e => setNewPrice(e.target.value)}
           />
-          <button className="btn-primary" type="submit" disabled={saving || !newName.trim()}>新增教材</button>
+          <button className="btn-primary" type="submit" disabled={saving || !newName.trim() || !newPrice.trim() || parseFloat(newPrice) <= 0}>新增教材</button>
         </form>
 
         {loading ? (

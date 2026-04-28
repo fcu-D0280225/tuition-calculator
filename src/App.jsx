@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
 import CoursesPage       from './pages/CoursesPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
@@ -26,65 +26,33 @@ const NAV = [
   ]},
 ]
 
-function NavGroup({ label, children, currentTab, onSelect }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const activeChild = children.find(c => c.id === currentTab)
-
-  useEffect(() => {
-    if (!open) return
-    function onDocClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [open])
-
-  return (
-    <div className="nav-group" ref={ref}>
-      <button
-        type="button"
-        className={`nav-tab ${activeChild ? 'active' : ''}`}
-        onClick={() => setOpen(v => !v)}
-      >
-        {label} ▾
-      </button>
-      {open && (
-        <div className="nav-group-menu">
-          {children.map(c => (
-            <button
-              key={c.id}
-              type="button"
-              className={`nav-group-item ${currentTab === c.id ? 'active' : ''}`}
-              onClick={() => { onSelect(c.id); setOpen(false) }}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function App() {
   const [tab, setTab] = useState('dashboard')
 
   return (
     <AppProviders>
       <div className="app-shell">
-        <header className="app-header">
+        <aside className="app-sidebar">
           <div className="app-title">補習班管理系統</div>
           <nav className="app-nav">
             {NAV.map(item => item.type === 'group' ? (
-              <NavGroup
-                key={item.key}
-                label={item.label}
-                children={item.children}
-                currentTab={tab}
-                onSelect={setTab}
-              />
+              <div className="nav-section" key={item.key}>
+                <div className="nav-section-label">{item.label}</div>
+                {item.children.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`nav-tab ${tab === c.id ? 'active' : ''}`}
+                    onClick={() => setTab(c.id)}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
             ) : (
               <button
                 key={item.id}
+                type="button"
                 className={`nav-tab ${tab === item.id ? 'active' : ''}`}
                 onClick={() => setTab(item.id)}
               >
@@ -92,7 +60,7 @@ export default function App() {
               </button>
             ))}
           </nav>
-        </header>
+        </aside>
         <main className="app-main">
           {tab === 'dashboard'  && <DashboardPage />}
           {tab === 'lessons'    && <LessonRecordsPage />}

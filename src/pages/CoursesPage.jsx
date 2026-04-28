@@ -25,8 +25,9 @@ export default function CoursesPage() {
   async function handleAdd(e) {
     e.preventDefault()
     const name = newName.trim()
-    if (!name) return
-    const hourlyRate = parseFloat(newRate) || 0
+    if (!name) { setError('請輸入家教課名稱'); return }
+    const hourlyRate = parseFloat(newRate)
+    if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入時薪'); return }
     setSaving(true); setError('')
     try { await createCourse(name, hourlyRate); setNewName(''); setNewRate('') }
     catch { setError('新增失敗') }
@@ -78,7 +79,7 @@ export default function CoursesPage() {
           value={newRate}
           onChange={e => setNewRate(e.target.value)}
         />
-        <button className="btn-primary" type="submit" disabled={saving || !newName.trim()}>新增家教課</button>
+        <button className="btn-primary" type="submit" disabled={saving || !newName.trim() || !newRate.trim() || parseFloat(newRate) <= 0}>新增家教課</button>
       </form>
 
       {error && <div className="error-msg">{error}</div>}
