@@ -29,8 +29,8 @@ export function CoursesProvider({ children }) {
     dispatch({ type: 'SET_COURSES', courses })
   }, [])
 
-  const createCourse = useCallback(async (name, hourlyRate = 0) => {
-    const course = await apiCreateCourse(name, hourlyRate)
+  const createCourse = useCallback(async (name, hourlyRate = 0, teacherHourlyRate = 0) => {
+    const course = await apiCreateCourse(name, hourlyRate, teacherHourlyRate)
     dispatch({ type: 'ADD_COURSE', course })
     return course
   }, [])

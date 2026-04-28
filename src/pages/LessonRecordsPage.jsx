@@ -11,7 +11,7 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), unit_price: '', note: '' }
+const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), unit_price: '', teacher_unit_price: '', note: '' }
 const EMPTY_GROUP_RECORD = { group_id: '', student_ids: [], record_date: todayStr(), note: '' }
 
 export default function LessonRecordsPage() {
@@ -72,11 +72,13 @@ export default function LessonRecordsPage() {
     if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     const unit_price = parseFloat(form.unit_price)
-    if (isNaN(unit_price) || unit_price <= 0) { setError('請輸入金額'); return }
+    if (isNaN(unit_price) || unit_price <= 0) { setError('請輸入學生時薪'); return }
+    const teacher_unit_price = parseFloat(form.teacher_unit_price)
+    if (isNaN(teacher_unit_price) || teacher_unit_price <= 0) { setError('請輸入老師時薪'); return }
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
     setSaving(true); setError('')
     try {
-      await createLesson({ ...form, hours, unit_price })
+      await createLesson({ ...form, hours, unit_price, teacher_unit_price })
       setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date })
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -87,8 +89,9 @@ export default function LessonRecordsPage() {
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     setSaving(true); setError('')
     try {
-      const unit_price = editForm.unit_price !== '' ? parseFloat(editForm.unit_price) : null
-      await updateLesson(id, { ...editForm, hours, unit_price })
+      const unit_price         = editForm.unit_price         !== '' ? parseFloat(editForm.unit_price)         : null
+      const teacher_unit_price = editForm.teacher_unit_price !== '' ? parseFloat(editForm.teacher_unit_price) : null
+      await updateLesson(id, { ...editForm, hours, unit_price, teacher_unit_price })
       setEditId(null); setEditForm(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -165,14 +168,15 @@ export default function LessonRecordsPage() {
   const { lessons, loading } = lessonState
   const { groups, records: groupRecords } = groupState
 
-  // 選課程時自動帶入預設時薪
+  // 選課程時自動帶入預設學生時薪與老師時薪
   function handleCourseChange(id, isEdit = false) {
-    const course = courses.find(c => c.id === id)
-    const rate   = course ? String(course.hourly_rate) : ''
+    const course       = courses.find(c => c.id === id)
+    const studentRate  = course ? String(course.hourly_rate) : ''
+    const teacherRate  = course ? String(course.teacher_hourly_rate ?? 0) : ''
     if (isEdit) {
-      setEditForm(f => ({ ...f, course_id: id, unit_price: rate }))
+      setEditForm(f => ({ ...f, course_id: id, unit_price: studentRate, teacher_unit_price: teacherRate }))
     } else {
-      setForm(f => ({ ...f, course_id: id, unit_price: rate }))
+      setForm(f => ({ ...f, course_id: id, unit_price: studentRate, teacher_unit_price: teacherRate }))
     }
   }
 
@@ -239,9 +243,16 @@ export default function LessonRecordsPage() {
                 className="hours-input"
               />
             </label>
-            <label>金額（元/時）
+            <label>學生時薪
               <input type="number" min="0" step="1" placeholder="課程預設"
                 value={form.unit_price} onChange={e => setForm(f => ({ ...f, unit_price: e.target.value }))}
+                className="hours-input"
+                style={{ width: '110px' }}
+              />
+            </label>
+            <label>老師時薪
+              <input type="number" min="0" step="1" placeholder="課程預設"
+                value={form.teacher_unit_price} onChange={e => setForm(f => ({ ...f, teacher_unit_price: e.target.value }))}
                 className="hours-input"
                 style={{ width: '110px' }}
               />
@@ -363,7 +374,8 @@ export default function LessonRecordsPage() {
               <th>課程</th>
               <th>老師</th>
               <th>時數</th>
-              <th>金額(元/時)</th>
+              <th>學生時薪</th>
+              <th>老師時薪</th>
               <th>備註</th>
               <th></th>
             </tr>
@@ -400,6 +412,7 @@ export default function LessonRecordsPage() {
                     </td>
                     <td><input type="number" min="0.5" step="0.5" value={editForm.hours} onChange={e => setEditForm(f => ({ ...f, hours: e.target.value }))} className="hours-input" /></td>
                     <td><input type="number" min="0" step="1" value={editForm.unit_price} onChange={e => setEditForm(f => ({ ...f, unit_price: e.target.value }))} className="hours-input" style={{ width: '90px' }} /></td>
+                    <td><input type="number" min="0" step="1" value={editForm.teacher_unit_price} onChange={e => setEditForm(f => ({ ...f, teacher_unit_price: e.target.value }))} className="hours-input" style={{ width: '90px' }} /></td>
                     <td><input type="text" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} /></td>
                     <td className="row-actions">
                       <button className="btn-sm btn-primary" onClick={() => handleSaveEdit(l.id)} disabled={saving}>儲存</button>
@@ -419,6 +432,12 @@ export default function LessonRecordsPage() {
                         : <span style={{ color: 'var(--muted)', fontSize: '12px' }}>{amt(l.course_hourly_rate)}（預設）</span>
                       }
                     </td>
+                    <td className="num-cell">
+                      {l.teacher_unit_price != null
+                        ? amt(l.teacher_unit_price)
+                        : <span style={{ color: 'var(--muted)', fontSize: '12px' }}>{amt(l.course_teacher_hourly_rate ?? 0)}（預設）</span>
+                      }
+                    </td>
                     <td className="note-cell">{l.note}</td>
                     <td className="row-actions">
                       <button className="btn-sm" onClick={() => {
@@ -430,6 +449,7 @@ export default function LessonRecordsPage() {
                           hours: String(l.hours),
                           lesson_date: l.lesson_date,
                           unit_price: l.unit_price != null ? String(l.unit_price) : String(l.course_hourly_rate),
+                          teacher_unit_price: l.teacher_unit_price != null ? String(l.teacher_unit_price) : String(l.course_teacher_hourly_rate ?? 0),
                           note: l.note,
                         })
                       }}>編輯</button>

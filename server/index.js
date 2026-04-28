@@ -138,8 +138,13 @@ app.post('/api/courses', async (req, res) => {
   if (!name) return res.status(400).json({ error: 'name_required' })
   const hourlyRate = req.body?.hourly_rate !== undefined ? parseFloat(req.body.hourly_rate) : 0
   if (isNaN(hourlyRate) || hourlyRate < 0) return res.status(400).json({ error: 'invalid_hourly_rate' })
+  const teacherHourlyRate = req.body?.teacher_hourly_rate !== undefined ? parseFloat(req.body.teacher_hourly_rate) : 0
+  if (isNaN(teacherHourlyRate) || teacherHourlyRate < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
   const id = genId('cr')
-  try { await insertCourse({ id, name, hourlyRate }); res.status(201).json({ id, name, hourly_rate: hourlyRate }) }
+  try {
+    await insertCourse({ id, name, hourlyRate, teacherHourlyRate })
+    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate })
+  }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -154,6 +159,11 @@ app.patch('/api/courses/:id', async (req, res) => {
     const hourlyRate = parseFloat(req.body.hourly_rate)
     if (isNaN(hourlyRate) || hourlyRate < 0) return res.status(400).json({ error: 'invalid_hourly_rate' })
     update.hourlyRate = hourlyRate
+  }
+  if (req.body?.teacher_hourly_rate !== undefined) {
+    const teacherHourlyRate = parseFloat(req.body.teacher_hourly_rate)
+    if (isNaN(teacherHourlyRate) || teacherHourlyRate < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
+    update.teacherHourlyRate = teacherHourlyRate
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
@@ -182,30 +192,33 @@ app.get('/api/lessons', async (req, res) => {
 })
 
 app.post('/api/lessons', async (req, res) => {
-  const { student_id, course_id, teacher_id, hours, lesson_date, unit_price, note } = req.body || {}
+  const { student_id, course_id, teacher_id, hours, lesson_date, unit_price, teacher_unit_price, note } = req.body || {}
   if (!student_id || !course_id || !teacher_id) return res.status(400).json({ error: 'student_id_course_id_teacher_id_required' })
   const parsedHours = parseFloat(hours)
   if (isNaN(parsedHours) || parsedHours <= 0) return res.status(400).json({ error: 'invalid_hours' })
   if (!lesson_date || !/^\d{4}-\d{2}-\d{2}$/.test(lesson_date)) return res.status(400).json({ error: 'invalid_lesson_date' })
   const parsedPrice = unit_price !== undefined && unit_price !== '' ? parseFloat(unit_price) : null
   if (parsedPrice !== null && (isNaN(parsedPrice) || parsedPrice < 0)) return res.status(400).json({ error: 'invalid_unit_price' })
+  const parsedTeacherPrice = teacher_unit_price !== undefined && teacher_unit_price !== '' ? parseFloat(teacher_unit_price) : null
+  if (parsedTeacherPrice !== null && (isNaN(parsedTeacherPrice) || parsedTeacherPrice < 0)) return res.status(400).json({ error: 'invalid_teacher_unit_price' })
   const id = genId('lr')
   try {
-    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId: teacher_id, hours: parsedHours, lessonDate: lesson_date, unitPrice: parsedPrice, note })
-    res.status(201).json({ id, student_id, course_id, teacher_id, hours: parsedHours, lesson_date, unit_price: parsedPrice, note: note || '' })
+    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId: teacher_id, hours: parsedHours, lessonDate: lesson_date, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note })
+    res.status(201).json({ id, student_id, course_id, teacher_id, hours: parsedHours, lesson_date, unit_price: parsedPrice, teacher_unit_price: parsedTeacherPrice, note: note || '' })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/lessons/:id', async (req, res) => {
-  const { student_id, course_id, teacher_id, hours, lesson_date, unit_price, note } = req.body || {}
+  const { student_id, course_id, teacher_id, hours, lesson_date, unit_price, teacher_unit_price, note } = req.body || {}
   const update = {}
-  if (student_id  !== undefined) update.studentId  = student_id
-  if (course_id   !== undefined) update.courseId   = course_id
-  if (teacher_id  !== undefined) update.teacherId  = teacher_id
-  if (hours       !== undefined) update.hours      = parseFloat(hours)
-  if (lesson_date !== undefined) update.lessonDate = lesson_date
-  if (unit_price  !== undefined) update.unitPrice  = unit_price === '' ? null : parseFloat(unit_price)
-  if (note        !== undefined) update.note       = note
+  if (student_id        !== undefined) update.studentId        = student_id
+  if (course_id         !== undefined) update.courseId         = course_id
+  if (teacher_id        !== undefined) update.teacherId        = teacher_id
+  if (hours             !== undefined) update.hours            = parseFloat(hours)
+  if (lesson_date       !== undefined) update.lessonDate       = lesson_date
+  if (unit_price        !== undefined) update.unitPrice        = unit_price === '' ? null : parseFloat(unit_price)
+  if (teacher_unit_price !== undefined) update.teacherUnitPrice = teacher_unit_price === '' ? null : parseFloat(teacher_unit_price)
+  if (note              !== undefined) update.note             = note
   try {
     const ok = await updateLesson(req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })

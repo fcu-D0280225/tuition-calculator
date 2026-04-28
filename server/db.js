@@ -89,6 +89,28 @@ export async function initSchema() {
     )
   }
 
+  // Migration: add teacher_hourly_rate to existing courses table if missing
+  const [courseTeacherRateCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'courses' AND COLUMN_NAME = 'teacher_hourly_rate'`
+  )
+  if (courseTeacherRateCols.length === 0) {
+    await pool.query(
+      `ALTER TABLE courses ADD COLUMN teacher_hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0`
+    )
+  }
+
+  // Migration: add teacher_unit_price (per-lesson teacher hourly rate override) to lesson_records
+  const [lrTeacherPriceCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_records' AND COLUMN_NAME = 'teacher_unit_price'`
+  )
+  if (lrTeacherPriceCols.length === 0) {
+    await pool.query(
+      `ALTER TABLE lesson_records ADD COLUMN teacher_unit_price DECIMAL(10,2) NULL DEFAULT NULL`
+    )
+  }
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS materials (
       id          VARCHAR(64)    NOT NULL PRIMARY KEY,
@@ -244,20 +266,24 @@ export async function deleteTeacher(id) {
 
 export async function listCourses() {
   const [rows] = await pool.query(
-    'SELECT id, name, hourly_rate FROM courses ORDER BY name ASC, hourly_rate DESC, id DESC'
+    'SELECT id, name, hourly_rate, teacher_hourly_rate FROM courses ORDER BY name ASC, hourly_rate DESC, id DESC'
   )
   return rows
 }
 
-export async function insertCourse({ id, name, hourlyRate }) {
-  await pool.query('INSERT INTO courses (id, name, hourly_rate) VALUES (?, ?, ?)', [id, name, hourlyRate ?? 0])
+export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate }) {
+  await pool.query(
+    'INSERT INTO courses (id, name, hourly_rate, teacher_hourly_rate) VALUES (?, ?, ?, ?)',
+    [id, name, hourlyRate ?? 0, teacherHourlyRate ?? 0]
+  )
 }
 
-export async function updateCourse(id, { name, hourlyRate }) {
+export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate }) {
   const sets = []
   const params = []
-  if (name       !== undefined) { sets.push('name = ?');        params.push(name) }
-  if (hourlyRate !== undefined) { sets.push('hourly_rate = ?'); params.push(hourlyRate) }
+  if (name              !== undefined) { sets.push('name = ?');                params.push(name) }
+  if (hourlyRate        !== undefined) { sets.push('hourly_rate = ?');         params.push(hourlyRate) }
+  if (teacherHourlyRate !== undefined) { sets.push('teacher_hourly_rate = ?'); params.push(teacherHourlyRate) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE courses SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -287,8 +313,9 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
     `SELECT lr.id, lr.student_id, s.name AS student_name,
             lr.course_id, c.name AS course_name,
             lr.teacher_id, t.name AS teacher_name,
-            lr.hours, lr.lesson_date, lr.unit_price, lr.note,
-            c.hourly_rate AS course_hourly_rate
+            lr.hours, lr.lesson_date, lr.unit_price, lr.teacher_unit_price, lr.note,
+            c.hourly_rate         AS course_hourly_rate,
+            c.teacher_hourly_rate AS course_teacher_hourly_rate
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
@@ -300,24 +327,25 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
   return rows
 }
 
-export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, unitPrice, note }) {
+export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, unitPrice, teacherUnitPrice, note }) {
   await pool.query(
-    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, unit_price, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, courseId, teacherId, hours, lessonDate, unitPrice ?? null, note || '']
+    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, unit_price, teacher_unit_price, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, studentId, courseId, teacherId, hours, lessonDate, unitPrice ?? null, teacherUnitPrice ?? null, note || '']
   )
 }
 
-export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, unitPrice, note }) {
+export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, unitPrice, teacherUnitPrice, note }) {
   const sets = []
   const params = []
-  if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
-  if (courseId   !== undefined) { sets.push('course_id = ?');   params.push(courseId) }
-  if (teacherId  !== undefined) { sets.push('teacher_id = ?');  params.push(teacherId) }
-  if (hours      !== undefined) { sets.push('hours = ?');       params.push(hours) }
-  if (lessonDate !== undefined) { sets.push('lesson_date = ?'); params.push(lessonDate) }
-  if (unitPrice  !== undefined) { sets.push('unit_price = ?');  params.push(unitPrice) }
-  if (note       !== undefined) { sets.push('note = ?');        params.push(note) }
+  if (studentId        !== undefined) { sets.push('student_id = ?');         params.push(studentId) }
+  if (courseId         !== undefined) { sets.push('course_id = ?');          params.push(courseId) }
+  if (teacherId        !== undefined) { sets.push('teacher_id = ?');         params.push(teacherId) }
+  if (hours            !== undefined) { sets.push('hours = ?');              params.push(hours) }
+  if (lessonDate       !== undefined) { sets.push('lesson_date = ?');        params.push(lessonDate) }
+  if (unitPrice        !== undefined) { sets.push('unit_price = ?');         params.push(unitPrice) }
+  if (teacherUnitPrice !== undefined) { sets.push('teacher_unit_price = ?'); params.push(teacherUnitPrice) }
+  if (note             !== undefined) { sets.push('note = ?');               params.push(note) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE lesson_records SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -437,11 +465,11 @@ export async function settlementSalary(from, to) {
   const [rows] = await pool.query(
     `SELECT
        lr.teacher_id,
-       t.name                                        AS teacher_name,
+       t.name                                                          AS teacher_name,
        lr.course_id,
-       c.name                                        AS course_name,
+       c.name                                                          AS course_name,
        lr.hours,
-       COALESCE(lr.unit_price, c.hourly_rate)        AS hourly_rate
+       COALESCE(lr.teacher_unit_price, c.teacher_hourly_rate)          AS hourly_rate
      FROM lesson_records lr
      JOIN teachers t ON t.id = lr.teacher_id
      JOIN courses  c ON c.id = lr.course_id

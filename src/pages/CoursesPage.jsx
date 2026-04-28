@@ -6,14 +6,16 @@ export default function CoursesPage() {
   const { state, loadCourses, createCourse, updateCourse, removeCourse } = useCourses()
   const { courses, loading } = state
 
-  const [newName, setNewName]         = useState('')
-  const [newRate, setNewRate]         = useState('')
-  const [editId, setEditId]           = useState(null)
-  const [editName, setEditName]       = useState('')
-  const [editRate, setEditRate]       = useState('')
-  const [error, setError]             = useState('')
-  const [saving, setSaving]           = useState(false)
-  const [showAmounts, setShowAmounts] = useState(false)
+  const [newName, setNewName]                   = useState('')
+  const [newRate, setNewRate]                   = useState('')
+  const [newTeacherRate, setNewTeacherRate]     = useState('')
+  const [editId, setEditId]                     = useState(null)
+  const [editName, setEditName]                 = useState('')
+  const [editRate, setEditRate]                 = useState('')
+  const [editTeacherRate, setEditTeacherRate]   = useState('')
+  const [error, setError]                       = useState('')
+  const [saving, setSaving]                     = useState(false)
+  const [showAmounts, setShowAmounts]           = useState(false)
 
   function amt(value) {
     if (!showAmounts) return '••••'
@@ -27,9 +29,14 @@ export default function CoursesPage() {
     const name = newName.trim()
     if (!name) { setError('請輸入家教課名稱'); return }
     const hourlyRate = parseFloat(newRate)
-    if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入時薪'); return }
+    if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入學生時薪'); return }
+    const teacherHourlyRate = parseFloat(newTeacherRate)
+    if (isNaN(teacherHourlyRate) || teacherHourlyRate <= 0) { setError('請輸入老師時薪'); return }
     setSaving(true); setError('')
-    try { await createCourse(name, hourlyRate); setNewName(''); setNewRate('') }
+    try {
+      await createCourse(name, hourlyRate, teacherHourlyRate)
+      setNewName(''); setNewRate(''); setNewTeacherRate('')
+    }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
   }
@@ -38,9 +45,11 @@ export default function CoursesPage() {
     const name = editName.trim()
     if (!name) return
     const hourly_rate = parseFloat(editRate)
-    if (isNaN(hourly_rate) || hourly_rate < 0) { setError('時薪格式不正確'); return }
+    if (isNaN(hourly_rate) || hourly_rate < 0) { setError('學生時薪格式不正確'); return }
+    const teacher_hourly_rate = parseFloat(editTeacherRate)
+    if (isNaN(teacher_hourly_rate) || teacher_hourly_rate < 0) { setError('老師時薪格式不正確'); return }
     setSaving(true); setError('')
-    try { await updateCourse(id, { name, hourly_rate }); setEditId(null) }
+    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate }); setEditId(null) }
     catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
@@ -72,14 +81,33 @@ export default function CoursesPage() {
         <input
           className="add-input"
           style={{ width: '120px' }}
-          placeholder="時薪（元）"
+          placeholder="學生時薪"
           type="number"
           min="0"
           step="1"
           value={newRate}
           onChange={e => setNewRate(e.target.value)}
         />
-        <button className="btn-primary" type="submit" disabled={saving || !newName.trim() || !newRate.trim() || parseFloat(newRate) <= 0}>新增家教課</button>
+        <input
+          className="add-input"
+          style={{ width: '120px' }}
+          placeholder="老師時薪"
+          type="number"
+          min="0"
+          step="1"
+          value={newTeacherRate}
+          onChange={e => setNewTeacherRate(e.target.value)}
+        />
+        <button
+          className="btn-primary"
+          type="submit"
+          disabled={
+            saving
+            || !newName.trim()
+            || !newRate.trim() || parseFloat(newRate) <= 0
+            || !newTeacherRate.trim() || parseFloat(newTeacherRate) <= 0
+          }
+        >新增家教課</button>
       </form>
 
       {error && <div className="error-msg">{error}</div>}
@@ -91,7 +119,7 @@ export default function CoursesPage() {
       ) : (
         <table className="entity-table">
           <thead>
-            <tr><th>家教課名稱</th><th>時薪（元/小時）</th><th></th></tr>
+            <tr><th>家教課名稱</th><th>學生時薪</th><th>老師時薪</th><th></th></tr>
           </thead>
           <tbody>
             {courses.map(c => (
@@ -124,6 +152,21 @@ export default function CoursesPage() {
                     amt(c.hourly_rate)
                   )}
                 </td>
+                <td>
+                  {editId === c.id ? (
+                    <input
+                      className="inline-edit-input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editTeacherRate}
+                      onChange={e => setEditTeacherRate(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                    />
+                  ) : (
+                    amt(c.teacher_hourly_rate ?? 0)
+                  )}
+                </td>
                 <td className="row-actions">
                   {editId === c.id ? (
                     <>
@@ -132,7 +175,12 @@ export default function CoursesPage() {
                     </>
                   ) : (
                     <>
-                      <button className="btn-sm" onClick={() => { setEditId(c.id); setEditName(c.name); setEditRate(String(c.hourly_rate)) }}>編輯</button>
+                      <button className="btn-sm" onClick={() => {
+                        setEditId(c.id)
+                        setEditName(c.name)
+                        setEditRate(String(c.hourly_rate))
+                        setEditTeacherRate(String(c.teacher_hourly_rate ?? 0))
+                      }}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(c.id)} disabled={saving}>刪除</button>
                     </>
                   )}
