@@ -33,7 +33,23 @@ function normalizeName(raw) {
   return raw.trim()
 }
 
-await initSchema()
+async function initSchemaWithRetry() {
+  const maxAttempts = 30
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await initSchema()
+      if (attempt > 1) console.log(`[tuition-calculator-backend] initSchema OK (attempt ${attempt})`)
+      return
+    } catch (e) {
+      if (attempt === maxAttempts) throw e
+      const delay = Math.min(2000 * attempt, 15000)
+      console.warn(`[tuition-calculator-backend] initSchema failed (attempt ${attempt}/${maxAttempts}): ${e.code || e.message} — retry in ${delay}ms`)
+      await new Promise(r => setTimeout(r, delay))
+    }
+  }
+}
+
+await initSchemaWithRetry()
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
