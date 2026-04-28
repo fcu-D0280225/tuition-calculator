@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "npm run build && npm run dev",
+    "start": "concurrently -n server,vite -c blue,green \"node --watch server/index.js\" \"vite\"",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -30,6 +30,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
     "jsdom": "^29.0.2",
     "vite": "^8.0.8",
     "vitest": "^4.1.4"
