@@ -244,7 +244,7 @@ export async function deleteTeacher(id) {
 
 export async function listCourses() {
   const [rows] = await pool.query(
-    'SELECT id, name, hourly_rate FROM courses ORDER BY created_at DESC, id DESC'
+    'SELECT id, name, hourly_rate FROM courses ORDER BY name ASC, hourly_rate DESC, id DESC'
   )
   return rows
 }
@@ -479,7 +479,7 @@ export async function settlementSalary(from, to) {
 
 export async function listMaterials() {
   const [rows] = await pool.query(
-    'SELECT id, name, unit_price FROM materials ORDER BY created_at DESC, id DESC'
+    'SELECT id, name, unit_price FROM materials ORDER BY unit_price DESC, id DESC'
   )
   return rows
 }
@@ -555,7 +555,7 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, note FROM `groups` ORDER BY created_at DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, note FROM `groups` ORDER BY monthly_fee DESC, id DESC'
   )
   return rows
 }
