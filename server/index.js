@@ -1,3 +1,4 @@
+import 'dotenv/config'
 import crypto from 'node:crypto'
 import express from 'express'
 import {
