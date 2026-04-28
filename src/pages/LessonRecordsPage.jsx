@@ -23,6 +23,7 @@ export default function LessonRecordsPage() {
 
   const [form, setForm]                 = useState(EMPTY_FORM)
   const [groupForm, setGroupForm]       = useState(EMPTY_GROUP_RECORD)
+  const [addMode, setAddMode]           = useState(null) // 'lesson' | 'group' | null
   const [editId, setEditId]             = useState(null)
   const [editForm, setEditForm]         = useState(null)
   const [error, setError]               = useState('')
@@ -159,7 +160,26 @@ export default function LessonRecordsPage() {
         </button>
       </div>
 
+      {/* 新增模式切換按鈕 */}
+      <div className="add-mode-switcher">
+        <button
+          type="button"
+          className={`btn-primary ${addMode === 'lesson' ? '' : 'btn-outline'}`}
+          onClick={() => { setError(''); setAddMode(m => m === 'lesson' ? null : 'lesson') }}
+        >
+          {addMode === 'lesson' ? '收起' : '＋'} 新增上課紀錄
+        </button>
+        <button
+          type="button"
+          className={`btn-primary ${addMode === 'group' ? '' : 'btn-outline'}`}
+          onClick={() => { setError(''); setAddMode(m => m === 'group' ? null : 'group') }}
+        >
+          {addMode === 'group' ? '收起' : '＋'} 新增團課上課紀錄
+        </button>
+      </div>
+
       {/* 新增表單 */}
+      {addMode === 'lesson' && (
       <div className="lesson-form-card">
         <div className="form-section-title">新增上課紀錄</div>
         <form className="lesson-form" onSubmit={handleCreate}>
@@ -217,8 +237,10 @@ export default function LessonRecordsPage() {
         </form>
         {error && <div className="error-msg">{error}</div>}
       </div>
+      )}
 
       {/* 新增團課上課紀錄 */}
+      {addMode === 'group' && (
       <div className="lesson-form-card">
         <div className="form-section-title">新增團課上課紀錄</div>
         <form className="lesson-form" onSubmit={handleAddGroupRecord}>
@@ -268,7 +290,9 @@ export default function LessonRecordsPage() {
           </label>
           <button className="btn-primary" type="submit" disabled={saving}>新增</button>
         </form>
+        {error && <div className="error-msg">{error}</div>}
       </div>
+      )}
 
       {/* 篩選 */}
       <form className="filter-bar" onSubmit={handleFilter}>
