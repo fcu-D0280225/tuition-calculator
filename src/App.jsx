@@ -7,8 +7,10 @@ import LessonRecordsPage from './pages/LessonRecordsPage.jsx'
 import SettlementPage    from './pages/SettlementPage.jsx'
 import MaterialsPage     from './pages/MaterialsPage.jsx'
 import GroupsPage        from './pages/GroupsPage.jsx'
+import DashboardPage     from './pages/DashboardPage.jsx'
 
 const NAV = [
+  { type: 'tab', id: 'dashboard', label: '財務總覽' },
   { type: 'group', key: 'courses', label: '課程', children: [
     { id: 'courses', label: '家教課' },
     { id: 'groups',  label: '團課' },
@@ -64,7 +66,7 @@ function NavGroup({ label, children, currentTab, onSelect }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('lessons')
+  const [tab, setTab] = useState('dashboard')
 
   return (
     <AppProviders>
@@ -92,6 +94,7 @@ export default function App() {
           </nav>
         </header>
         <main className="app-main">
+          {tab === 'dashboard'  && <DashboardPage />}
           {tab === 'lessons'    && <LessonRecordsPage />}
           {tab === 'settlement' && <SettlementPage />}
           {tab === 'students'   && <StudentsPage />}

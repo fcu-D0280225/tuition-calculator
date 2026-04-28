@@ -2956,3 +2956,98 @@ select.catalog-input.catalog-select {
   color: var(--text);
   outline: none;
 }
+
+/* ── Dashboard Page ─────────────────────────────────────────── */
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 600px) {
+  .dashboard-cards { grid-template-columns: 1fr; }
+}
+
+.dashboard-card {
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--border);
+}
+
+.dashboard-card-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+.dashboard-card-value {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.dashboard-card-sub {
+  font-size: 11px;
+  opacity: 0.55;
+  margin-top: 2px;
+}
+
+.dashboard-card--income {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.dashboard-card--expense {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.dashboard-card--profit {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
+.dashboard-card--loss {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 700px) {
+  .dashboard-charts { grid-template-columns: 1fr; }
+}
+
+.dashboard-chart-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.dashboard-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.dashboard-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
