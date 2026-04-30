@@ -3564,15 +3564,13 @@ select.catalog-input.catalog-select {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  align-items: center;
-  text-align: center;
+  text-align: left;
 }
 .users-form-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
-  justify-content: center;
 }
 .users-form-row label {
   display: flex;
@@ -3580,8 +3578,13 @@ select.catalog-input.catalog-select {
   gap: 4px;
   font-size: 13px;
   color: var(--muted);
-  text-align: center;
-  align-items: center;
+}
+/* 新增表單裡的權限格保持左對齊 */
+.users-add-form .users-perm-grid {
+  justify-items: start;
+}
+.users-add-form .users-perm-item {
+  justify-content: flex-start;
 }
 .users-form-row label input[type="text"],
 .users-form-row label input[type="password"],
@@ -3631,9 +3634,63 @@ select.catalog-input.catalog-select {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
   color: var(--text);
+  cursor: pointer;
+}
+
+/* 使用者頁專用的客製 checkbox */
+.users-perm-item input[type="checkbox"],
+.users-form-checkbox input[type="checkbox"],
+.modal-card .users-perm-item input[type="checkbox"],
+.modal-card .users-form-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  flex-shrink: 0;
+}
+.users-perm-item input[type="checkbox"]:hover,
+.users-form-checkbox input[type="checkbox"]:hover,
+.modal-card .users-perm-item input[type="checkbox"]:hover,
+.modal-card .users-form-checkbox input[type="checkbox"]:hover {
+  border-color: var(--accent);
+}
+.users-perm-item input[type="checkbox"]:focus-visible,
+.users-form-checkbox input[type="checkbox"]:focus-visible,
+.modal-card .users-perm-item input[type="checkbox"]:focus-visible,
+.modal-card .users-form-checkbox input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+.users-perm-item input[type="checkbox"]:checked,
+.users-form-checkbox input[type="checkbox"]:checked,
+.modal-card .users-perm-item input[type="checkbox"]:checked,
+.modal-card .users-form-checkbox input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.users-perm-item input[type="checkbox"]:checked::after,
+.users-form-checkbox input[type="checkbox"]:checked::after,
+.modal-card .users-perm-item input[type="checkbox"]:checked::after,
+.modal-card .users-form-checkbox input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 5px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 .users-error {
