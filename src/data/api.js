@@ -61,6 +61,9 @@ export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 
 export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
+export const apiListCourseRates = (id)                     => request(`/courses/${encodeURIComponent(id)}/rates`)
+export const apiSetCourseRates  = (id, rates)              => request(`/courses/${encodeURIComponent(id)}/rates`, { method: 'PUT', body: JSON.stringify({ rates }) })
+
 // ── Materials ─────────────────────────────────────────────────────────────────
 
 export const apiListMaterials   = ()              => request('/materials')

@@ -3859,6 +3859,38 @@ select.catalog-input.catalog-select {
   overflow-y: auto;
 }
 
+/* ── Course rates editor ─────────────────────────────────────────────────── */
+.course-rate-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.course-rate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+.course-rate-row input[type="number"] {
+  width: 90px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+}
+.course-rate-row input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
 /* ── Disclosure button（展開／收起） ────────────────────────────────────── */
 .btn-disclosure {
   display: inline-flex;

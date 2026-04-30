@@ -177,6 +177,16 @@ export async function initSchema() {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS course_rates (
+      course_id        VARCHAR(64)    NOT NULL,
+      attendee_count   INT            NOT NULL,
+      hourly_rate      DECIMAL(10,2)  NOT NULL,
+      PRIMARY KEY (course_id, attendee_count),
+      FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS group_members (
       group_id    VARCHAR(64) NOT NULL,
       student_id  VARCHAR(64) NOT NULL,
@@ -329,6 +339,65 @@ export async function deleteCourse(id) {
   return res.affectedRows > 0
 }
 
+// ── Course Rates（人數→鐘點費對照表） ─────────────────────────────────────────
+
+export async function listCourseRates(courseId) {
+  const [rows] = await pool.query(
+    'SELECT attendee_count, hourly_rate FROM course_rates WHERE course_id = ? ORDER BY attendee_count ASC',
+    [courseId]
+  )
+  return rows.map(r => ({ attendee_count: r.attendee_count, hourly_rate: parseFloat(r.hourly_rate) }))
+}
+
+export async function setCourseRates(courseId, rates) {
+  await pool.query('DELETE FROM course_rates WHERE course_id = ?', [courseId])
+  const cleaned = (rates || [])
+    .map(r => ({ count: parseInt(r.attendee_count, 10), rate: parseFloat(r.hourly_rate) }))
+    .filter(r => Number.isInteger(r.count) && r.count > 0 && r.count <= 50 && Number.isFinite(r.rate) && r.rate >= 0)
+  if (cleaned.length === 0) return
+  const dedup = new Map()
+  for (const r of cleaned) dedup.set(r.count, r.rate)
+  const values = Array.from(dedup.entries()).map(([count, rate]) => [courseId, count, rate])
+  await pool.query(
+    'INSERT INTO course_rates (course_id, attendee_count, hourly_rate) VALUES ?',
+    [values]
+  )
+}
+
+async function loadRatesForCourses(courseIds) {
+  // course_id -> Map<count, rate>
+  const out = new Map()
+  if (!courseIds.length) return out
+  const [rows] = await pool.query(
+    'SELECT course_id, attendee_count, hourly_rate FROM course_rates WHERE course_id IN (?)',
+    [courseIds]
+  )
+  for (const r of rows) {
+    if (!out.has(r.course_id)) out.set(r.course_id, new Map())
+    out.get(r.course_id).set(r.attendee_count, parseFloat(r.hourly_rate))
+  }
+  return out
+}
+
+function priceForLessonRecord(lr, sessionStudents, ratesMap) {
+  if (lr.unit_price !== null && lr.unit_price !== undefined) return parseFloat(lr.unit_price)
+  const key = `${lr.course_id}::${lr.lesson_date}::${lr.teacher_id}`
+  const N = sessionStudents.get(key)?.size ?? 1
+  const courseRates = ratesMap.get(lr.course_id)
+  if (courseRates && courseRates.has(N)) return courseRates.get(N)
+  return parseFloat(lr.course_hourly_rate ?? lr.hourly_rate ?? 0)
+}
+
+function buildSessionStudents(records) {
+  const map = new Map()
+  for (const lr of records) {
+    const key = `${lr.course_id}::${lr.lesson_date}::${lr.teacher_id}`
+    if (!map.has(key)) map.set(key, new Set())
+    map.get(key).add(lr.student_id)
+  }
+  return map
+}
+
 // ── Lesson Records ────────────────────────────────────────────────────────────
 
 export async function listLessons({ from, to, studentId, teacherId, courseId } = {}) {
@@ -394,15 +463,18 @@ export async function deleteLesson(id) {
 // ── Settlement ────────────────────────────────────────────────────────────────
 
 export async function settlementTuition(from, to) {
-  // 逐筆取出，讓每筆紀錄的 unit_price 覆蓋優先於課程預設
+  // 逐筆取出，讓每筆紀錄的 unit_price 覆蓋優先於課程預設；其次查 course_rates 對照表（依當日同課同師實際出席人數），最後 fallback course.hourly_rate
   const [rows] = await pool.query(
     `SELECT
        lr.student_id,
        s.name                                        AS student_name,
        lr.course_id,
        c.name                                        AS course_name,
+       lr.teacher_id,
+       lr.lesson_date,
        lr.hours,
-       COALESCE(lr.unit_price, c.hourly_rate)        AS unit_price
+       lr.unit_price,
+       c.hourly_rate                                 AS course_hourly_rate
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
@@ -411,22 +483,26 @@ export async function settlementTuition(from, to) {
     [from, to]
   )
 
+  const sessionStudents = buildSessionStudents(rows)
+  const ratesMap = await loadRatesForCourses([...new Set(rows.map(r => r.course_id))])
+
   // 先依 student + course + unit_price 合算，再彙整
   const map = new Map()
   for (const row of rows) {
+    const unitPrice = priceForLessonRecord(row, sessionStudents, ratesMap)
     if (!map.has(row.student_id)) {
       map.set(row.student_id, { student_id: row.student_id, student_name: row.student_name, courses: new Map(), total: 0 })
     }
     const student  = map.get(row.student_id)
-    const key      = `${row.course_id}::${row.unit_price}`
+    const key      = `${row.course_id}::${unitPrice}`
     if (!student.courses.has(key)) {
-      student.courses.set(key, { course_id: row.course_id, course_name: row.course_name, total_hours: 0, unit_price: parseFloat(row.unit_price), amount: 0 })
+      student.courses.set(key, { course_id: row.course_id, course_name: row.course_name, total_hours: 0, unit_price: unitPrice, amount: 0 })
     }
     const entry = student.courses.get(key)
     const h = parseFloat(row.hours)
     entry.total_hours = Math.round((entry.total_hours + h) * 100) / 100
     entry.amount = Math.round(entry.total_hours * entry.unit_price)
-    student.total += Math.round(h * entry.unit_price)
+    student.total += Math.round(h * unitPrice)
   }
 
   // 合併團課費（按出席月份數 × 月費）
@@ -740,23 +816,26 @@ export async function getShareTokenByToken(token) {
 }
 
 export async function getStudentBill(studentId, from, to) {
-  // 家教課
-  const [lessonRows] = await pool.query(
-    `SELECT lr.lesson_date, lr.hours, lr.unit_price, lr.note,
-            c.id AS course_id, c.name AS course_name, c.hourly_rate,
+  // 家教課：先抓區間內 *所有* lessons（不只該生）以計算「同日同課同師」實際人數
+  const [allLessonRows] = await pool.query(
+    `SELECT lr.student_id, lr.teacher_id, lr.lesson_date, lr.hours, lr.unit_price, lr.note,
+            c.id AS course_id, c.name AS course_name, c.hourly_rate AS course_hourly_rate,
             t.name AS teacher_name
      FROM lesson_records lr
      JOIN courses  c ON c.id = lr.course_id
      JOIN teachers t ON t.id = lr.teacher_id
-     WHERE lr.student_id = ? AND lr.lesson_date >= ? AND lr.lesson_date <= ?
+     WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
      ORDER BY lr.lesson_date ASC`,
-    [studentId, from, to]
+    [from, to]
   )
+  const sessionStudents = buildSessionStudents(allLessonRows)
+  const ratesMap = await loadRatesForCourses([...new Set(allLessonRows.map(r => r.course_id))])
+  const lessonRows = allLessonRows.filter(r => r.student_id === studentId)
 
   const courseMap = new Map()
   let total = 0
   const lessons = lessonRows.map(row => {
-    const unit = row.unit_price !== null ? parseFloat(row.unit_price) : parseFloat(row.hourly_rate)
+    const unit = priceForLessonRecord(row, sessionStudents, ratesMap)
     const hours = parseFloat(row.hours)
     const amount = Math.round(hours * unit)
     total += amount

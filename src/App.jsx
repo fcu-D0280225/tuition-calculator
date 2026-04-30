@@ -19,16 +19,16 @@ const NAV = [
     { id: 'courses', label: '家教課' },
     { id: 'groups',  label: '團課' },
   ]},
+  { type: 'group', key: 'people', label: '人員', children: [
+    { id: 'students', label: '學生' },
+    { id: 'teachers', label: '老師' },
+  ]},
   { type: 'group', key: 'records', label: '紀錄', children: [
     { id: 'lessons',    label: '上課紀錄' },
     { id: 'attendance', label: '點名' },
     { id: 'materials',  label: '教材' },
   ]},
   { type: 'tab', id: 'settlement', label: '結算' },
-  { type: 'group', key: 'people', label: '人員', children: [
-    { id: 'students', label: '學生' },
-    { id: 'teachers', label: '老師' },
-  ]},
   { type: 'tab', id: 'users', label: '使用者管理' },
 ]
 
