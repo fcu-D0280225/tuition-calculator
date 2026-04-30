@@ -57,7 +57,7 @@ export const apiDeleteTeacher   = (id)         => request(`/teachers/${encodeURI
 // ── Courses ───────────────────────────────────────────────────────────────────
 
 export const apiListCourses     = ()                        => request('/courses')
-export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0) => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate }) })
+export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0, discount_multiplier = 1) => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate, discount_multiplier }) })
 export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 

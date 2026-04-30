@@ -10,10 +10,12 @@ export default function CoursesPage() {
   const [newName, setNewName]                   = useState('')
   const [newRate, setNewRate]                   = useState('')
   const [newTeacherRate, setNewTeacherRate]     = useState('')
+  const [newDiscountPct, setNewDiscountPct]     = useState('100')
   const [editId, setEditId]                     = useState(null)
   const [editName, setEditName]                 = useState('')
   const [editRate, setEditRate]                 = useState('')
   const [editTeacherRate, setEditTeacherRate]   = useState('')
+  const [editDiscountPct, setEditDiscountPct]   = useState('100')
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
   const [showAmounts, setShowAmounts]           = useState(false)
@@ -100,10 +102,12 @@ export default function CoursesPage() {
     if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入學生時薪'); return }
     const teacherHourlyRate = parseFloat(newTeacherRate)
     if (isNaN(teacherHourlyRate) || teacherHourlyRate <= 0) { setError('請輸入老師時薪'); return }
+    const pct = parseFloat(newDiscountPct)
+    if (isNaN(pct) || pct <= 0 || pct > 500) { setError('遞減百分比格式不正確（0–500）'); return }
     setSaving(true); setError('')
     try {
-      await createCourse(name, hourlyRate, teacherHourlyRate)
-      setNewName(''); setNewRate(''); setNewTeacherRate('')
+      await createCourse(name, hourlyRate, teacherHourlyRate, pct / 100)
+      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountPct('100')
     }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -116,8 +120,10 @@ export default function CoursesPage() {
     if (isNaN(hourly_rate) || hourly_rate < 0) { setError('學生時薪格式不正確'); return }
     const teacher_hourly_rate = parseFloat(editTeacherRate)
     if (isNaN(teacher_hourly_rate) || teacher_hourly_rate < 0) { setError('老師時薪格式不正確'); return }
+    const pct = parseFloat(editDiscountPct)
+    if (isNaN(pct) || pct <= 0 || pct > 500) { setError('遞減百分比格式不正確（0–500）'); return }
     setSaving(true); setError('')
-    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate }); setEditId(null) }
+    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_multiplier: pct / 100 }); setEditId(null) }
     catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
@@ -168,6 +174,18 @@ export default function CoursesPage() {
             value={newTeacherRate}
             onChange={e => setNewTeacherRate(e.target.value)}
           />
+          <input
+            className="add-input"
+            style={{ width: '160px' }}
+            placeholder="每多一人乘上 (%)"
+            type="number"
+            min="1"
+            max="200"
+            step="1"
+            value={newDiscountPct}
+            onChange={e => setNewDiscountPct(e.target.value)}
+            title="N 人時學生時薪 = 預設時薪 × (此百分比 / 100)^(N-1)。100 = 不打折"
+          />
           <button
             className="btn-primary"
             type="submit"
@@ -190,7 +208,7 @@ export default function CoursesPage() {
       ) : (
         <table className="entity-table">
           <thead>
-            <tr><th>家教課名稱</th><th>學生時薪</th><th>老師時薪</th><th>人數鐘點費</th><th></th></tr>
+            <tr><th>家教課名稱</th><th>學生時薪</th><th>老師時薪</th><th>每多一人 ×</th><th>人數鐘點費</th><th></th></tr>
           </thead>
           <tbody>
             {courses.map(c => (
@@ -239,6 +257,24 @@ export default function CoursesPage() {
                   )}
                 </td>
                 <td>
+                  {editId === c.id ? (
+                    <input
+                      className="inline-edit-input"
+                      type="number"
+                      min="1"
+                      max="200"
+                      step="1"
+                      value={editDiscountPct}
+                      onChange={e => setEditDiscountPct(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                    />
+                  ) : (
+                    c.discount_multiplier && parseFloat(c.discount_multiplier) !== 1
+                      ? `${Math.round(parseFloat(c.discount_multiplier) * 10000) / 100}%`
+                      : '—'
+                  )}
+                </td>
+                <td>
                   {rateCounts[c.id] > 0
                     ? <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{rateCounts[c.id]} 段</span>
                     : <span style={{ color: 'var(--muted)' }}>未設定</span>}
@@ -257,6 +293,7 @@ export default function CoursesPage() {
                         setEditName(c.name)
                         setEditRate(String(c.hourly_rate))
                         setEditTeacherRate(String(c.teacher_hourly_rate ?? 0))
+                        setEditDiscountPct(c.discount_multiplier != null ? String(Math.round(parseFloat(c.discount_multiplier) * 10000) / 100) : '100')
                       }}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(c.id)} disabled={saving}>刪除</button>
                     </>

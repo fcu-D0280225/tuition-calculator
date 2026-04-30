@@ -155,10 +155,12 @@ app.post('/api/courses', async (req, res) => {
   if (isNaN(hourlyRate) || hourlyRate < 0) return res.status(400).json({ error: 'invalid_hourly_rate' })
   const teacherHourlyRate = req.body?.teacher_hourly_rate !== undefined ? parseFloat(req.body.teacher_hourly_rate) : 0
   if (isNaN(teacherHourlyRate) || teacherHourlyRate < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
+  const discountMultiplier = req.body?.discount_multiplier !== undefined ? parseFloat(req.body.discount_multiplier) : 1
+  if (isNaN(discountMultiplier) || discountMultiplier <= 0 || discountMultiplier > 5) return res.status(400).json({ error: 'invalid_discount_multiplier' })
   const id = genId('cr')
   try {
-    await insertCourse({ id, name, hourlyRate, teacherHourlyRate })
-    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate })
+    await insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountMultiplier })
+    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate, discount_multiplier: discountMultiplier })
   }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
@@ -179,6 +181,11 @@ app.patch('/api/courses/:id', async (req, res) => {
     const teacherHourlyRate = parseFloat(req.body.teacher_hourly_rate)
     if (isNaN(teacherHourlyRate) || teacherHourlyRate < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
     update.teacherHourlyRate = teacherHourlyRate
+  }
+  if (req.body?.discount_multiplier !== undefined) {
+    const dmu = parseFloat(req.body.discount_multiplier)
+    if (isNaN(dmu) || dmu <= 0 || dmu > 5) return res.status(400).json({ error: 'invalid_discount_multiplier' })
+    update.discountMultiplier = dmu
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
@@ -388,13 +395,11 @@ app.post('/api/groups', async (req, res) => {
   if (isNaN(durationMonths) || durationMonths < 0 || durationMonths > 4) return res.status(400).json({ error: 'invalid_duration_months' })
   const monthlyFee = req.body?.monthly_fee !== undefined ? parseFloat(req.body.monthly_fee) : 0
   if (isNaN(monthlyFee) || monthlyFee < 0) return res.status(400).json({ error: 'invalid_monthly_fee' })
-  const discountMultiplier = req.body?.discount_multiplier !== undefined ? parseFloat(req.body.discount_multiplier) : 1
-  if (isNaN(discountMultiplier) || discountMultiplier <= 0 || discountMultiplier > 5) return res.status(400).json({ error: 'invalid_discount_multiplier' })
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const id = genId('gr')
   try {
-    await insertGroup({ id, name, weekdays, durationMonths, monthlyFee, discountMultiplier, note })
-    res.status(201).json({ id, name, weekdays, duration_months: durationMonths, monthly_fee: monthlyFee, discount_multiplier: discountMultiplier, note })
+    await insertGroup({ id, name, weekdays, durationMonths, monthlyFee, note })
+    res.status(201).json({ id, name, weekdays, duration_months: durationMonths, monthly_fee: monthlyFee, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -419,11 +424,6 @@ app.patch('/api/groups/:id', async (req, res) => {
     const mf = parseFloat(req.body.monthly_fee)
     if (isNaN(mf) || mf < 0) return res.status(400).json({ error: 'invalid_monthly_fee' })
     update.monthlyFee = mf
-  }
-  if (req.body?.discount_multiplier !== undefined) {
-    const dmu = parseFloat(req.body.discount_multiplier)
-    if (isNaN(dmu) || dmu <= 0 || dmu > 5) return res.status(400).json({ error: 'invalid_discount_multiplier' })
-    update.discountMultiplier = dmu
   }
   if (req.body?.note !== undefined) {
     update.note = typeof req.body.note === 'string' ? req.body.note : ''
