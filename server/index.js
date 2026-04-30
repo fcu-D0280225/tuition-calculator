@@ -24,6 +24,7 @@ import {
   // payment records
   listPaymentRecords, insertPaymentRecord, deletePaymentRecord,
 } from './db.js'
+import { initAuthSchema, requireAuth, registerAuthRoutes, registerAdminRoutes } from './auth.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
 
@@ -55,6 +56,7 @@ async function initSchemaWithRetry() {
 }
 
 await initSchemaWithRetry()
+await initAuthSchema()
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
@@ -62,6 +64,12 @@ app.use(express.json({ limit: '2mb' }))
 // ── Health ────────────────────────────────────────────────────────────────────
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }))
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+registerAuthRoutes(app)
+app.use(requireAuth())
+registerAdminRoutes(app)
 
 // ── Students ──────────────────────────────────────────────────────────────────
 

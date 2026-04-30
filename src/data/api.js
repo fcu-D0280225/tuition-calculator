@@ -1,11 +1,20 @@
 const API_BASE = '/api'
 
+const PUBLIC_PATHS = ['/auth/login', '/auth/logout', '/auth/me', '/health']
+
 async function request(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: 'same-origin',
+    ...options,
+    headers,
+  })
+  if (res.status === 401 && !PUBLIC_PATHS.some(p => path.startsWith(p)) && !path.startsWith('/share/')) {
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '')
     throw new Error(`API ${options.method || 'GET'} ${path} failed: ${res.status} ${text}`)
@@ -13,6 +22,23 @@ async function request(path, options = {}) {
   if (res.status === 204) return null
   return res.json()
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export const apiAuthMe     = ()                   => request('/auth/me')
+export const apiAuthLogin  = (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+export const apiAuthLogout = ()                   => request('/auth/logout', { method: 'POST' })
+export const apiAuthChangePassword = (current_password, new_password) =>
+  request('/auth/change-password', { method: 'POST', body: JSON.stringify({ current_password, new_password }) })
+
+// ── Admin: user management ───────────────────────────────────────────────────
+
+export const apiAdminListUsers  = ()      => request('/admin/users')
+export const apiAdminCreateUser = (body)  => request('/admin/users', { method: 'POST', body: JSON.stringify(body) })
+export const apiAdminUpdateUser = (id, patch) =>
+  request(`/admin/users/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiAdminDeleteUser = (id)    =>
+  request(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
