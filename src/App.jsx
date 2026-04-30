@@ -30,12 +30,31 @@ const NAV = [
 
 export default function App() {
   const [tab, setTab] = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  function navigate(id) {
+    setTab(id)
+    setSidebarOpen(false)
+  }
 
   return (
     <AppProviders>
       <div className="app-shell">
-        <aside className="app-sidebar">
-          <div className="app-title">補習班管理系統</div>
+        {/* 手機遮罩：點擊關閉 drawer */}
+        {sidebarOpen && (
+          <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />
+        )}
+
+        <aside className={`app-sidebar${sidebarOpen ? ' open' : ''}`}>
+          <div className="app-sidebar-header">
+            <div className="app-title">補習班管理系統</div>
+            <button
+              type="button"
+              className="sidebar-close-btn"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="關閉選單"
+            >✕</button>
+          </div>
           <nav className="app-nav">
             {NAV.map(item => item.type === 'group' ? (
               <div className="nav-section" key={item.key}>
@@ -45,7 +64,7 @@ export default function App() {
                     key={c.id}
                     type="button"
                     className={`nav-tab ${tab === c.id ? 'active' : ''}`}
-                    onClick={() => setTab(c.id)}
+                    onClick={() => navigate(c.id)}
                   >
                     {c.label}
                   </button>
@@ -56,24 +75,42 @@ export default function App() {
                 key={item.id}
                 type="button"
                 className={`nav-tab ${tab === item.id ? 'active' : ''}`}
-                onClick={() => setTab(item.id)}
+                onClick={() => navigate(item.id)}
               >
                 {item.label}
               </button>
             ))}
           </nav>
         </aside>
-        <main className="app-main">
-          {tab === 'dashboard'  && <DashboardPage />}
-          {tab === 'lessons'    && <LessonRecordsPage />}
-          {tab === 'settlement' && <SettlementPage />}
-          {tab === 'students'   && <StudentsPage />}
-          {tab === 'teachers'   && <TeachersPage />}
-          {tab === 'courses'    && <CoursesPage />}
-          {tab === 'materials'   && <MaterialsPage />}
-          {tab === 'groups'      && <GroupsPage />}
-          {tab === 'attendance'  && <AttendancePage />}
-        </main>
+
+        <div className="app-content">
+          {/* 手機頂部 bar */}
+          <header className="mobile-topbar">
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="開啟選單"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
+            <span className="mobile-topbar-title">補習班管理系統</span>
+          </header>
+
+          <main className="app-main">
+            {tab === 'dashboard'  && <DashboardPage />}
+            {tab === 'lessons'    && <LessonRecordsPage />}
+            {tab === 'settlement' && <SettlementPage />}
+            {tab === 'students'   && <StudentsPage />}
+            {tab === 'teachers'   && <TeachersPage />}
+            {tab === 'courses'    && <CoursesPage />}
+            {tab === 'materials'  && <MaterialsPage />}
+            {tab === 'groups'     && <GroupsPage />}
+            {tab === 'attendance' && <AttendancePage />}
+          </main>
+        </div>
       </div>
     </AppProviders>
   )

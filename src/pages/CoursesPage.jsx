@@ -71,44 +71,47 @@ export default function CoursesPage() {
         </button>
       </div>
 
-      <form className="add-form" onSubmit={handleAdd}>
-        <input
-          className="add-input"
-          placeholder="家教課名稱（如：國中英文）"
-          value={newName}
-          onChange={e => setNewName(e.target.value)}
-        />
-        <input
-          className="add-input"
-          style={{ width: '120px' }}
-          placeholder="學生時薪"
-          type="number"
-          min="0"
-          step="1"
-          value={newRate}
-          onChange={e => setNewRate(e.target.value)}
-        />
-        <input
-          className="add-input"
-          style={{ width: '120px' }}
-          placeholder="老師時薪"
-          type="number"
-          min="0"
-          step="1"
-          value={newTeacherRate}
-          onChange={e => setNewTeacherRate(e.target.value)}
-        />
-        <button
-          className="btn-primary"
-          type="submit"
-          disabled={
-            saving
-            || !newName.trim()
-            || !newRate.trim() || parseFloat(newRate) <= 0
-            || !newTeacherRate.trim() || parseFloat(newTeacherRate) <= 0
-          }
-        >新增家教課</button>
-      </form>
+      <div className="lesson-form-card">
+        <div className="form-section-title">家教課目錄</div>
+        <form className="add-form" onSubmit={handleAdd}>
+          <input
+            className="add-input"
+            placeholder="家教課名稱（如：國中英文）"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+          />
+          <input
+            className="add-input"
+            style={{ width: '120px' }}
+            placeholder="學生時薪"
+            type="number"
+            min="0"
+            step="1"
+            value={newRate}
+            onChange={e => setNewRate(e.target.value)}
+          />
+          <input
+            className="add-input"
+            style={{ width: '120px' }}
+            placeholder="老師時薪"
+            type="number"
+            min="0"
+            step="1"
+            value={newTeacherRate}
+            onChange={e => setNewTeacherRate(e.target.value)}
+          />
+          <button
+            className="btn-primary"
+            type="submit"
+            disabled={
+              saving
+              || !newName.trim()
+              || !newRate.trim() || parseFloat(newRate) <= 0
+              || !newTeacherRate.trim() || parseFloat(newTeacherRate) <= 0
+            }
+          >新增家教課</button>
+        </form>
+      </div>
 
       {error && <div className="error-msg">{error}</div>}
 

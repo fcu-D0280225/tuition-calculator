@@ -2195,39 +2195,6 @@ select.catalog-input.catalog-select {
     min-width: 0;
     border-right: none;
     border-bottom: 1px solid var(--border);
-    /* Collapsed by default on mobile via details[open] in JSX */
-  }
-  .app-shell {
-    flex-direction: column;
-  }
-  .app-sidebar {
-    width: 100%;
-    height: auto;
-    position: static;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding: var(--space-3) var(--space-3);
-    gap: var(--space-2);
-  }
-  .app-nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .nav-section {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 0;
-    align-items: center;
-  }
-  .nav-section-label {
-    padding: 0 4px 0 0;
-  }
-  .nav-tab {
-    width: auto;
-    padding: 6px 12px;
-    border: 1px solid var(--border);
   }
   .main {
     padding: var(--space-5) var(--space-4);
@@ -2280,11 +2247,34 @@ select.catalog-input.catalog-select {
   z-index: 100;
 }
 
+.app-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .app-title {
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
   padding: 0 8px;
+}
+
+/* 關閉按鈕：桌面隱藏，手機顯示 */
+.sidebar-close-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+}
+.sidebar-close-btn:hover {
+  background: var(--bg);
+  color: var(--text);
 }
 
 .app-nav {
@@ -2325,6 +2315,7 @@ select.catalog-input.catalog-select {
   background: transparent;
   cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
+  outline: none;
 }
 .nav-tab:hover {
   color: var(--text);
@@ -2336,6 +2327,63 @@ select.catalog-input.catalog-select {
   border-color: var(--accent);
 }
 
+/* app-content：sidebar 右邊的整個區塊（含 mobile topbar + main） */
+.app-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 手機頂部 bar：桌面隱藏 */
+.mobile-topbar {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 90;
+}
+
+.mobile-topbar-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 漢堡按鈕 */
+.sidebar-toggle-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
+}
+.sidebar-toggle-btn span {
+  display: block;
+  height: 2px;
+  width: 22px;
+  background: var(--text);
+  border-radius: 2px;
+}
+
+/* 遮罩層 */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 150;
+}
+
 .app-main {
   flex: 1;
   min-width: 0;
@@ -2343,6 +2391,42 @@ select.catalog-input.catalog-select {
   max-width: 1100px;
   margin: 0 auto;
   width: 100%;
+}
+
+/* ── 手機 RWD（≤768px）：drawer 模式 ─────────────────────────── */
+@media (max-width: 768px) {
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .sidebar-close-btn {
+    display: block;
+  }
+
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 260px;
+    z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: none;
+  }
+
+  .app-sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+  }
+
+  .app-main {
+    padding: var(--space-4) var(--space-3);
+  }
 }
 
 /* ── 通用頁面容器 ─────────────────────────────────────────────── */
