@@ -56,10 +56,14 @@ export default function UsersPage({ currentUser }) {
   async function handleCreate(e) {
     e.preventDefault()
     if (busy) return
-    setBusy(true); setError('')
+    setError('')
+    const uname = newUser.username.trim()
+    if (!uname) { setError('請輸入帳號'); return }
+    if (newUser.password.length < 6) { setError('密碼至少 6 碼'); return }
+    setBusy(true)
     try {
       await apiAdminCreateUser({
-        username: newUser.username.trim(),
+        username: uname,
         password: newUser.password,
         is_admin: newUser.is_admin,
         permissions: newUser.is_admin ? [] : newUser.permissions,
@@ -72,7 +76,8 @@ export default function UsersPage({ currentUser }) {
       if (msg.includes('username_taken'))           setError('帳號已被使用')
       else if (msg.includes('invalid_username'))    setError('帳號不能為空，且長度不可超過 64 字')
       else if (msg.includes('password_too_short'))  setError('密碼至少 6 碼')
-      else                                          setError('建立失敗')
+      else if (msg.includes('401') || msg.includes('403')) setError('沒有權限建立使用者，請以 admin 重新登入')
+      else                                          setError(`建立失敗：${msg.slice(0, 120)}`)
     } finally {
       setBusy(false)
     }
@@ -221,7 +226,7 @@ export default function UsersPage({ currentUser }) {
                 </div>
               )}
               <div className="users-form-actions">
-                <button type="submit" disabled={busy || !newUser.username.trim() || newUser.password.length < 6}>建立</button>
+                <button type="submit" disabled={busy}>{busy ? '建立中…' : '建立'}</button>
               </div>
             </form>
           )}
