@@ -9,7 +9,6 @@ import {
   listTeachers, insertTeacher, updateTeacherName, deleteTeacher,
   // courses
   listCourses, insertCourse, updateCourse, deleteCourse,
-  listCourseRates, setCourseRates,
   // lessons
   listLessons, insertLesson, updateLesson, deleteLesson,
   // materials
@@ -200,22 +199,6 @@ app.delete('/api/courses/:id', async (req, res) => {
     const ok = await deleteCourse(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
-  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-// ── Course Rates（人數→鐘點費對照表） ────────────────────────────────────────
-
-app.get('/api/courses/:id/rates', async (req, res) => {
-  try { res.json(await listCourseRates(req.params.id)) }
-  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-app.put('/api/courses/:id/rates', async (req, res) => {
-  const rates = Array.isArray(req.body?.rates) ? req.body.rates : null
-  if (rates === null) return res.status(400).json({ error: 'rates_required' })
-  try {
-    await setCourseRates(req.params.id, rates)
-    res.json(await listCourseRates(req.params.id))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

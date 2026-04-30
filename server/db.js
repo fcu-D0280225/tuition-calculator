@@ -177,16 +177,6 @@ export async function initSchema() {
   `)
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS course_rates (
-      course_id        VARCHAR(64)    NOT NULL,
-      attendee_count   INT            NOT NULL,
-      hourly_rate      DECIMAL(10,2)  NOT NULL,
-      PRIMARY KEY (course_id, attendee_count),
-      FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
-    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-  `)
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS group_members (
       group_id    VARCHAR(64) NOT NULL,
       student_id  VARCHAR(64) NOT NULL,
@@ -369,54 +359,10 @@ export async function deleteCourse(id) {
   return res.affectedRows > 0
 }
 
-// ── Course Rates（人數→鐘點費對照表） ─────────────────────────────────────────
-
-export async function listCourseRates(courseId) {
-  const [rows] = await pool.query(
-    'SELECT attendee_count, hourly_rate FROM course_rates WHERE course_id = ? ORDER BY attendee_count ASC',
-    [courseId]
-  )
-  return rows.map(r => ({ attendee_count: r.attendee_count, hourly_rate: parseFloat(r.hourly_rate) }))
-}
-
-export async function setCourseRates(courseId, rates) {
-  await pool.query('DELETE FROM course_rates WHERE course_id = ?', [courseId])
-  const cleaned = (rates || [])
-    .map(r => ({ count: parseInt(r.attendee_count, 10), rate: parseFloat(r.hourly_rate) }))
-    .filter(r => Number.isInteger(r.count) && r.count > 0 && r.count <= 50 && Number.isFinite(r.rate) && r.rate >= 0)
-  if (cleaned.length === 0) return
-  const dedup = new Map()
-  for (const r of cleaned) dedup.set(r.count, r.rate)
-  const values = Array.from(dedup.entries()).map(([count, rate]) => [courseId, count, rate])
-  await pool.query(
-    'INSERT INTO course_rates (course_id, attendee_count, hourly_rate) VALUES ?',
-    [values]
-  )
-}
-
-async function loadRatesForCourses(courseIds) {
-  // course_id -> Map<count, rate>
-  const out = new Map()
-  if (!courseIds.length) return out
-  const [rows] = await pool.query(
-    'SELECT course_id, attendee_count, hourly_rate FROM course_rates WHERE course_id IN (?)',
-    [courseIds]
-  )
-  for (const r of rows) {
-    if (!out.has(r.course_id)) out.set(r.course_id, new Map())
-    out.get(r.course_id).set(r.attendee_count, parseFloat(r.hourly_rate))
-  }
-  return out
-}
-
-function priceForLessonRecord(lr, sessionStudents, ratesMap) {
+function priceForLessonRecord(lr, sessionStudents) {
   if (lr.unit_price !== null && lr.unit_price !== undefined) return parseFloat(lr.unit_price)
   const key = `${lr.course_id}::${lr.lesson_date}::${lr.teacher_id}`
   const N = sessionStudents.get(key)?.size ?? 1
-  // 1) 對照表優先
-  const courseRates = ratesMap.get(lr.course_id)
-  if (courseRates && courseRates.has(N)) return courseRates.get(N)
-  // 2) 否則套遞減公式：base × multiplier^(N-1)
   const base = parseFloat(lr.course_hourly_rate ?? lr.hourly_rate ?? 0)
   const mult = parseFloat(lr.course_discount_multiplier ?? 1)
   if (mult && mult !== 1) return Math.round(base * Math.pow(mult, Math.max(0, N - 1)))
@@ -533,12 +479,11 @@ export async function settlementTuition(from, to) {
   )
 
   const sessionStudents = buildSessionStudents(rows)
-  const ratesMap = await loadRatesForCourses([...new Set(rows.map(r => r.course_id))])
 
   // 先依 student + course + unit_price 合算，再彙整
   const map = new Map()
   for (const row of rows) {
-    const unitPrice = priceForLessonRecord(row, sessionStudents, ratesMap)
+    const unitPrice = priceForLessonRecord(row, sessionStudents)
     if (!map.has(row.student_id)) {
       map.set(row.student_id, { student_id: row.student_id, student_name: row.student_name, courses: new Map(), total: 0 })
     }
@@ -877,13 +822,12 @@ export async function getStudentBill(studentId, from, to) {
     [from, to]
   )
   const sessionStudents = buildSessionStudents(allLessonRows)
-  const ratesMap = await loadRatesForCourses([...new Set(allLessonRows.map(r => r.course_id))])
   const lessonRows = allLessonRows.filter(r => r.student_id === studentId)
 
   const courseMap = new Map()
   let total = 0
   const lessons = lessonRows.map(row => {
-    const unit = priceForLessonRecord(row, sessionStudents, ratesMap)
+    const unit = priceForLessonRecord(row, sessionStudents)
     const hours = parseFloat(row.hours)
     const amount = Math.round(hours * unit)
     total += amount

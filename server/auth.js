@@ -214,8 +214,7 @@ function getRequiredNavs(method, p) {
   if (/^\/api\/students(\/[^/]+)?$/.test(p))           return ['students']
   // teachers
   if (/^\/api\/teachers(\/[^/]+)?$/.test(p))           return ['teachers']
-  // courses + rates 表
-  if (/^\/api\/courses\/[^/]+\/rates$/.test(p))        return ['courses']
+  // courses
   if (/^\/api\/courses(\/[^/]+)?$/.test(p))            return ['courses']
   // group members（應到名單）— 點名與團課管理都會用到
   if (/^\/api\/groups\/[^/]+\/members$/.test(p)) {
