@@ -229,6 +229,24 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE \`groups\` ADD COLUMN monthly_fee DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER duration_months`)
   }
 
+  // Migration: 把寫在 note 裡的純數字月費搬到 monthly_fee（適用早期資料）
+  await pool.query(
+    `UPDATE \`groups\`
+        SET monthly_fee = CAST(note AS DECIMAL(10,2)),
+            note = ''
+      WHERE monthly_fee = 0
+        AND note REGEXP '^[0-9]+(\\.[0-9]+)?$'
+        AND CAST(note AS DECIMAL(10,2)) > 0`
+  )
+  // Migration: monthly_fee 已正確但 note 仍寫同樣數字的，清掉 note 避免重複顯示
+  await pool.query(
+    `UPDATE \`groups\`
+        SET note = ''
+      WHERE note REGEXP '^[0-9]+(\\.[0-9]+)?$'
+        AND monthly_fee > 0
+        AND CAST(note AS DECIMAL(10,2)) = monthly_fee`
+  )
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS share_tokens (
       id          VARCHAR(64)  NOT NULL PRIMARY KEY,

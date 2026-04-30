@@ -51,7 +51,7 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: 0, note: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', note: '' }
 
 export default function GroupsPage() {
   const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
@@ -144,10 +144,11 @@ export default function GroupsPage() {
     if (!name) { setError('請輸入團課名稱'); return }
     if (!parseWeekdays(newGroup.weekdays).length) { setError('請選擇上課星期'); return }
     if (!Number.isInteger(newGroup.duration_months) || newGroup.duration_months <= 0) { setError('請選擇持續時間'); return }
-    if (isNaN(newGroup.monthly_fee) || newGroup.monthly_fee <= 0) { setError('請輸入月費'); return }
+    const fee = parseFloat(newGroup.monthly_fee)
+    if (isNaN(fee) || fee <= 0) { setError('請輸入月費'); return }
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: newGroup.monthly_fee, note: newGroup.note })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, note: newGroup.note })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -155,15 +156,17 @@ export default function GroupsPage() {
 
   function startEdit(g) {
     setEditId(g.id)
-    setEditGroup({ name: g.name, weekdays: g.weekdays || '', duration_months: g.duration_months ?? 0, monthly_fee: g.monthly_fee ?? 0, note: g.note || '' })
+    setEditGroup({ name: g.name, weekdays: g.weekdays || '', duration_months: g.duration_months ?? 0, monthly_fee: g.monthly_fee != null ? String(g.monthly_fee) : '', note: g.note || '' })
   }
 
   async function handleUpdateGroup(id) {
     const name = editGroup.name.trim()
     if (!name) return
+    const fee = parseFloat(editGroup.monthly_fee)
+    if (isNaN(fee) || fee < 0) { setError('月費格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: editGroup.monthly_fee, note: editGroup.note })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, note: editGroup.note })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -228,9 +231,9 @@ export default function GroupsPage() {
                 type="number"
                 min="0"
                 step="1"
-                placeholder="0"
+                placeholder="例如 3600"
                 value={newGroup.monthly_fee}
-                onChange={e => setNewGroup(g => ({ ...g, monthly_fee: parseFloat(e.target.value) || 0 }))}
+                onChange={e => setNewGroup(g => ({ ...g, monthly_fee: e.target.value }))}
               />
             </label>
             <label>備註
@@ -251,7 +254,7 @@ export default function GroupsPage() {
               || !newGroup.name.trim()
               || !parseWeekdays(newGroup.weekdays).length
               || !(newGroup.duration_months > 0)
-              || !(newGroup.monthly_fee > 0)
+              || !(parseFloat(newGroup.monthly_fee) > 0)
             }
           >新增團課</button>
         </form>
@@ -311,7 +314,7 @@ export default function GroupsPage() {
                         step="1"
                         className="inline-edit-input"
                         value={editGroup.monthly_fee}
-                        onChange={e => setEditGroup(eg => ({ ...eg, monthly_fee: parseFloat(e.target.value) || 0 }))}
+                        onChange={e => setEditGroup(eg => ({ ...eg, monthly_fee: e.target.value }))}
                       />
                     ) : (g.monthly_fee > 0 ? amt(g.monthly_fee) : '—')}
                   </td>
