@@ -31,7 +31,7 @@ export default function CoursesPage() {
     const name = newName.trim()
     if (!name) { setError('請輸入家教課名稱'); return }
     const hourlyRate = parseFloat(newRate)
-    if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入學生時薪'); return }
+    if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入學費'); return }
     const teacherHourlyRate = parseFloat(newTeacherRate)
     if (isNaN(teacherHourlyRate) || teacherHourlyRate <= 0) { setError('請輸入老師時薪'); return }
     const pct = parseFloat(newDiscountPct)
@@ -49,7 +49,7 @@ export default function CoursesPage() {
     const name = editName.trim()
     if (!name) return
     const hourly_rate = parseFloat(editRate)
-    if (isNaN(hourly_rate) || hourly_rate < 0) { setError('學生時薪格式不正確'); return }
+    if (isNaN(hourly_rate) || hourly_rate < 0) { setError('學費格式不正確'); return }
     const teacher_hourly_rate = parseFloat(editTeacherRate)
     if (isNaN(teacher_hourly_rate) || teacher_hourly_rate < 0) { setError('老師時薪格式不正確'); return }
     const pct = parseFloat(editDiscountPct)
@@ -89,7 +89,7 @@ export default function CoursesPage() {
           <input
             className="add-input"
             style={{ width: '120px' }}
-            placeholder="學生時薪"
+            placeholder="學費"
             type="number"
             min="0"
             step="1"
@@ -106,7 +106,7 @@ export default function CoursesPage() {
             value={newTeacherRate}
             onChange={e => setNewTeacherRate(e.target.value)}
           />
-          <span className="input-with-suffix" title="N 人時學生時薪 = 預設時薪 × (此百分比 ÷ 100)^(N-1)。100 = 不打折">
+          <span className="input-with-suffix" title="N 人時學費 = 預設時薪 × (此百分比 ÷ 100)^(N-1)。100 = 不打折">
             <input
               className="add-input"
               style={{ width: '180px' }}
@@ -142,7 +142,7 @@ export default function CoursesPage() {
       ) : (
         <table className="entity-table">
           <thead>
-            <tr><th>家教課名稱</th><th>學生時薪</th><th>老師時薪</th><th>每多一人 ×</th><th></th></tr>
+            <tr><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 ×</th><th></th></tr>
           </thead>
           <tbody>
             {courses.map(c => (

@@ -72,7 +72,7 @@ export default function LessonRecordsPage() {
     if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     const unit_price = parseFloat(form.unit_price)
-    if (isNaN(unit_price) || unit_price <= 0) { setError('請輸入學生時薪'); return }
+    if (isNaN(unit_price) || unit_price <= 0) { setError('請輸入學費'); return }
     const teacher_unit_price = parseFloat(form.teacher_unit_price)
     if (isNaN(teacher_unit_price) || teacher_unit_price <= 0) { setError('請輸入老師時薪'); return }
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
@@ -168,7 +168,7 @@ export default function LessonRecordsPage() {
   const { lessons, loading } = lessonState
   const { groups, records: groupRecords } = groupState
 
-  // 選課程時自動帶入預設學生時薪與老師時薪
+  // 選課程時自動帶入預設學費與老師時薪
   function handleCourseChange(id, isEdit = false) {
     const course       = courses.find(c => c.id === id)
     const studentRate  = course ? String(course.hourly_rate) : ''
@@ -245,7 +245,7 @@ export default function LessonRecordsPage() {
                 className="hours-input"
               />
             </label>
-            <label>學生時薪
+            <label>學費
               <input type="number" min="0" step="1" placeholder="課程預設"
                 value={form.unit_price} onChange={e => setForm(f => ({ ...f, unit_price: e.target.value }))}
                 className="hours-input"
@@ -376,7 +376,7 @@ export default function LessonRecordsPage() {
               <th>課程</th>
               <th>老師</th>
               <th>時數</th>
-              <th>學生時薪</th>
+              <th>學費</th>
               <th>老師時薪</th>
               <th>備註</th>
               <th></th>
