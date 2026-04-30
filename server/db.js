@@ -825,4 +825,3 @@ export async function deletePaymentRecord(id) {
   const [res] = await pool.query('DELETE FROM payment_records WHERE id = ?', [id])
   return res.affectedRows > 0
 }
-}
