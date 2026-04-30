@@ -71,11 +71,12 @@ export default function LessonRecordsPage() {
     const hours = parseFloat(form.hours)
     if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
-    const unit_price = parseFloat(form.unit_price)
-    if (isNaN(unit_price) || unit_price <= 0) { setError('請輸入學費'); return }
-    const teacher_unit_price = parseFloat(form.teacher_unit_price)
-    if (isNaN(teacher_unit_price) || teacher_unit_price <= 0) { setError('請輸入老師時薪'); return }
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
+    // 學費 / 老師時薪：留空 → null，後端結算時用課程預設
+    const unit_price         = form.unit_price         !== '' ? parseFloat(form.unit_price)         : null
+    const teacher_unit_price = form.teacher_unit_price !== '' ? parseFloat(form.teacher_unit_price) : null
+    if (unit_price !== null && (isNaN(unit_price) || unit_price < 0)) { setError('學費格式不正確'); return }
+    if (teacher_unit_price !== null && (isNaN(teacher_unit_price) || teacher_unit_price < 0)) { setError('老師時薪格式不正確'); return }
     setSaving(true); setError('')
     try {
       await createLesson({ ...form, hours, unit_price, teacher_unit_price })
@@ -171,14 +172,26 @@ export default function LessonRecordsPage() {
   // 選課程時自動帶入預設學費與老師時薪
   function handleCourseChange(id, isEdit = false) {
     const course       = courses.find(c => c.id === id)
-    const studentRate  = course ? String(course.hourly_rate) : ''
-    const teacherRate  = course ? String(course.teacher_hourly_rate ?? 0) : ''
+    const studentRate  = course && course.hourly_rate         != null ? String(course.hourly_rate)         : ''
+    const teacherRate  = course && course.teacher_hourly_rate != null ? String(course.teacher_hourly_rate) : ''
     if (isEdit) {
       setEditForm(f => ({ ...f, course_id: id, unit_price: studentRate, teacher_unit_price: teacherRate }))
     } else {
       setForm(f => ({ ...f, course_id: id, unit_price: studentRate, teacher_unit_price: teacherRate }))
     }
   }
+
+  // 安全網：courses 載入完成後若 form 已選了課但費用空白，補帶預設
+  useEffect(() => {
+    if (!form.course_id || courses.length === 0) return
+    const c = courses.find(x => x.id === form.course_id)
+    if (!c) return
+    setForm(f => ({
+      ...f,
+      unit_price:         f.unit_price === ''         && c.hourly_rate         != null ? String(c.hourly_rate)         : f.unit_price,
+      teacher_unit_price: f.teacher_unit_price === '' && c.teacher_hourly_rate != null ? String(c.teacher_hourly_rate) : f.teacher_unit_price,
+    }))
+  }, [form.course_id, courses])
 
   return (
     <div className="page">
