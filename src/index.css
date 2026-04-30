@@ -3891,6 +3891,44 @@ select.catalog-input.catalog-select {
   box-shadow: 0 0 0 2px var(--accent-light);
 }
 
+/* ── Inline help / input suffix ─────────────────────────────────────────── */
+.form-help-note {
+  margin-bottom: var(--space-3);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
+  background: var(--accent-light);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+}
+.form-help-note strong { color: var(--accent-dark); }
+.form-help-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--text);
+}
+.form-help-note sup { font-size: 0.8em; }
+
+.input-with-suffix {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.input-with-suffix .add-input {
+  padding-right: 28px;
+}
+.input-suffix {
+  position: absolute;
+  right: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* ── Disclosure button（展開／收起） ────────────────────────────────────── */
 .btn-disclosure {
   display: inline-flex;
