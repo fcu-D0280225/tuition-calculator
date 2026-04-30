@@ -3929,6 +3929,23 @@ select.catalog-input.catalog-select {
   user-select: none;
 }
 
+.rate-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rate-hint-btn {
+  margin-left: 4px;
+  font-size: 11px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+.rate-hint-btn:hover { text-decoration: underline; }
+
 /* ── Drag-to-reorder rows ───────────────────────────────────────────────── */
 .drag-handle {
   cursor: grab;

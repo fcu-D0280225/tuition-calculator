@@ -264,6 +264,11 @@ export default function LessonRecordsPage() {
                 className="hours-input"
                 style={{ width: '110px' }}
               />
+              {(() => {
+                const c = courses.find(x => x.id === form.course_id)
+                if (!c) return null
+                return <small className="rate-hint">課程預設 ${c.hourly_rate} <button type="button" className="btn-link rate-hint-btn" onClick={() => handleCourseChange(form.course_id)}>重填</button></small>
+              })()}
             </label>
             <label>老師時薪
               <input type="number" min="0" step="1" placeholder="課程預設"
@@ -271,6 +276,11 @@ export default function LessonRecordsPage() {
                 className="hours-input"
                 style={{ width: '110px' }}
               />
+              {(() => {
+                const c = courses.find(x => x.id === form.course_id)
+                if (!c) return null
+                return <small className="rate-hint">課程預設 ${c.teacher_hourly_rate ?? 0}</small>
+              })()}
             </label>
             <label>日期
               <input type="date" value={form.lesson_date}
