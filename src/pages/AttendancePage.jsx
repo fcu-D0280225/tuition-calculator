@@ -8,6 +8,24 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function buildLineMessage(groupName, date, studentNames) {
+  const d = new Date(date + 'T00:00:00')
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+  const dateStr = `${date.slice(5).replace('-', '/')}（${weekdays[d.getDay()]}）`
+  const names = studentNames.join('、')
+  return `【補習班】${dateStr} 到班：\n${names}（共 ${studentNames.length} 人）\n✅ 點名完成`
+}
+
+function openLineShare(msg) {
+  const encoded = encodeURIComponent(msg)
+  window.location.href = `line://msg/text/?${encoded}`
+  setTimeout(() => {
+    if (!document.hidden) {
+      window.open(`https://line.me/R/msg/text/?${encoded}`, '_blank')
+    }
+  }, 1500)
+}
+
 export default function AttendancePage() {
   const { state: groupsState, loadGroups } = useGroups()
   const { state: studentsState, loadStudents } = useStudents()
@@ -199,11 +217,21 @@ export default function AttendancePage() {
         <div className="attendance-success">
           <div>{successMsg}</div>
           {attendedNames.length > 0 && (
-            <div className="attendance-names-list">
-              {attendedNames.map(name => (
-                <span key={name} className="attendance-name-tag">{name}</span>
-              ))}
-            </div>
+            <>
+              <div className="attendance-names-list">
+                {attendedNames.map(name => (
+                  <span key={name} className="attendance-name-tag">{name}</span>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn-line-share"
+                onClick={() => openLineShare(buildLineMessage(selectedGroupName, selectedDate, attendedNames))}
+              >
+                <span className="btn-line-icon">LINE</span>
+                傳到班級群組
+              </button>
+            </>
           )}
         </div>
       )}
