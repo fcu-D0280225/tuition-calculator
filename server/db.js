@@ -229,6 +229,15 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE \`groups\` ADD COLUMN monthly_fee DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER duration_months`)
   }
 
+  // Migration: 加 discount_multiplier（每多一人費用乘上幾%，預設 100%=無折扣）
+  const [gDiscCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'discount_multiplier'`
+  )
+  if (gDiscCols.length === 0) {
+    await pool.query(`ALTER TABLE \`groups\` ADD COLUMN discount_multiplier DECIMAL(6,4) NOT NULL DEFAULT 1.0000 AFTER monthly_fee`)
+  }
+
   // Migration: 把寫在 note 裡的純數字月費搬到 monthly_fee（適用早期資料）
   await pool.query(
     `UPDATE \`groups\`
@@ -406,6 +415,19 @@ function priceForLessonRecord(lr, sessionStudents, ratesMap) {
   return parseFloat(lr.course_hourly_rate ?? lr.hourly_rate ?? 0)
 }
 
+async function loadGroupMemberCounts(groupIds) {
+  const out = new Map()
+  if (!groupIds.length) return out
+  const [rows] = await pool.query(
+    'SELECT group_id, COUNT(*) AS n FROM group_members WHERE group_id IN (?) GROUP BY group_id',
+    [groupIds]
+  )
+  for (const r of rows) out.set(r.group_id, parseInt(r.n, 10))
+  // 沒設報名名單的團課，fallback 用該期間實際出席人數推算（保守用 1）
+  for (const id of groupIds) if (!out.has(id)) out.set(id, 1)
+  return out
+}
+
 function buildSessionStudents(records) {
   const map = new Map()
   for (const lr of records) {
@@ -523,7 +545,7 @@ export async function settlementTuition(from, to) {
     student.total += Math.round(h * unitPrice)
   }
 
-  // 合併團課費（按出席月份數 × 月費）
+  // 合併團課費（按出席月份數 × 月費 × 折扣公式）
   const [grRows] = await pool.query(
     `SELECT
        gr.student_id,
@@ -531,26 +553,33 @@ export async function settlementTuition(from, to) {
        gr.group_id,
        g.name                                        AS group_name,
        g.monthly_fee,
+       g.discount_multiplier,
        COUNT(DISTINCT DATE_FORMAT(gr.record_date, '%Y-%m')) AS billable_months
      FROM group_records gr
      JOIN \`groups\`  g ON g.id = gr.group_id
      JOIN students   s ON s.id = gr.student_id
      WHERE gr.record_date >= ? AND gr.record_date <= ?
-     GROUP BY gr.student_id, s.name, gr.group_id, g.name, g.monthly_fee
+     GROUP BY gr.student_id, s.name, gr.group_id, g.name, g.monthly_fee, g.discount_multiplier
      ORDER BY s.name ASC, g.name ASC`,
     [from, to]
   )
+  // 抓涉及到的所有 group 的報名人數
+  const involvedGroupIds = [...new Set(grRows.map(r => r.group_id))]
+  const memberCountByGroup = await loadGroupMemberCounts(involvedGroupIds)
+
   for (const row of grRows) {
     if (!map.has(row.student_id)) {
-      // 只上團課、沒有家教課的學生也要出現在帳單
       map.set(row.student_id, { student_id: row.student_id, student_name: row.student_name, courses: new Map(), total: 0 })
     }
     const student = map.get(row.student_id)
     if (!student.groups) student.groups = []
-    const months     = parseInt(row.billable_months, 10)
-    const monthlyFee = parseFloat(row.monthly_fee)
-    const amount     = Math.round(months * monthlyFee)
-    student.groups.push({ group_id: row.group_id, group_name: row.group_name, billable_months: months, monthly_fee: monthlyFee, amount })
+    const months       = parseInt(row.billable_months, 10)
+    const monthlyFee   = parseFloat(row.monthly_fee)
+    const multiplier   = parseFloat(row.discount_multiplier)
+    const memberCount  = memberCountByGroup.get(row.group_id) ?? 1
+    const perPersonFee = Math.round(monthlyFee * Math.pow(multiplier || 1, Math.max(0, memberCount - 1)))
+    const amount       = Math.round(months * perPersonFee)
+    student.groups.push({ group_id: row.group_id, group_name: row.group_name, billable_months: months, monthly_fee: perPersonFee, base_monthly_fee: monthlyFee, member_count: memberCount, discount_multiplier: multiplier, amount })
     student.total += amount
   }
 
@@ -711,25 +740,26 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, note FROM `groups` ORDER BY monthly_fee DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, discount_multiplier, note FROM `groups` ORDER BY monthly_fee DESC, id DESC'
   )
-  return rows
+  return rows.map(r => ({ ...r, discount_multiplier: parseFloat(r.discount_multiplier) }))
 }
 
-export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, note }) {
+export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, discountMultiplier, note }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, note) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, note || '']
+    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, discount_multiplier, note) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, discountMultiplier ?? 1, note || '']
   )
 }
 
-export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, note }) {
+export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, discountMultiplier, note }) {
   const sets = []; const params = []
-  if (name            !== undefined) { sets.push('name = ?');             params.push(name) }
-  if (weekdays        !== undefined) { sets.push('weekdays = ?');         params.push(weekdays || '') }
-  if (durationMonths  !== undefined) { sets.push('duration_months = ?');  params.push(durationMonths) }
-  if (monthlyFee      !== undefined) { sets.push('monthly_fee = ?');      params.push(monthlyFee) }
-  if (note            !== undefined) { sets.push('note = ?');             params.push(note || '') }
+  if (name               !== undefined) { sets.push('name = ?');                params.push(name) }
+  if (weekdays           !== undefined) { sets.push('weekdays = ?');            params.push(weekdays || '') }
+  if (durationMonths     !== undefined) { sets.push('duration_months = ?');     params.push(durationMonths) }
+  if (monthlyFee         !== undefined) { sets.push('monthly_fee = ?');         params.push(monthlyFee) }
+  if (discountMultiplier !== undefined) { sets.push('discount_multiplier = ?'); params.push(discountMultiplier) }
+  if (note               !== undefined) { sets.push('note = ?');                params.push(note || '') }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -873,23 +903,27 @@ export async function getStudentBill(studentId, from, to) {
     }
   })
 
-  // 團課（鏡像 settlementTuition：按出席月份數 × 月費）
+  // 團課（鏡像 settlementTuition：按出席月份數 × 月費 × 折扣公式）
   const [groupRows] = await pool.query(
-    `SELECT gr.group_id, g.name AS group_name, g.monthly_fee,
+    `SELECT gr.group_id, g.name AS group_name, g.monthly_fee, g.discount_multiplier,
             COUNT(DISTINCT DATE_FORMAT(gr.record_date, '%Y-%m')) AS billable_months
      FROM group_records gr
      JOIN \`groups\` g ON g.id = gr.group_id
      WHERE gr.student_id = ? AND gr.record_date >= ? AND gr.record_date <= ?
-     GROUP BY gr.group_id, g.name, g.monthly_fee
+     GROUP BY gr.group_id, g.name, g.monthly_fee, g.discount_multiplier
      ORDER BY g.name ASC`,
     [studentId, from, to]
   )
+  const memberCountByGroup = await loadGroupMemberCounts([...new Set(groupRows.map(r => r.group_id))])
   const groups = groupRows.map(row => {
-    const months = parseInt(row.billable_months, 10)
-    const monthly = parseFloat(row.monthly_fee)
-    const amount = Math.round(months * monthly)
+    const months       = parseInt(row.billable_months, 10)
+    const baseFee      = parseFloat(row.monthly_fee)
+    const multiplier   = parseFloat(row.discount_multiplier)
+    const memberCount  = memberCountByGroup.get(row.group_id) ?? 1
+    const perPersonFee = Math.round(baseFee * Math.pow(multiplier || 1, Math.max(0, memberCount - 1)))
+    const amount       = Math.round(months * perPersonFee)
     total += amount
-    return { group_id: row.group_id, group_name: row.group_name, billable_months: months, monthly_fee: monthly, amount }
+    return { group_id: row.group_id, group_name: row.group_name, billable_months: months, monthly_fee: perPersonFee, base_monthly_fee: baseFee, member_count: memberCount, discount_multiplier: multiplier, amount }
   })
 
   // 教材

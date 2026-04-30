@@ -51,7 +51,7 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', note: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', discount_pct: '100', note: '' }
 
 export default function GroupsPage() {
   const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
@@ -146,9 +146,11 @@ export default function GroupsPage() {
     if (!Number.isInteger(newGroup.duration_months) || newGroup.duration_months <= 0) { setError('請選擇持續時間'); return }
     const fee = parseFloat(newGroup.monthly_fee)
     if (isNaN(fee) || fee <= 0) { setError('請輸入月費'); return }
+    const pct = parseFloat(newGroup.discount_pct)
+    if (isNaN(pct) || pct <= 0 || pct > 500) { setError('遞減百分比格式不正確（0–500）'); return }
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, note: newGroup.note })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, discount_multiplier: pct / 100, note: newGroup.note })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -156,7 +158,7 @@ export default function GroupsPage() {
 
   function startEdit(g) {
     setEditId(g.id)
-    setEditGroup({ name: g.name, weekdays: g.weekdays || '', duration_months: g.duration_months ?? 0, monthly_fee: g.monthly_fee != null ? String(g.monthly_fee) : '', note: g.note || '' })
+    setEditGroup({ name: g.name, weekdays: g.weekdays || '', duration_months: g.duration_months ?? 0, monthly_fee: g.monthly_fee != null ? String(g.monthly_fee) : '', discount_pct: g.discount_multiplier != null ? String(Math.round(parseFloat(g.discount_multiplier) * 10000) / 100) : '100', note: g.note || '' })
   }
 
   async function handleUpdateGroup(id) {
@@ -164,9 +166,11 @@ export default function GroupsPage() {
     if (!name) return
     const fee = parseFloat(editGroup.monthly_fee)
     if (isNaN(fee) || fee < 0) { setError('月費格式不正確'); return }
+    const pct = parseFloat(editGroup.discount_pct)
+    if (isNaN(pct) || pct <= 0 || pct > 500) { setError('遞減百分比格式不正確（0–500）'); return }
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, note: editGroup.note })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, discount_multiplier: pct / 100, note: editGroup.note })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -236,6 +240,18 @@ export default function GroupsPage() {
                 onChange={e => setNewGroup(g => ({ ...g, monthly_fee: e.target.value }))}
               />
             </label>
+            <label>每多一人乘上 (%)
+              <input
+                type="number"
+                min="1"
+                max="200"
+                step="1"
+                placeholder="100 = 不打折"
+                value={newGroup.discount_pct}
+                onChange={e => setNewGroup(g => ({ ...g, discount_pct: e.target.value }))}
+                title="N 人時每人月費 = 月費 × (此百分比 / 100)^(N-1)"
+              />
+            </label>
             <label>備註
               <input
                 type="text"
@@ -266,7 +282,7 @@ export default function GroupsPage() {
         ) : (
           <table className="entity-table">
             <thead>
-              <tr><th>團課名稱</th><th>上課星期</th><th>持續時間</th><th>月費</th><th>報名人數</th><th>備註</th><th></th></tr>
+              <tr><th>團課名稱</th><th>上課星期</th><th>持續時間</th><th>月費</th><th>每多一人 ×</th><th>報名人數</th><th>備註</th><th></th></tr>
             </thead>
             <tbody>
               {groups.map(g => (
@@ -317,6 +333,23 @@ export default function GroupsPage() {
                         onChange={e => setEditGroup(eg => ({ ...eg, monthly_fee: e.target.value }))}
                       />
                     ) : (g.monthly_fee > 0 ? amt(g.monthly_fee) : '—')}
+                  </td>
+                  <td>
+                    {editId === g.id ? (
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        step="1"
+                        className="inline-edit-input"
+                        value={editGroup.discount_pct}
+                        onChange={e => setEditGroup(eg => ({ ...eg, discount_pct: e.target.value }))}
+                      />
+                    ) : (
+                      g.discount_multiplier && parseFloat(g.discount_multiplier) !== 1
+                        ? `${Math.round(parseFloat(g.discount_multiplier) * 10000) / 100}%`
+                        : '—'
+                    )}
                   </td>
                   <td>{memberCounts[g.id] ?? '—'} 人</td>
                   <td className="note-cell">
