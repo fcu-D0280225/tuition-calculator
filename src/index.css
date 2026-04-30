@@ -3929,6 +3929,28 @@ select.catalog-input.catalog-select {
   user-select: none;
 }
 
+/* ── Drag-to-reorder rows ───────────────────────────────────────────────── */
+.drag-handle {
+  cursor: grab;
+  color: var(--muted);
+  text-align: center;
+  user-select: none;
+  font-size: 16px;
+  letter-spacing: -2px;
+  width: 36px;
+  font-weight: 700;
+}
+.drag-handle:active { cursor: grabbing; }
+.drag-handle:hover  { color: var(--accent); }
+
+.entity-table tr.row-dragging {
+  opacity: 0.45;
+  background: var(--accent-light);
+}
+.entity-table tr.row-drop-target td {
+  border-top: 2px solid var(--accent);
+}
+
 /* ── Disclosure button（展開／收起） ────────────────────────────────────── */
 .btn-disclosure {
   display: inline-flex;

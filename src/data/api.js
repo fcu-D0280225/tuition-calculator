@@ -60,6 +60,7 @@ export const apiListCourses     = ()                        => request('/courses
 export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0, discount_multiplier = 1) => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate, discount_multiplier }) })
 export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiReorderCourses  = (ids)                    => request('/courses/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 
 // ── Materials ─────────────────────────────────────────────────────────────────
 

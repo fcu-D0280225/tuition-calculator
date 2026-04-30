@@ -8,7 +8,7 @@ import {
   // teachers
   listTeachers, insertTeacher, updateTeacherName, deleteTeacher,
   // courses
-  listCourses, insertCourse, updateCourse, deleteCourse,
+  listCourses, insertCourse, updateCourse, deleteCourse, reorderCourses,
   // lessons
   listLessons, insertLesson, updateLesson, deleteLesson,
   // materials
@@ -199,6 +199,15 @@ app.delete('/api/courses/:id', async (req, res) => {
     const ok = await deleteCourse(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.put('/api/courses/reorder', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
+  if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
+  try {
+    await reorderCourses(ids)
+    res.json(await listCourses())
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

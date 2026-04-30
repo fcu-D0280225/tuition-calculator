@@ -227,6 +227,18 @@ export async function initSchema() {
   if (cDiscCols.length === 0) {
     await pool.query(`ALTER TABLE courses ADD COLUMN discount_multiplier DECIMAL(6,4) NOT NULL DEFAULT 1.0000 AFTER hourly_rate`)
   }
+
+  // Migration: 加 courses.sort_order，可手動拖曳排序
+  const [cSortCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'courses' AND COLUMN_NAME = 'sort_order'`
+  )
+  if (cSortCols.length === 0) {
+    await pool.query(`ALTER TABLE courses ADD COLUMN sort_order INT NOT NULL DEFAULT 0`)
+    // 把既有資料按 name ASC 給編號（每筆相差 10，方便日後手動插入）
+    await pool.query(`SET @rn := 0`)
+    await pool.query(`UPDATE courses SET sort_order = (@rn := @rn + 10) ORDER BY name ASC, id ASC`)
+  }
   // Migration: 早期版本曾經把 discount_multiplier 加在 groups 上，現在不用了，留欄位不影響但忽略
 
 
@@ -329,9 +341,17 @@ export async function deleteTeacher(id) {
 
 export async function listCourses() {
   const [rows] = await pool.query(
-    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_multiplier FROM courses ORDER BY name ASC, hourly_rate DESC, id DESC'
+    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_multiplier, sort_order FROM courses ORDER BY sort_order ASC, name ASC, id DESC'
   )
   return rows.map(r => ({ ...r, discount_multiplier: parseFloat(r.discount_multiplier) }))
+}
+
+export async function reorderCourses(orderedIds) {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
+  // 一次更新：用 CASE WHEN 把每個 id 對應到它的新 sort_order（每筆相差 10）
+  const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
+  const sql = `UPDATE courses SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?)`
+  await pool.query(sql, [...orderedIds, orderedIds])
 }
 
 export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountMultiplier }) {

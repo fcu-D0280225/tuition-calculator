@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
+import { apiReorderCourses } from '../data/api.js'
 import EyeIcon from '../components/EyeIcon.jsx'
 
 export default function CoursesPage() {
@@ -18,6 +19,39 @@ export default function CoursesPage() {
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
   const [showAmounts, setShowAmounts]           = useState(false)
+
+  // 拖曳排序
+  const [dragId, setDragId]   = useState(null)
+  const [overId, setOverId]   = useState(null)
+  const [orderOverride, setOrderOverride] = useState(null) // 樂觀更新後的順序
+
+  function startDrag(id) { setDragId(id) }
+  function endDrag() { setDragId(null); setOverId(null) }
+
+  async function handleDrop(targetId) {
+    if (!dragId || dragId === targetId) { endDrag(); return }
+    const list = (orderOverride ?? courses).map(c => c.id)
+    const fromIdx = list.indexOf(dragId)
+    const toIdx   = list.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
+    const next = list.slice()
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, dragId)
+    // 樂觀更新顯示順序
+    const idMap = new Map(courses.map(c => [c.id, c]))
+    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
+    endDrag()
+    try {
+      await apiReorderCourses(next)
+      await loadCourses()
+      setOrderOverride(null)
+    } catch {
+      setError('排序儲存失敗')
+      setOrderOverride(null)
+    }
+  }
+
+  const displayCourses = orderOverride ?? courses
 
   function amt(value) {
     if (!showAmounts) return '••••'
@@ -142,11 +176,24 @@ export default function CoursesPage() {
       ) : (
         <table className="entity-table">
           <thead>
-            <tr><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 ×</th><th></th></tr>
+            <tr><th aria-label="拖曳排序" style={{ width: 36 }}></th><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 ×</th><th></th></tr>
           </thead>
           <tbody>
-            {courses.map(c => (
-              <tr key={c.id}>
+            {displayCourses.map(c => (
+              <tr
+                key={c.id}
+                className={`${dragId === c.id ? 'row-dragging' : ''} ${overId === c.id ? 'row-drop-target' : ''}`}
+                onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(c.id) } }}
+                onDragLeave={() => { if (overId === c.id) setOverId(null) }}
+                onDrop={e => { e.preventDefault(); handleDrop(c.id) }}
+              >
+                <td
+                  className="drag-handle"
+                  draggable={editId === null}
+                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(c.id) }}
+                  onDragEnd={endDrag}
+                  title="拖曳調整順序"
+                >⋮⋮</td>
                 <td>
                   {editId === c.id ? (
                     <input
