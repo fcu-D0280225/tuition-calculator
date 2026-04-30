@@ -193,17 +193,19 @@ export default function LessonRecordsPage() {
       <div className="add-mode-switcher">
         <button
           type="button"
-          className="btn-primary"
+          className={`mode-toggle${addMode === 'lesson' ? ' active' : ''}`}
           onClick={() => { setError(''); setAddMode(m => m === 'lesson' ? null : 'lesson') }}
+          aria-pressed={addMode === 'lesson'}
         >
-          {addMode === 'lesson' ? '收起' : '＋'} 新增上課紀錄
+          新增上課紀錄
         </button>
         <button
           type="button"
-          className="btn-primary"
+          className={`mode-toggle${addMode === 'group' ? ' active' : ''}`}
           onClick={() => { setError(''); setAddMode(m => m === 'group' ? null : 'group') }}
+          aria-pressed={addMode === 'group'}
         >
-          {addMode === 'group' ? '收起' : '＋'} 新增團課上課紀錄
+          新增團課上課紀錄
         </button>
       </div>
 

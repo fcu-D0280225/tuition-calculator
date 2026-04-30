@@ -3029,6 +3029,29 @@ select.catalog-input.catalog-select {
   margin-bottom: var(--space-4);
 }
 
+.mode-toggle {
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.mode-toggle:hover:not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mode-toggle.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+}
+.mode-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .btn-outline {
   background: var(--surface);
   color: var(--accent);
