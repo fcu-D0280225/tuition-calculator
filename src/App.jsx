@@ -8,6 +8,7 @@ import SettlementPage    from './pages/SettlementPage.jsx'
 import MaterialsPage     from './pages/MaterialsPage.jsx'
 import GroupsPage        from './pages/GroupsPage.jsx'
 import DashboardPage     from './pages/DashboardPage.jsx'
+import AttendancePage    from './pages/AttendancePage.jsx'
 
 const NAV = [
   { type: 'tab', id: 'dashboard', label: '財務總覽' },
@@ -16,8 +17,9 @@ const NAV = [
     { id: 'groups',  label: '團課' },
   ]},
   { type: 'group', key: 'records', label: '紀錄', children: [
-    { id: 'lessons',   label: '上課紀錄' },
-    { id: 'materials', label: '教材' },
+    { id: 'lessons',    label: '上課紀錄' },
+    { id: 'attendance', label: '點名' },
+    { id: 'materials',  label: '教材' },
   ]},
   { type: 'tab', id: 'settlement', label: '結算' },
   { type: 'group', key: 'people', label: '人員', children: [
@@ -68,8 +70,9 @@ export default function App() {
           {tab === 'students'   && <StudentsPage />}
           {tab === 'teachers'   && <TeachersPage />}
           {tab === 'courses'    && <CoursesPage />}
-          {tab === 'materials'  && <MaterialsPage />}
-          {tab === 'groups'     && <GroupsPage />}
+          {tab === 'materials'   && <MaterialsPage />}
+          {tab === 'groups'      && <GroupsPage />}
+          {tab === 'attendance'  && <AttendancePage />}
         </main>
       </div>
     </AppProviders>

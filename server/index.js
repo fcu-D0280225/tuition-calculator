@@ -21,6 +21,8 @@ import {
   settlementTuition, settlementSalary,
   // share tokens
   insertShareToken, getShareTokenByToken, getStudentBill,
+  // payment records
+  listPaymentRecords, insertPaymentRecord, deletePaymentRecord,
 } from './db.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
@@ -28,6 +30,8 @@ const PORT = parseInt(process.env.PORT || '3100', 10)
 function genId(prefix) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 }
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 function normalizeName(raw) {
   if (typeof raw !== 'string') return ''
@@ -448,6 +452,39 @@ app.delete('/api/group-records/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
+// ── Payment Records ───────────────────────────────────────────────────────────
+
+app.get('/api/payment-records', async (req, res) => {
+  const { from, to } = req.query
+  try { res.json(await listPaymentRecords({ from, to })) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.post('/api/payment-records', async (req, res) => {
+  const { student_id, period_from, period_to, note } = req.body || {}
+  if (!student_id) return res.status(400).json({ error: 'student_id_required' })
+  if (!period_from || !DATE_RE.test(period_from)) return res.status(400).json({ error: 'invalid_period_from' })
+  if (!period_to   || !DATE_RE.test(period_to))   return res.status(400).json({ error: 'invalid_period_to' })
+  if (period_from > period_to) return res.status(400).json({ error: 'period_from_after_to' })
+  const id = genId('pay')
+  try {
+    await insertPaymentRecord({ id, studentId: student_id, periodFrom: period_from, periodTo: period_to, note })
+    const paid_at = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    res.status(201).json({ id, student_id, period_from, period_to, paid_at, note: note || '' })
+  } catch (e) {
+    if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'already_paid' })
+    console.error(e); res.status(500).json({ error: 'failed' })
+  }
+})
+
+app.delete('/api/payment-records/:id', async (req, res) => {
+  try {
+    const ok = await deletePaymentRecord(req.params.id)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
 // ── Settlement ────────────────────────────────────────────────────────────────
 
 app.get('/api/settlement/tuition', async (req, res) => {
@@ -465,8 +502,6 @@ app.get('/api/settlement/salary', async (req, res) => {
 })
 
 // ── Share Tokens ──────────────────────────────────────────────────────────────
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 app.post('/api/students/:id/share-token', async (req, res) => {
   const { from, to, expires_days } = req.body || {}

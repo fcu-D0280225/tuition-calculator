@@ -100,6 +100,20 @@ export const apiUpdateLesson = (id, patch) =>
 export const apiDeleteLesson = (id) =>
   request(`/lessons/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
+// ── Payment Records ───────────────────────────────────────────────────────────
+
+export const apiListPaymentRecords = ({ from, to } = {}) => {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to)   params.set('to', to)
+  const qs = params.toString()
+  return request(`/payment-records${qs ? '?' + qs : ''}`)
+}
+export const apiCreatePaymentRecord = (record) =>
+  request('/payment-records', { method: 'POST', body: JSON.stringify(record) })
+export const apiDeletePaymentRecord = (id) =>
+  request(`/payment-records/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
 // ── Settlement ────────────────────────────────────────────────────────────────
 
 export const apiSettlementTuition = (from, to) =>

@@ -220,6 +220,22 @@ export async function initSchema() {
       INDEX idx_share_tokens_token (token)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS payment_records (
+      id           VARCHAR(64)   NOT NULL PRIMARY KEY,
+      student_id   VARCHAR(64)   NOT NULL,
+      period_from  DATE          NOT NULL,
+      period_to    DATE          NOT NULL,
+      paid_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      note         VARCHAR(256)  NOT NULL DEFAULT '',
+      created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+      UNIQUE KEY uk_payment (student_id, period_from, period_to),
+      INDEX idx_payment_period (period_from, period_to)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────
@@ -776,4 +792,37 @@ export async function getStudentBill(studentId, from, to) {
     lessons,
     total,
   }
+}
+
+// ── Payment Records ───────────────────────────────────────────────────────────
+
+export async function listPaymentRecords({ from, to } = {}) {
+  const conditions = []; const params = []
+  if (from) { conditions.push('pr.period_from >= ?'); params.push(from) }
+  if (to)   { conditions.push('pr.period_to <= ?');   params.push(to) }
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+  const [rows] = await pool.query(
+    `SELECT pr.id, pr.student_id, s.name AS student_name,
+            pr.period_from, pr.period_to, pr.paid_at, pr.note
+     FROM payment_records pr
+     JOIN students s ON s.id = pr.student_id
+     ${where}
+     ORDER BY pr.paid_at DESC`,
+    params
+  )
+  return rows
+}
+
+export async function insertPaymentRecord({ id, studentId, periodFrom, periodTo, note }) {
+  await pool.query(
+    `INSERT INTO payment_records (id, student_id, period_from, period_to, note)
+     VALUES (?, ?, ?, ?, ?)`,
+    [id, studentId, periodFrom, periodTo, note || '']
+  )
+}
+
+export async function deletePaymentRecord(id) {
+  const [res] = await pool.query('DELETE FROM payment_records WHERE id = ?', [id])
+  return res.affectedRows > 0
+}
 }

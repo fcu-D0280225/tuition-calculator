@@ -2857,6 +2857,47 @@ select.catalog-input.catalog-select {
 .grand-total-label  { text-align: right; }
 .grand-total-amount { font-size: 15px; font-weight: 800; }
 
+.payment-summary {
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: auto;
+  margin-right: var(--space-3);
+}
+.payment-summary strong {
+  color: var(--green);
+  font-size: 15px;
+}
+
+.btn-paid {
+  background: var(--green-light);
+  color: var(--green-text);
+  border: 1px solid #86efac;
+  font-weight: 700;
+  min-width: 72px;
+}
+.btn-paid:hover:not(:disabled) {
+  background: #bbf7d0;
+  border-color: #4ade80;
+}
+
+.btn-unpaid {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  min-width: 72px;
+}
+.btn-unpaid:hover:not(:disabled) {
+  background: var(--bg);
+  color: var(--text);
+  border-color: #94a3b8;
+}
+
+.paid-date {
+  font-size: 11px;
+  color: var(--green-text);
+  letter-spacing: 0.02em;
+}
+
 /* ── Weekday picker ──────────────────────────────────────────────────────── */
 
 .weekday-picker {
@@ -3090,4 +3131,114 @@ select.catalog-input.catalog-select {
 .dashboard-chart-scroll {
   overflow-x: auto;
   padding-bottom: 4px;
+}
+
+/* ── 點名頁 ─────────────────────────────────────────────────────────────── */
+
+.attendance-success {
+  padding: var(--space-3) var(--space-4);
+  background: var(--green-light);
+  color: var(--green-text);
+  border: 1px solid #a7f3d0;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  margin-bottom: var(--space-3);
+}
+
+.attendance-count {
+  font-size: 13px;
+  color: var(--muted);
+}
+.attendance-count strong {
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.attendance-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.attendance-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.1s, border-color 0.1s;
+  user-select: none;
+  font-size: 14px;
+}
+.attendance-item:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+}
+.attendance-item--checked {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.attendance-item-all {
+  grid-column: 1 / -1;
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--muted);
+  border-style: dashed;
+}
+.attendance-item-all:hover {
+  color: var(--text);
+}
+
+.attendance-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.attendance-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attendance-section-label {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  padding: var(--space-2) 0 var(--space-1);
+  border-bottom: 1px solid var(--accent-light);
+  margin-bottom: var(--space-1);
+}
+.attendance-section-label--other {
+  color: var(--muted);
+  border-bottom-color: var(--border);
+  margin-top: var(--space-2);
+}
+
+.attendance-names-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin-top: var(--space-2);
+}
+.attendance-name-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  background: #bbf7d0;
+  color: var(--green-text-dark);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
 }

@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { apiSettlementTuition, apiSettlementSalary, apiCreateShareToken } from '../data/api.js'
+import { apiSettlementTuition, apiSettlementSalary, apiCreateShareToken, apiListPaymentRecords, apiCreatePaymentRecord, apiDeletePaymentRecord } from '../data/api.js'
 import { generateTuitionPDF, generateSalaryPDF, generateStudentTuitionPDF, generateTeacherSalaryPDF } from '../utils/pdf.js'
 import EyeIcon from '../components/EyeIcon.jsx'
+import { genId } from '../utils/ids.js'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -26,6 +27,9 @@ export default function SettlementPage() {
   const [shareUrl, setShareUrl] = useState(null)     // { studentName, url, expiresAt }
   const [copied, setCopied] = useState(false)
   const [showAmounts, setShowAmounts] = useState(false)
+  // student_id -> { id, paid_at }
+  const [paymentMap, setPaymentMap] = useState({})
+  const [payLoading, setPayLoading] = useState('')   // student_id 正在處理中
 
   function amt(value, suffix = '') {
     if (!showAmounts) return '••••'
@@ -37,8 +41,15 @@ export default function SettlementPage() {
     if (!from || !to) { setError('請選擇日期區間'); return }
     setLoading(true); setError('')
     try {
-      const [t, s] = await Promise.all([apiSettlementTuition(from, to), apiSettlementSalary(from, to)])
+      const [t, s, payments] = await Promise.all([
+        apiSettlementTuition(from, to),
+        apiSettlementSalary(from, to),
+        apiListPaymentRecords({ from, to }),
+      ])
       setTuition(t); setSalary(s)
+      const map = {}
+      for (const p of payments) map[p.student_id] = { id: p.id, paid_at: p.paid_at }
+      setPaymentMap(map)
     } catch { setError('載入結算資料失敗') }
     finally { setLoading(false) }
   }
@@ -109,6 +120,26 @@ export default function SettlementPage() {
     finally { setPdfLoading('') }
   }
 
+  async function handleTogglePaid(student) {
+    const existing = paymentMap[student.student_id]
+    setPayLoading(student.student_id)
+    try {
+      if (existing) {
+        await apiDeletePaymentRecord(existing.id)
+        setPaymentMap(prev => { const next = { ...prev }; delete next[student.student_id]; return next })
+      } else {
+        const rec = await apiCreatePaymentRecord({
+          id: genId('pay'),
+          student_id: student.student_id,
+          period_from: from,
+          period_to: to,
+        })
+        setPaymentMap(prev => ({ ...prev, [student.student_id]: { id: rec.id, paid_at: rec.paid_at } }))
+      }
+    } catch { alert('操作失敗，請再試一次') }
+    finally { setPayLoading('') }
+  }
+
   const periodLabel = from && to ? `${from} ~ ${to}` : ''
 
   return (
@@ -163,6 +194,11 @@ export default function SettlementPage() {
           <div className="settlement-section-header">
             <h2>學費報表</h2>
             <span className="period-badge">{periodLabel}</span>
+            {tuition.length > 0 && (
+              <span className="payment-summary">
+                已繳 <strong>{Object.keys(paymentMap).length}</strong> / {tuition.length} 人
+              </span>
+            )}
             <button className="btn-primary" onClick={handleDownloadTuition} disabled={pdfLoading === 'tuition'}>
               {pdfLoading === 'tuition' ? '產生中⋯' : '下載學費單 PDF'}
             </button>
@@ -185,25 +221,41 @@ export default function SettlementPage() {
                   const nameCell = (
                     <td rowSpan={totalRows} className="student-cell">{student.student_name}</td>
                   )
+                  const isPaid = !!paymentMap[student.student_id]
+                  const paidAt = paymentMap[student.student_id]?.paid_at
                   const actionCell = (
                     <td rowSpan={totalRows} style={{ verticalAlign: 'middle', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <button
-                        className="btn-sm"
-                        onClick={() => handleStudentPDF(student)}
-                        disabled={!!pdfLoading}
-                        title={`下載 ${student.student_name} 學費單 PDF`}
-                      >
-                        {pdfLoading === student.student_id ? '…' : 'PDF'}
-                      </button>
-                      <button
-                        className="btn-sm"
-                        style={{ marginLeft: 4 }}
-                        onClick={() => handleShareStudent(student)}
-                        disabled={!!shareLoading}
-                        title={`產生 ${student.student_name} 的家長分享連結`}
-                      >
-                        {shareLoading === student.student_id ? '…' : '分享'}
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                        <button
+                          className={isPaid ? 'btn-sm btn-paid' : 'btn-sm btn-unpaid'}
+                          onClick={() => handleTogglePaid(student)}
+                          disabled={payLoading === student.student_id}
+                          title={isPaid ? `${paidAt?.slice(0, 10)} 已標記繳費，點擊取消` : '標記為已繳費'}
+                        >
+                          {payLoading === student.student_id ? '…' : isPaid ? '✓ 已繳費' : '未繳費'}
+                        </button>
+                        {isPaid && paidAt && (
+                          <span className="paid-date">{paidAt.slice(0, 10)}</span>
+                        )}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn-sm"
+                            onClick={() => handleStudentPDF(student)}
+                            disabled={!!pdfLoading}
+                            title={`下載 ${student.student_name} 學費單 PDF`}
+                          >
+                            {pdfLoading === student.student_id ? '…' : 'PDF'}
+                          </button>
+                          <button
+                            className="btn-sm"
+                            onClick={() => handleShareStudent(student)}
+                            disabled={!!shareLoading}
+                            title={`產生 ${student.student_name} 的家長分享連結`}
+                          >
+                            {shareLoading === student.student_id ? '…' : '分享'}
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   )
                   return (
