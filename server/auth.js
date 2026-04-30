@@ -216,6 +216,12 @@ function getRequiredNavs(method, p) {
   if (/^\/api\/teachers(\/[^/]+)?$/.test(p))           return ['teachers']
   // courses
   if (/^\/api\/courses(\/[^/]+)?$/.test(p))            return ['courses']
+  // group members（應到名單）— 點名與團課管理都會用到
+  if (/^\/api\/groups\/[^/]+\/members$/.test(p)) {
+    return method === 'GET'
+      ? ['groups', 'attendance', 'lessons']
+      : ['groups', 'attendance']
+  }
   // groups
   if (/^\/api\/groups(\/[^/]+)?$/.test(p))             return ['groups']
   // group-records

@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
-import { apiListGroupRecords, apiCreateGroupRecord, apiDeleteGroupRecord } from '../data/api.js'
+import {
+  apiListGroupRecords, apiCreateGroupRecord, apiDeleteGroupRecord,
+  apiListGroupMembers, apiSetGroupMembers,
+} from '../data/api.js'
 import { genId } from '../utils/ids.js'
 
 function todayStr() {
@@ -33,12 +36,11 @@ export default function AttendancePage() {
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedDate, setSelectedDate]   = useState(todayStr)
 
-  // student_id -> record_id，代表已存入 DB 的紀錄
+  // student_id -> record_id
   const [existingMap, setExistingMap] = useState({})
-  // 目前勾選的 student_id set
   const [checked, setChecked] = useState(new Set())
-  // 本班學生（歷史上曾出席此團課的 student_id）
-  const [rosterIds, setRosterIds] = useState(new Set())
+  // 應到名單 student_id（DB: group_members）
+  const [memberIds, setMemberIds] = useState(new Set())
 
   const [loaded,     setLoaded]     = useState(false)
   const [fetching,   setFetching]   = useState(false)
@@ -47,26 +49,31 @@ export default function AttendancePage() {
   const [successMsg, setSuccessMsg] = useState('')
   const [attendedNames, setAttendedNames] = useState([])
 
-  // 避免重複觸發
+  // 「其他學生」摺疊
+  const [showOthers, setShowOthers] = useState(false)
+  // 管理應到名單面板
+  const [editRoster, setEditRoster] = useState(false)
+  const [rosterDraft, setRosterDraft] = useState(new Set())
+  const [rosterFilter, setRosterFilter] = useState('')
+  const [rosterSaving, setRosterSaving] = useState(false)
+
   const loadAbortRef = useRef(null)
 
   useEffect(() => { loadGroups() },   [loadGroups])
   useEffect(() => { loadStudents() }, [loadStudents])
 
-  // 選取團課後，拉取歷史出席紀錄以推算本班名單
+  // 切換團課時拉應到名單
   useEffect(() => {
     if (!selectedGroup) {
-      setRosterIds(new Set())
+      setMemberIds(new Set())
       return
     }
-    apiListGroupRecords({ group_id: selectedGroup })
-      .then(records => {
-        setRosterIds(new Set(records.map(r => r.student_id)))
-      })
+    apiListGroupMembers(selectedGroup)
+      .then(rows => setMemberIds(new Set(rows.map(r => r.id))))
       .catch(() => {})
   }, [selectedGroup])
 
-  // 切換課堂或日期時自動載入點名紀錄
+  // 切換團課/日期：載入該日點名紀錄
   useEffect(() => {
     setLoaded(false)
     setChecked(new Set())
@@ -77,7 +84,6 @@ export default function AttendancePage() {
 
     if (!selectedGroup || !selectedDate) return
 
-    // 取消上一次還未完成的請求
     const abortCtrl = new AbortController()
     loadAbortRef.current = abortCtrl
 
@@ -117,11 +123,17 @@ export default function AttendancePage() {
     setAttendedNames([])
   }
 
-  function handleToggleAll() {
-    const sortedStudents = getSortedStudents()
-    const all = sortedStudents.map(s => s.id)
+  // 全選/取消：只針對應到名單
+  function handleToggleAllRoster() {
+    const rosterStudents = studentsState.students.filter(s => memberIds.has(s.id))
+    const all = rosterStudents.map(s => s.id)
     const allChecked = all.length > 0 && all.every(id => checked.has(id))
-    setChecked(allChecked ? new Set() : new Set(all))
+    setChecked(prev => {
+      const next = new Set(prev)
+      if (allChecked) all.forEach(id => next.delete(id))
+      else            all.forEach(id => next.add(id))
+      return next
+    })
     setSuccessMsg('')
     setAttendedNames([])
   }
@@ -155,7 +167,6 @@ export default function AttendancePage() {
         ...toDelete.map(id => apiDeleteGroupRecord(id)),
       ])
 
-      // 重新同步最新狀態
       const fresh = await apiListGroupRecords({
         from: selectedDate,
         to:   selectedDate,
@@ -170,18 +181,13 @@ export default function AttendancePage() {
       setExistingMap(newMap)
       setChecked(newChecked)
 
-      // 更新本班名單（加入剛出席的新學生）
-      setRosterIds(prev => {
-        const next = new Set(prev)
-        for (const id of newChecked) next.add(id)
-        return next
-      })
-
       const names = studentsState.students
         .filter(s => newChecked.has(s.id))
         .map(s => s.name)
       setAttendedNames(names)
-      setSuccessMsg(`已儲存！出席 ${newChecked.size} 人 / 共 ${studentsState.students.length} 人`)
+
+      const rosterCount = studentsState.students.filter(s => memberIds.has(s.id)).length
+      setSuccessMsg(`已儲存！出席 ${newChecked.size} 人${rosterCount ? ` / 應到 ${rosterCount} 人` : ''}`)
     } catch {
       setError('儲存失敗，請再試一次')
     } finally {
@@ -189,22 +195,51 @@ export default function AttendancePage() {
     }
   }
 
-  function getSortedStudents() {
-    const roster = []
-    const others = []
-    for (const s of studentsState.students) {
-      if (rosterIds.has(s.id)) roster.push(s)
-      else others.push(s)
+  // ── 管理應到名單 ──
+  function openRosterEditor() {
+    setRosterDraft(new Set(memberIds))
+    setRosterFilter('')
+    setEditRoster(true)
+  }
+  function toggleRosterDraft(studentId) {
+    setRosterDraft(prev => {
+      const next = new Set(prev)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+  async function saveRoster() {
+    if (rosterSaving) return
+    setRosterSaving(true)
+    try {
+      const rows = await apiSetGroupMembers(selectedGroup, Array.from(rosterDraft))
+      setMemberIds(new Set(rows.map(r => r.id)))
+      setEditRoster(false)
+    } catch {
+      setError('儲存應到名單失敗')
+    } finally {
+      setRosterSaving(false)
     }
-    return { roster, others }
   }
 
   const { groups }   = groupsState
   const { students } = studentsState
-  const allStudents  = getSortedStudents()
-  const totalChecked = checked.size
   const selectedGroupName = groups.find(g => g.id === selectedGroup)?.name || ''
-  const allChecked = students.length > 0 && students.every(s => checked.has(s.id))
+
+  // 切兩堆：應到 / 其他
+  const rosterStudents = students.filter(s => memberIds.has(s.id))
+  const otherStudents  = students.filter(s => !memberIds.has(s.id))
+  const rosterFilterLower = rosterFilter.trim().toLowerCase()
+  const filteredForRoster = rosterFilterLower
+    ? students.filter(s => s.name.toLowerCase().includes(rosterFilterLower))
+    : students
+
+  const rosterCount  = rosterStudents.length
+  const presentCount = checked.size
+  const rosterAllChecked = rosterCount > 0 && rosterStudents.every(s => checked.has(s.id))
+  // 「其他學生」中已勾選（臨時加入）的數量
+  const otherCheckedCount = otherStudents.filter(s => checked.has(s.id)).length
 
   return (
     <div className="page">
@@ -272,10 +307,11 @@ export default function AttendancePage() {
 
       {!fetching && loaded && (
         <div className="lesson-form-card">
-          <div className="form-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="form-section-title attendance-header-row">
             <span>{selectedGroupName}・{selectedDate}</span>
             <span className="attendance-count">
-              出席 <strong>{totalChecked}</strong> / {students.length} 人
+              出席 <strong>{presentCount}</strong>
+              {rosterCount > 0 && <> / 應到 {rosterCount}</>} 人
             </span>
           </div>
 
@@ -283,61 +319,73 @@ export default function AttendancePage() {
             <div className="empty-hint">尚未新增任何學生</div>
           ) : (
             <>
-              <div className="attendance-list">
-                {/* 全選 */}
-                <label className="attendance-item attendance-item-all">
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
-                    onChange={handleToggleAll}
-                  />
-                  <span>全選</span>
-                </label>
-
-                {/* 本班學生 */}
-                {allStudents.roster.length > 0 && (
-                  <>
-                    <div className="attendance-section-label">
-                      本班學生（{allStudents.roster.length} 人）
-                    </div>
-                    {allStudents.roster.map(s => (
-                      <label
-                        key={s.id}
-                        className={`attendance-item${checked.has(s.id) ? ' attendance-item--checked' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked.has(s.id)}
-                          onChange={() => toggleStudent(s.id)}
-                        />
-                        <span className="attendance-name">{s.name}</span>
-                      </label>
-                    ))}
-                  </>
-                )}
-
-                {/* 其他學生 */}
-                {allStudents.others.length > 0 && (
-                  <>
-                    <div className="attendance-section-label attendance-section-label--other">
-                      其他學生（{allStudents.others.length} 人）
-                    </div>
-                    {allStudents.others.map(s => (
-                      <label
-                        key={s.id}
-                        className={`attendance-item${checked.has(s.id) ? ' attendance-item--checked' : ''}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked.has(s.id)}
-                          onChange={() => toggleStudent(s.id)}
-                        />
-                        <span className="attendance-name">{s.name}</span>
-                      </label>
-                    ))}
-                  </>
-                )}
+              {/* 應到名單 */}
+              <div className="attendance-section-label attendance-roster-header">
+                <span>應到名單（{rosterCount} 人）</span>
+                <button type="button" className="btn-link" onClick={openRosterEditor}>
+                  管理應到名單
+                </button>
               </div>
+
+              {rosterCount === 0 ? (
+                <div className="empty-hint">
+                  尚未設定本班應到學生。請點上方「管理應到名單」加入學員。
+                </div>
+              ) : (
+                <div className="attendance-list">
+                  <label className="attendance-item attendance-item-all">
+                    <input
+                      type="checkbox"
+                      checked={rosterAllChecked}
+                      onChange={handleToggleAllRoster}
+                    />
+                    <span>全選應到</span>
+                  </label>
+                  {rosterStudents.map(s => (
+                    <label
+                      key={s.id}
+                      className={`attendance-item${checked.has(s.id) ? ' attendance-item--checked' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked.has(s.id)}
+                        onChange={() => toggleStudent(s.id)}
+                      />
+                      <span className="attendance-name">{s.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {/* 其他學生（臨時加入用，預設折疊） */}
+              {otherStudents.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => setShowOthers(v => !v)}
+                  >
+                    {showOthers ? '▾' : '▸'} 加入未在名單的學生（{otherStudents.length} 人{otherCheckedCount > 0 && `；已勾 ${otherCheckedCount}`}）
+                  </button>
+                  {showOthers && (
+                    <div className="attendance-list" style={{ marginTop: 8 }}>
+                      {otherStudents.map(s => (
+                        <label
+                          key={s.id}
+                          className={`attendance-item${checked.has(s.id) ? ' attendance-item--checked' : ''}`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked.has(s.id)}
+                            onChange={() => toggleStudent(s.id)}
+                          />
+                          <span className="attendance-name">{s.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <button
                 className="btn-primary"
@@ -350,6 +398,56 @@ export default function AttendancePage() {
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── 管理應到名單 modal ── */}
+      {editRoster && (
+        <div className="modal-overlay" onClick={() => !rosterSaving && setEditRoster(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{selectedGroupName}・應到名單</h3>
+              <button type="button" className="modal-close" onClick={() => !rosterSaving && setEditRoster(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <input
+                type="text"
+                placeholder="搜尋學生姓名"
+                value={rosterFilter}
+                onChange={e => setRosterFilter(e.target.value)}
+                className="roster-filter-input"
+                autoFocus
+              />
+              <div className="roster-summary">
+                已選 {rosterDraft.size} 人 / 共 {students.length} 人
+              </div>
+              <div className="roster-list">
+                {filteredForRoster.length === 0 ? (
+                  <div className="empty-hint">沒有符合條件的學生</div>
+                ) : (
+                  filteredForRoster.map(s => (
+                    <label
+                      key={s.id}
+                      className={`attendance-item${rosterDraft.has(s.id) ? ' attendance-item--checked' : ''}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={rosterDraft.has(s.id)}
+                        onChange={() => toggleRosterDraft(s.id)}
+                      />
+                      <span className="attendance-name">{s.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" onClick={() => setEditRoster(false)} disabled={rosterSaving}>取消</button>
+              <button type="button" className="btn-primary" onClick={saveRoster} disabled={rosterSaving}>
+                {rosterSaving ? '儲存中…' : '儲存名單'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

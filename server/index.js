@@ -17,6 +17,7 @@ import {
   // groups
   listGroups, insertGroup, updateGroup, deleteGroup,
   listGroupRecords, insertGroupRecord, updateGroupRecord, deleteGroupRecord,
+  listGroupMembers, setGroupMembers,
   // settlement
   settlementTuition, settlementSalary,
   // share tokens
@@ -457,6 +458,22 @@ app.delete('/api/group-records/:id', async (req, res) => {
     const ok = await deleteGroupRecord(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Group Members（應到名單） ─────────────────────────────────────────────────
+
+app.get('/api/groups/:id/members', async (req, res) => {
+  try { res.json(await listGroupMembers(req.params.id)) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.put('/api/groups/:id/members', async (req, res) => {
+  const ids = Array.isArray(req.body?.student_ids) ? req.body.student_ids : null
+  if (ids === null) return res.status(400).json({ error: 'student_ids_required' })
+  try {
+    await setGroupMembers(req.params.id, ids)
+    res.json(await listGroupMembers(req.params.id))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

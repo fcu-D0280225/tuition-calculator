@@ -176,6 +176,18 @@ export async function initSchema() {
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS group_members (
+      group_id    VARCHAR(64) NOT NULL,
+      student_id  VARCHAR(64) NOT NULL,
+      created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (group_id, student_id),
+      FOREIGN KEY (group_id)   REFERENCES \`groups\`(id) ON DELETE CASCADE,
+      FOREIGN KEY (student_id) REFERENCES students(id)   ON DELETE CASCADE,
+      INDEX idx_gm_student (student_id)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
   // Migration: add student_id to existing group_records table if missing
   const [grCols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -681,6 +693,28 @@ export async function updateGroupRecord(id, { groupId, studentId, recordDate, no
 export async function deleteGroupRecord(id) {
   const [res] = await pool.query('DELETE FROM group_records WHERE id = ?', [id])
   return res.affectedRows > 0
+}
+
+// ── Group Members（應到名單） ─────────────────────────────────────────────────
+
+export async function listGroupMembers(groupId) {
+  const [rows] = await pool.query(
+    `SELECT s.id, s.name
+       FROM group_members gm
+       JOIN students s ON s.id = gm.student_id
+      WHERE gm.group_id = ?
+      ORDER BY s.name ASC, s.id ASC`,
+    [groupId]
+  )
+  return rows
+}
+
+export async function setGroupMembers(groupId, studentIds) {
+  const cleaned = Array.from(new Set((studentIds || []).filter(Boolean)))
+  await pool.query('DELETE FROM group_members WHERE group_id = ?', [groupId])
+  if (cleaned.length === 0) return
+  const values = cleaned.map(sid => [groupId, sid])
+  await pool.query('INSERT INTO group_members (group_id, student_id) VALUES ?', [values])
 }
 
 // ── Share Tokens ──────────────────────────────────────────────────────────────

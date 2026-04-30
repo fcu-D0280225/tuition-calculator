@@ -100,6 +100,14 @@ export const apiListGroupRecords = ({ from, to, group_id, student_id } = {}) => 
   const qs = params.toString()
   return request(`/group-records${qs ? '?' + qs : ''}`)
 }
+export const apiListGroupMembers = (groupId) =>
+  request(`/groups/${encodeURIComponent(groupId)}/members`)
+export const apiSetGroupMembers = (groupId, studentIds) =>
+  request(`/groups/${encodeURIComponent(groupId)}/members`, {
+    method: 'PUT',
+    body: JSON.stringify({ student_ids: studentIds }),
+  })
+
 export const apiCreateGroupRecord = (record) => request('/group-records', { method: 'POST', body: JSON.stringify(record) })
 export const apiUpdateGroupRecord = (id, patch) => request(`/group-records/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteGroupRecord = (id) => request(`/group-records/${encodeURIComponent(id)}`, { method: 'DELETE' })
