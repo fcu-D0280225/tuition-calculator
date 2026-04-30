@@ -3599,7 +3599,7 @@ select.catalog-input.catalog-select {
 .users-form-checkbox {
   flex-direction: row !important;
   align-items: center;
-  gap: 6px !important;
+  gap: 10px !important;
   font-size: 14px;
   color: var(--text);
 }
@@ -3634,7 +3634,8 @@ select.catalog-input.catalog-select {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
+  padding: 4px 6px;
   font-size: 13px;
   color: var(--text);
   cursor: pointer;
