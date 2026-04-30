@@ -40,6 +40,13 @@ export const apiAdminUpdateUser = (id, patch) =>
 export const apiAdminDeleteUser = (id)    =>
   request(`/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
+export const apiAdminListGroups  = ()       => request('/admin/groups')
+export const apiAdminCreateGroup = (body)   => request('/admin/groups', { method: 'POST', body: JSON.stringify(body) })
+export const apiAdminUpdateGroup = (id, patch) =>
+  request(`/admin/groups/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
+export const apiAdminDeleteGroup = (id)     =>
+  request(`/admin/groups/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
 // ── Students ──────────────────────────────────────────────────────────────────
 
 export const apiListStudents    = ()           => request('/students')
