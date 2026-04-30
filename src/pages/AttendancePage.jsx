@@ -362,10 +362,16 @@ export default function AttendancePage() {
                 <div style={{ marginTop: 16 }}>
                   <button
                     type="button"
-                    className="btn-link"
+                    className={`btn-disclosure${showOthers ? ' open' : ''}`}
                     onClick={() => setShowOthers(v => !v)}
+                    aria-expanded={showOthers}
                   >
-                    {showOthers ? '▾' : '▸'} 加入未在名單的學生（{otherStudents.length} 人{otherCheckedCount > 0 && `；已勾 ${otherCheckedCount}`}）
+                    <span className="chev" aria-hidden="true" />
+                    <span>加入未在名單的學生</span>
+                    <span className="count-pill count-pill--muted">{otherStudents.length}</span>
+                    {otherCheckedCount > 0 && (
+                      <span className="count-pill">已勾 {otherCheckedCount}</span>
+                    )}
                   </button>
                   {showOthers && (
                     <div className="attendance-list" style={{ marginTop: 8 }}>

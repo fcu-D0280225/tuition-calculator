@@ -155,8 +155,14 @@ export default function UsersPage({ currentUser }) {
       <div className="users-section">
         <div className="users-section-header">
           <h3>修改自己的密碼</h3>
-          <button type="button" className="btn-link" onClick={() => setShowPwd(v => !v)}>
-            {showPwd ? '收起' : '展開'}
+          <button
+            type="button"
+            className={`btn-disclosure${showPwd ? ' open' : ''}`}
+            onClick={() => setShowPwd(v => !v)}
+            aria-expanded={showPwd}
+          >
+            <span className="chev" aria-hidden="true" />
+            <span>{showPwd ? '收起' : '展開'}</span>
           </button>
         </div>
         {showPwd && (

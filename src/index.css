@@ -3486,7 +3486,7 @@ select.catalog-input.catalog-select {
   font-weight: 700;
   color: var(--text);
 }
-.users-section-header button {
+.users-section-header button:not(.btn-disclosure) {
   font-size: 13px;
   padding: 6px 12px;
   background: var(--accent);
@@ -3764,4 +3764,59 @@ select.catalog-input.catalog-select {
   gap: 4px;
   max-height: 50vh;
   overflow-y: auto;
+}
+
+/* ── Disclosure button（展開／收起） ────────────────────────────────────── */
+.btn-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-light);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.btn-disclosure:hover {
+  background: #fff;
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
+.btn-disclosure:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-disclosure .chev {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+  margin-bottom: 2px;
+}
+.btn-disclosure.open .chev {
+  transform: rotate(45deg);
+  margin-bottom: 0;
+  margin-top: 2px;
+}
+.btn-disclosure .count-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+}
+.btn-disclosure .count-pill--muted {
+  color: var(--muted);
+  background: var(--border);
 }
