@@ -147,13 +147,6 @@ export default function CoursesPage() {
 
       <div className="lesson-form-card">
         <div className="form-section-title">家教課目錄</div>
-        <div className="form-help-note">
-          <strong>每多一人乘上 (%)</strong>：當天同一堂課有 N 個學生時，每個人的學生時薪會等於
-          <code> 預設時薪 × (此百分比 ÷ 100)<sup>N-1</sup></code>。
-          填整數百分比即可，例如：<b>100</b> = 不打折、<b>90</b> = 每多一人打九折、<b>85</b> = 每多一人打八五折。
-          <br />範例：時薪 700、設 90 →&nbsp;
-          1 人 700、2 人 700 × 0.9 = 630、3 人 700 × 0.81 = 567。
-        </div>
         <form className="add-form" onSubmit={handleAdd}>
           <input
             className="add-input"
