@@ -3495,19 +3495,22 @@ select.catalog-input.catalog-select {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  text-align: center;
 }
 .users-section-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-3);
+  justify-content: center;
   gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
 }
 .users-section-header h3 {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
   color: var(--text);
+  text-align: center;
 }
 .users-section-header button:not(.btn-disclosure) {
   font-size: 13px;
@@ -3529,6 +3532,7 @@ select.catalog-input.catalog-select {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  justify-content: center;
 }
 .users-pwd-form input {
   padding: 8px 10px;
@@ -3560,12 +3564,15 @@ select.catalog-input.catalog-select {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  align-items: center;
+  text-align: center;
 }
 .users-form-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
+  justify-content: center;
 }
 .users-form-row label {
   display: flex;
@@ -3573,6 +3580,8 @@ select.catalog-input.catalog-select {
   gap: 4px;
   font-size: 13px;
   color: var(--muted);
+  text-align: center;
+  align-items: center;
 }
 .users-form-row label input[type="text"],
 .users-form-row label input[type="password"],
@@ -3613,6 +3622,7 @@ select.catalog-input.catalog-select {
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 6px 12px;
   padding: 8px 0;
+  justify-items: center;
 }
 .users-perm-grid--inline {
   padding: 4px 0;
@@ -3620,6 +3630,7 @@ select.catalog-input.catalog-select {
 .users-perm-item {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   font-size: 13px;
   color: var(--text);
@@ -3644,8 +3655,8 @@ select.catalog-input.catalog-select {
 .users-table td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  vertical-align: top;
-  text-align: left;
+  vertical-align: middle;
+  text-align: center;
 }
 .users-table th {
   font-weight: 600;
@@ -3664,6 +3675,7 @@ select.catalog-input.catalog-select {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+  justify-content: center;
 }
 .users-row-actions button {
   padding: 6px 10px;

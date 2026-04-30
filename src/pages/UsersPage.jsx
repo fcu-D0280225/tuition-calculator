@@ -77,6 +77,8 @@ export default function UsersPage({ currentUser }) {
     }
   }
 
+  const editingUser = users.find(u => u.id === editingId) || null
+
   function startEdit(u) {
     setEditingId(u.id)
     setEditIsAdmin(u.is_admin)
@@ -89,11 +91,11 @@ export default function UsersPage({ currentUser }) {
     setEditPerms([])
   }
 
-  async function saveEdit(u) {
-    if (busy) return
+  async function saveEdit() {
+    if (!editingUser || busy) return
     setBusy(true); setError('')
     try {
-      await apiAdminUpdateUser(u.id, {
+      await apiAdminUpdateUser(editingUser.id, {
         is_admin: editIsAdmin,
         permissions: editIsAdmin ? [] : editPerms,
       })
@@ -232,68 +234,75 @@ export default function UsersPage({ currentUser }) {
                   <tr><th>帳號</th><th>角色</th><th>權限</th><th></th></tr>
                 </thead>
                 <tbody>
-                  {users.map(u => {
-                    const editing = editingId === u.id
-                    return (
-                      <tr key={u.id}>
-                        <td>{u.username}{u.id === currentUser?.id && <span className="users-self-tag">（你）</span>}</td>
-                        <td>
-                          {editing ? (
-                            <label className="users-form-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={editIsAdmin}
-                                onChange={e => setEditIsAdmin(e.target.checked)}
-                              />
-                              管理員
-                            </label>
-                          ) : (u.is_admin ? '管理員' : '一般使用者')}
-                        </td>
-                        <td>
-                          {editing && !editIsAdmin ? (
-                            <div className="users-perm-grid users-perm-grid--inline">
-                              {NAV_OPTIONS.map(opt => (
-                                <label key={opt.id} className="users-perm-item">
-                                  <input
-                                    type="checkbox"
-                                    checked={editPerms.includes(opt.id)}
-                                    onChange={() => setEditPerms(p => togglePermInList(p, opt.id))}
-                                  />
-                                  {opt.label}
-                                </label>
-                              ))}
-                            </div>
-                          ) : (
-                            u.is_admin ? <span className="users-perm-all">全部</span>
-                            : (u.permissions.length === 0
-                                ? <span className="users-perm-none">（無）</span>
-                                : u.permissions
-                                    .map(id => NAV_OPTIONS.find(n => n.id === id)?.label || id)
-                                    .join('、'))
-                          )}
-                        </td>
-                        <td className="users-row-actions">
-                          {editing ? (
-                            <>
-                              <button type="button" className="btn-primary-sm" onClick={() => saveEdit(u)} disabled={busy}>儲存</button>
-                              <button type="button" onClick={cancelEdit}>取消</button>
-                            </>
-                          ) : (
-                            <>
-                              <button type="button" onClick={() => startEdit(u)}>編輯權限</button>
-                              {u.id !== currentUser?.id && (
-                                <button type="button" className="btn-danger-sm" onClick={() => handleDelete(u)} disabled={busy}>刪除</button>
-                              )}
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
+                  {users.map(u => (
+                    <tr key={u.id}>
+                      <td>{u.username}{u.id === currentUser?.id && <span className="users-self-tag">（你）</span>}</td>
+                      <td>{u.is_admin ? '管理員' : '一般使用者'}</td>
+                      <td>
+                        {u.is_admin
+                          ? <span className="users-perm-all">全部</span>
+                          : (u.permissions.length === 0
+                              ? <span className="users-perm-none">（無）</span>
+                              : u.permissions.map(id => NAV_OPTIONS.find(n => n.id === id)?.label || id).join('、'))}
+                      </td>
+                      <td className="users-row-actions">
+                        <button type="button" onClick={() => startEdit(u)}>編輯權限</button>
+                        {u.id !== currentUser?.id && (
+                          <button type="button" className="btn-danger-sm" onClick={() => handleDelete(u)} disabled={busy}>刪除</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── 編輯權限 modal ── */}
+      {editingUser && (
+        <div className="modal-overlay" onClick={() => !busy && cancelEdit()}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>編輯權限・{editingUser.username}</h3>
+              <button type="button" className="modal-close" onClick={() => !busy && cancelEdit()}>✕</button>
+            </div>
+            <div className="modal-body">
+              <label className="users-form-checkbox" style={{ alignSelf: 'flex-start' }}>
+                <input
+                  type="checkbox"
+                  checked={editIsAdmin}
+                  onChange={e => setEditIsAdmin(e.target.checked)}
+                />
+                設為管理員（自動擁有全部權限）
+              </label>
+              {!editIsAdmin && (
+                <>
+                  <div className="roster-summary">頁面權限</div>
+                  <div className="users-perm-grid">
+                    {NAV_OPTIONS.map(opt => (
+                      <label key={opt.id} className="users-perm-item">
+                        <input
+                          type="checkbox"
+                          checked={editPerms.includes(opt.id)}
+                          onChange={() => setEditPerms(p => togglePermInList(p, opt.id))}
+                        />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+              {error && <div className="users-error">{error}</div>}
+            </div>
+            <div className="modal-actions">
+              <button type="button" onClick={cancelEdit} disabled={busy}>取消</button>
+              <button type="button" className="btn-primary" onClick={saveEdit} disabled={busy}>
+                {busy ? '儲存中…' : '儲存'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
