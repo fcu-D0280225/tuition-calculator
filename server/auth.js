@@ -396,7 +396,7 @@ export function registerAdminRoutes(app) {
     const password = typeof req.body?.password === 'string' ? req.body.password : ''
     const isAdmin  = !!req.body?.is_admin
     const permissions = Array.isArray(req.body?.permissions) ? req.body.permissions : []
-    if (!username || !/^[\w.\-@]{1,64}$/.test(username)) return res.status(400).json({ error: 'invalid_username' })
+    if (!username || username.length > 64) return res.status(400).json({ error: 'invalid_username' })
     if (!password || password.length < 6) return res.status(400).json({ error: 'password_too_short' })
     try {
       const exists = await findUserByUsername(username)

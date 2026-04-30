@@ -69,9 +69,10 @@ export default function UsersPage({ currentUser }) {
       await reload()
     } catch (err) {
       const msg = String(err?.message || '')
-      if (msg.includes('409'))      setError('帳號已被使用')
-      else if (msg.includes('400')) setError('帳號或密碼格式不符（密碼至少 6 碼）')
-      else                          setError('建立失敗')
+      if (msg.includes('username_taken'))           setError('帳號已被使用')
+      else if (msg.includes('invalid_username'))    setError('帳號不能為空，且長度不可超過 64 字')
+      else if (msg.includes('password_too_short'))  setError('密碼至少 6 碼')
+      else                                          setError('建立失敗')
     } finally {
       setBusy(false)
     }
