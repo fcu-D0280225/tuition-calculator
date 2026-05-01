@@ -5,13 +5,12 @@ import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import Combobox from '../components/Combobox.jsx'
-import EyeIcon from '../components/EyeIcon.jsx'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), unit_price: '', teacher_unit_price: '', note: '' }
+const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), note: '' }
 const EMPTY_GROUP_RECORD = { group_id: '', student_ids: [], record_date: todayStr(), note: '' }
 
 export default function LessonRecordsPage() {
@@ -30,12 +29,6 @@ export default function LessonRecordsPage() {
   const [editGroupRec, setEditGroupRec]     = useState(null)
   const [error, setError]               = useState('')
   const [saving, setSaving]             = useState(false)
-  const [showAmounts, setShowAmounts]   = useState(false)
-
-  function amt(value) {
-    if (!showAmounts) return '••••'
-    return parseFloat(value).toLocaleString()
-  }
 
   // Filters
   const [filterFrom, setFilterFrom]       = useState('')
@@ -72,14 +65,9 @@ export default function LessonRecordsPage() {
     if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
-    // 學費 / 老師時薪：留空 → null，後端結算時用課程預設
-    const unit_price         = form.unit_price         !== '' ? parseFloat(form.unit_price)         : null
-    const teacher_unit_price = form.teacher_unit_price !== '' ? parseFloat(form.teacher_unit_price) : null
-    if (unit_price !== null && (isNaN(unit_price) || unit_price < 0)) { setError('學費格式不正確'); return }
-    if (teacher_unit_price !== null && (isNaN(teacher_unit_price) || teacher_unit_price < 0)) { setError('老師時薪格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await createLesson({ ...form, hours, unit_price, teacher_unit_price })
+      await createLesson({ ...form, hours, unit_price: null, teacher_unit_price: null })
       setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date })
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -90,9 +78,7 @@ export default function LessonRecordsPage() {
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     setSaving(true); setError('')
     try {
-      const unit_price         = editForm.unit_price         !== '' ? parseFloat(editForm.unit_price)         : null
-      const teacher_unit_price = editForm.teacher_unit_price !== '' ? parseFloat(editForm.teacher_unit_price) : null
-      await updateLesson(id, { ...editForm, hours, unit_price, teacher_unit_price })
+      await updateLesson(id, { ...editForm, hours })
       setEditId(null); setEditForm(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -169,37 +155,18 @@ export default function LessonRecordsPage() {
   const { lessons, loading } = lessonState
   const { groups, records: groupRecords } = groupState
 
-  // 選課程時自動帶入預設學費與老師時薪
   function handleCourseChange(id, isEdit = false) {
-    const course       = courses.find(c => c.id === id)
-    const studentRate  = course && course.hourly_rate         != null ? String(course.hourly_rate)         : ''
-    const teacherRate  = course && course.teacher_hourly_rate != null ? String(course.teacher_hourly_rate) : ''
     if (isEdit) {
-      setEditForm(f => ({ ...f, course_id: id, unit_price: studentRate, teacher_unit_price: teacherRate }))
+      setEditForm(f => ({ ...f, course_id: id }))
     } else {
-      setForm(f => ({ ...f, course_id: id, unit_price: studentRate, teacher_unit_price: teacherRate }))
+      setForm(f => ({ ...f, course_id: id }))
     }
   }
-
-  // 安全網：courses 載入完成後若 form 已選了課但費用空白，補帶預設
-  useEffect(() => {
-    if (!form.course_id || courses.length === 0) return
-    const c = courses.find(x => x.id === form.course_id)
-    if (!c) return
-    setForm(f => ({
-      ...f,
-      unit_price:         f.unit_price === ''         && c.hourly_rate         != null ? String(c.hourly_rate)         : f.unit_price,
-      teacher_unit_price: f.teacher_unit_price === '' && c.teacher_hourly_rate != null ? String(c.teacher_hourly_rate) : f.teacher_unit_price,
-    }))
-  }, [form.course_id, courses])
 
   return (
     <div className="page">
       <div className="page-header">
         <h1>上課紀錄</h1>
-        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
-          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
-        </button>
       </div>
 
       {/* 新增模式切換按鈕 */}
@@ -257,30 +224,6 @@ export default function LessonRecordsPage() {
                 value={form.hours} onChange={e => setForm(f => ({ ...f, hours: e.target.value }))}
                 className="hours-input"
               />
-            </label>
-            <label>學費
-              <input type="number" min="0" step="1" placeholder="課程預設"
-                value={form.unit_price} onChange={e => setForm(f => ({ ...f, unit_price: e.target.value }))}
-                className="hours-input"
-                style={{ width: '110px' }}
-              />
-              {(() => {
-                const c = courses.find(x => x.id === form.course_id)
-                if (!c) return null
-                return <small className="rate-hint">課程預設 ${c.hourly_rate} <button type="button" className="btn-link rate-hint-btn" onClick={() => handleCourseChange(form.course_id)}>重填</button></small>
-              })()}
-            </label>
-            <label>老師時薪
-              <input type="number" min="0" step="1" placeholder="課程預設"
-                value={form.teacher_unit_price} onChange={e => setForm(f => ({ ...f, teacher_unit_price: e.target.value }))}
-                className="hours-input"
-                style={{ width: '110px' }}
-              />
-              {(() => {
-                const c = courses.find(x => x.id === form.course_id)
-                if (!c) return null
-                return <small className="rate-hint">課程預設 ${c.teacher_hourly_rate ?? 0}</small>
-              })()}
             </label>
             <label>日期
               <input type="date" value={form.lesson_date}
@@ -399,8 +342,6 @@ export default function LessonRecordsPage() {
               <th>課程</th>
               <th>老師</th>
               <th>時數</th>
-              <th>學費</th>
-              <th>老師時薪</th>
               <th>備註</th>
               <th></th>
             </tr>
@@ -436,8 +377,6 @@ export default function LessonRecordsPage() {
                       />
                     </td>
                     <td><input type="number" min="0.5" step="0.5" value={editForm.hours} onChange={e => setEditForm(f => ({ ...f, hours: e.target.value }))} className="hours-input" /></td>
-                    <td><input type="number" min="0" step="1" value={editForm.unit_price} onChange={e => setEditForm(f => ({ ...f, unit_price: e.target.value }))} className="hours-input" style={{ width: '90px' }} /></td>
-                    <td><input type="number" min="0" step="1" value={editForm.teacher_unit_price} onChange={e => setEditForm(f => ({ ...f, teacher_unit_price: e.target.value }))} className="hours-input" style={{ width: '90px' }} /></td>
                     <td><input type="text" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} /></td>
                     <td className="row-actions">
                       <button className="btn-sm btn-primary" onClick={() => handleSaveEdit(l.id)} disabled={saving}>儲存</button>
@@ -451,18 +390,6 @@ export default function LessonRecordsPage() {
                     <td>{l.course_name}</td>
                     <td>{l.teacher_name}</td>
                     <td>{l.hours}</td>
-                    <td className="num-cell">
-                      {l.unit_price != null
-                        ? amt(l.unit_price)
-                        : <span style={{ color: 'var(--muted)', fontSize: '12px' }}>{amt(l.course_hourly_rate)}（預設）</span>
-                      }
-                    </td>
-                    <td className="num-cell">
-                      {l.teacher_unit_price != null
-                        ? amt(l.teacher_unit_price)
-                        : <span style={{ color: 'var(--muted)', fontSize: '12px' }}>{amt(l.course_teacher_hourly_rate ?? 0)}（預設）</span>
-                      }
-                    </td>
                     <td className="note-cell">{l.note}</td>
                     <td className="row-actions">
                       <button className="btn-sm" onClick={() => {
@@ -473,8 +400,6 @@ export default function LessonRecordsPage() {
                           teacher_id: l.teacher_id,
                           hours: String(l.hours),
                           lesson_date: l.lesson_date,
-                          unit_price: l.unit_price != null ? String(l.unit_price) : String(l.course_hourly_rate),
-                          teacher_unit_price: l.teacher_unit_price != null ? String(l.teacher_unit_price) : String(l.course_teacher_hourly_rate ?? 0),
                           note: l.note,
                         })
                       }}>編輯</button>
