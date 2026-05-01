@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import { apiListStudents, apiCreateStudent, apiRenameStudent, apiDeleteStudent } from '../data/api.js'
+import { apiListStudents, apiCreateStudent, apiUpdateStudent, apiDeleteStudent } from '../data/api.js'
 
 const StudentsContext = createContext(null)
 
@@ -29,14 +29,14 @@ export function StudentsProvider({ children }) {
     dispatch({ type: 'SET_STUDENTS', students })
   }, [])
 
-  const createStudent = useCallback(async (name) => {
-    const student = await apiCreateStudent(name)
+  const createStudent = useCallback(async (body) => {
+    const student = await apiCreateStudent(body)
     dispatch({ type: 'ADD_STUDENT', student })
     return student
   }, [])
 
-  const renameStudent = useCallback(async (id, name) => {
-    const student = await apiRenameStudent(id, name)
+  const updateStudent = useCallback(async (id, patch) => {
+    const student = await apiUpdateStudent(id, patch)
     dispatch({ type: 'UPDATE_STUDENT', student })
   }, [])
 
@@ -46,7 +46,7 @@ export function StudentsProvider({ children }) {
   }, [])
 
   return (
-    <StudentsContext.Provider value={{ state, loadStudents, createStudent, renameStudent, removeStudent }}>
+    <StudentsContext.Provider value={{ state, loadStudents, createStudent, updateStudent, removeStudent }}>
       {children}
     </StudentsContext.Provider>
   )

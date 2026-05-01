@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { apiSettlementTuition, apiSettlementSalary } from '../data/api.js'
-import EyeIcon from '../components/EyeIcon.jsx'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -17,7 +16,7 @@ const BAR_MAX_H = 160
 const BAR_W = 44
 const BAR_GAP = 14
 
-function BarChart({ items, color, showAmounts }) {
+function BarChart({ items, color }) {
   if (!items || items.length === 0) {
     return <div className="empty-hint">無資料</div>
   }
@@ -43,7 +42,7 @@ function BarChart({ items, color, showAmounts }) {
               fill="#475569"
               fontFamily="system-ui, sans-serif"
             >
-              {showAmounts ? item.value.toLocaleString() : '••••'}
+              {item.value.toLocaleString()}
             </text>
             <foreignObject x={x - 6} y={padTop + BAR_MAX_H + 8} width={BAR_W + 12} height={padBot - 8}>
               <div
@@ -74,10 +73,8 @@ export default function DashboardPage() {
   const [salary, setSalary]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
-  const [showAmounts, setShowAmounts] = useState(false)
 
   function amt(value) {
-    if (!showAmounts) return '••••'
     return typeof value === 'number' ? value.toLocaleString() : String(value)
   }
 
@@ -110,15 +107,6 @@ export default function DashboardPage() {
     <div className="page">
       <div className="page-header">
         <h1>財務總覽</h1>
-        <button
-          className="btn-sm"
-          onClick={() => setShowAmounts(v => !v)}
-          title={showAmounts ? '隱藏金額' : '顯示金額'}
-          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-        >
-          <EyeIcon open={showAmounts} />
-          {showAmounts ? '隱藏金額' : '顯示金額'}
-        </button>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>
@@ -152,9 +140,7 @@ export default function DashboardPage() {
             <div className={`dashboard-card ${netProfit >= 0 ? 'dashboard-card--profit' : 'dashboard-card--loss'}`}>
               <div className="dashboard-card-label">淨利</div>
               <div className="dashboard-card-value">
-                {showAmounts
-                  ? (netProfit >= 0 ? '+' : '') + netProfit.toLocaleString()
-                  : '••••'}
+                {(netProfit >= 0 ? '+' : '') + netProfit.toLocaleString()}
               </div>
               <div className="dashboard-card-sub">收入 − 支出</div>
             </div>
@@ -169,13 +155,13 @@ export default function DashboardPage() {
               <div className="dashboard-chart-block">
                 <div className="dashboard-chart-title">各學生收入（元）</div>
                 <div className="dashboard-chart-scroll">
-                  <BarChart items={studentBars} color="#2563eb" showAmounts={showAmounts} />
+                  <BarChart items={studentBars} color="#2563eb" />
                 </div>
               </div>
               <div className="dashboard-chart-block">
                 <div className="dashboard-chart-title">各老師薪資支出（元）</div>
                 <div className="dashboard-chart-scroll">
-                  <BarChart items={teacherBars} color="#f59e0b" showAmounts={showAmounts} />
+                  <BarChart items={teacherBars} color="#f59e0b" />
                 </div>
               </div>
             </div>

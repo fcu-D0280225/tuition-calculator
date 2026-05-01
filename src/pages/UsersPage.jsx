@@ -12,6 +12,7 @@ const NAV_OPTIONS = [
   { id: 'lessons',    label: '上課紀錄' },
   { id: 'attendance', label: '點名' },
   { id: 'materials',  label: '教材' },
+  { id: 'schedule',   label: '課表' },
   { id: 'settlement', label: '結算' },
   { id: 'students',   label: '學生' },
   { id: 'teachers',   label: '老師' },

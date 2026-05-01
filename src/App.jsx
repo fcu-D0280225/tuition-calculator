@@ -9,6 +9,7 @@ import MaterialsPage     from './pages/MaterialsPage.jsx'
 import GroupsPage        from './pages/GroupsPage.jsx'
 import DashboardPage     from './pages/DashboardPage.jsx'
 import AttendancePage    from './pages/AttendancePage.jsx'
+import SchedulePage      from './pages/SchedulePage.jsx'
 import UsersPage         from './pages/UsersPage.jsx'
 import LoginPage         from './pages/LoginPage.jsx'
 import { apiAuthMe, apiAuthLogout } from './data/api.js'
@@ -28,6 +29,7 @@ const NAV = [
     { id: 'attendance', label: '點名' },
     { id: 'materials',  label: '教材' },
   ]},
+  { type: 'tab', id: 'schedule', label: '課表' },
   { type: 'tab', id: 'settlement', label: '結算' },
   { type: 'tab', id: 'users', label: '使用者管理' },
 ]
@@ -198,6 +200,7 @@ export default function App() {
             {tab === 'materials'  && <MaterialsPage />}
             {tab === 'groups'     && <GroupsPage />}
             {tab === 'attendance' && <AttendancePage />}
+            {tab === 'schedule'   && <SchedulePage />}
             {tab === 'users'      && <UsersPage currentUser={{ ...authState.user, is_admin: authState.is_admin }} />}
           </main>
         </div>

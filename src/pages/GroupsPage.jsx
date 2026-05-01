@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { apiListGroupMembers, apiSetGroupMembers } from '../data/api.js'
-import EyeIcon from '../components/EyeIcon.jsx'
 
 const WEEKDAYS = [
   { value: 0, label: '日' },
@@ -51,7 +50,7 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', note: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', note: '' }
 
 export default function GroupsPage() {
   const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
@@ -63,7 +62,6 @@ export default function GroupsPage() {
 
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
-  const [showAmounts, setShowAmounts] = useState(false)
 
   // 「報名學生」面板
   const [memberGroup, setMemberGroup]   = useState(null)   // { id, name }
@@ -75,7 +73,6 @@ export default function GroupsPage() {
   const [memberCounts, setMemberCounts] = useState({})
 
   function amt(value) {
-    if (!showAmounts) return '••••'
     return parseFloat(value).toLocaleString()
   }
 
@@ -146,9 +143,11 @@ export default function GroupsPage() {
     if (!Number.isInteger(newGroup.duration_months) || newGroup.duration_months <= 0) { setError('請選擇持續時間'); return }
     const fee = parseFloat(newGroup.monthly_fee)
     if (isNaN(fee) || fee <= 0) { setError('請輸入月費'); return }
+    const dh = newGroup.duration_hours === '' ? 0 : parseFloat(newGroup.duration_hours)
+    if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, note: newGroup.note })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, note: newGroup.note })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -156,7 +155,15 @@ export default function GroupsPage() {
 
   function startEdit(g) {
     setEditId(g.id)
-    setEditGroup({ name: g.name, weekdays: g.weekdays || '', duration_months: g.duration_months ?? 0, monthly_fee: g.monthly_fee != null ? String(g.monthly_fee) : '', note: g.note || '' })
+    setEditGroup({
+      name: g.name,
+      weekdays: g.weekdays || '',
+      duration_months: g.duration_months ?? 0,
+      monthly_fee: g.monthly_fee != null ? String(g.monthly_fee) : '',
+      start_time: g.start_time ? String(g.start_time).slice(0, 5) : '',
+      duration_hours: g.duration_hours != null ? String(g.duration_hours) : '',
+      note: g.note || '',
+    })
   }
 
   async function handleUpdateGroup(id) {
@@ -164,9 +171,11 @@ export default function GroupsPage() {
     if (!name) return
     const fee = parseFloat(editGroup.monthly_fee)
     if (isNaN(fee) || fee < 0) { setError('月費格式不正確'); return }
+    const dh = editGroup.duration_hours === '' ? 0 : parseFloat(editGroup.duration_hours)
+    if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, note: editGroup.note })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, note: editGroup.note })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -186,9 +195,6 @@ export default function GroupsPage() {
     <div className="page">
       <div className="page-header">
         <h1>團課管理</h1>
-        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
-          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
-        </button>
       </div>
 
       {error && <div className="error-msg">{error}</div>}
@@ -236,6 +242,25 @@ export default function GroupsPage() {
                 onChange={e => setNewGroup(g => ({ ...g, monthly_fee: e.target.value }))}
               />
             </label>
+            <label>開始時間
+              <input
+                type="time"
+                step="900"
+                value={newGroup.start_time}
+                onChange={e => setNewGroup(g => ({ ...g, start_time: e.target.value }))}
+              />
+            </label>
+            <label>課堂時數
+              <input
+                type="number"
+                min="0"
+                max="24"
+                step="0.5"
+                placeholder="例如 2"
+                value={newGroup.duration_hours}
+                onChange={e => setNewGroup(g => ({ ...g, duration_hours: e.target.value }))}
+              />
+            </label>
             <label>備註
               <input
                 type="text"
@@ -266,7 +291,7 @@ export default function GroupsPage() {
         ) : (
           <table className="entity-table">
             <thead>
-              <tr><th>團課名稱</th><th>上課星期</th><th>持續時間</th><th>月費</th><th>報名人數</th><th>備註</th><th></th></tr>
+              <tr><th>團課名稱</th><th>上課星期</th><th>上課時段</th><th>持續時間</th><th>月費</th><th>報名人數</th><th>備註</th><th></th></tr>
             </thead>
             <tbody>
               {groups.map(g => (
@@ -290,6 +315,22 @@ export default function GroupsPage() {
                         disabled={saving}
                       />
                     ) : formatWeekdays(g.weekdays)}
+                  </td>
+                  <td>
+                    {editId === g.id ? (
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <input type="time" step="900" className="inline-edit-input" style={{ width: 110 }}
+                          value={editGroup.start_time}
+                          onChange={e => setEditGroup(eg => ({ ...eg, start_time: e.target.value }))}
+                        />
+                        <span style={{ color: 'var(--muted)' }}>×</span>
+                        <input type="number" min="0" max="24" step="0.5" className="inline-edit-input" style={{ width: 70 }}
+                          value={editGroup.duration_hours}
+                          onChange={e => setEditGroup(eg => ({ ...eg, duration_hours: e.target.value }))}
+                        />
+                        <span style={{ color: 'var(--muted)' }}>小時</span>
+                      </div>
+                    ) : (g.start_time ? `${String(g.start_time).slice(0, 5)}（${parseFloat(g.duration_hours || 0)} 小時）` : '—')}
                   </td>
                   <td>
                     {editId === g.id ? (

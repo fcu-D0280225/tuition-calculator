@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { apiSettlementTuition, apiSettlementSalary, apiCreateShareToken, apiListPaymentRecords, apiCreatePaymentRecord, apiDeletePaymentRecord } from '../data/api.js'
 import { generateTuitionPDF, generateSalaryPDF, generateStudentTuitionPDF, generateTeacherSalaryPDF } from '../utils/pdf.js'
-import EyeIcon from '../components/EyeIcon.jsx'
 import { genId } from '../utils/ids.js'
 
 function firstDayOfMonth() {
@@ -26,13 +25,11 @@ export default function SettlementPage() {
   const [shareLoading, setShareLoading] = useState('')
   const [shareUrl, setShareUrl] = useState(null)     // { studentName, url, expiresAt }
   const [copied, setCopied] = useState(false)
-  const [showAmounts, setShowAmounts] = useState(false)
   // student_id -> { id, paid_at }
   const [paymentMap, setPaymentMap] = useState({})
   const [payLoading, setPayLoading] = useState('')   // student_id 正在處理中
 
   function amt(value, suffix = '') {
-    if (!showAmounts) return '••••'
     return value.toLocaleString() + suffix
   }
 
@@ -146,15 +143,6 @@ export default function SettlementPage() {
     <div className="page">
       <div className="page-header">
         <h1>結算</h1>
-        <button
-          className="btn-sm"
-          onClick={() => setShowAmounts(v => !v)}
-          title={showAmounts ? '隱藏金額' : '顯示金額'}
-          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-        >
-          <EyeIcon open={showAmounts} />
-          {showAmounts ? '隱藏金額' : '顯示金額'}
-        </button>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>

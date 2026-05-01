@@ -16,6 +16,7 @@ export const VALID_NAV_IDS = [
   'settlement',
   'students',
   'teachers',
+  'schedule',
   'users',
 ]
 

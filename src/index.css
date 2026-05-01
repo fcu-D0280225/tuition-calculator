@@ -4022,3 +4022,87 @@ select.catalog-input.catalog-select {
   color: var(--muted);
   background: var(--border);
 }
+
+/* ── 課表（週視圖）─────────────────────────────────────────── */
+.schedule-grid {
+  display: grid;
+  grid-template-columns: 60px repeat(7, minmax(110px, 1fr));
+  grid-template-rows: 56px auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  font-size: 13px;
+}
+.schedule-corner { background: var(--bg); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+.schedule-day-header {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 8px;
+  text-align: center;
+}
+.schedule-day-header.is-today { background: #e0f2fe; }
+.schedule-day-header:last-child { border-right: none; }
+.schedule-dow { font-weight: 700; color: var(--text); font-size: 13px; }
+.schedule-date { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+.schedule-times {
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+}
+.schedule-time-cell {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px dashed var(--border);
+  box-sizing: border-box;
+}
+.schedule-day-col {
+  position: relative;
+  border-right: 1px solid var(--border);
+  box-sizing: border-box;
+}
+.schedule-day-col:last-child { border-right: none; }
+.schedule-hour-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--border);
+  height: 0;
+}
+.schedule-item {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+  overflow: hidden;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
+  color: #1e3a8a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  z-index: 1;
+}
+.schedule-item--group {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #14532d;
+}
+.schedule-item-time { font-size: 10px; opacity: 0.7; }
+.schedule-item-title { font-weight: 700; line-height: 1.2; }
+.schedule-item-sub { font-size: 11px; opacity: 0.85; }
+.schedule-no-time-list { margin: 0; padding-left: 1.2em; line-height: 1.8; }
+
+/* 家教課表格固定寬度 + Combobox 在表格內穩定佔位（避免編輯時整列跳動） */
+.courses-table { table-layout: fixed; }
+.courses-table td, .courses-table th { vertical-align: middle; }
+.combobox-cell { display: block; width: 100%; }
+.combobox-cell .combobox { display: block; width: 100%; }
+.combobox-cell .combobox-input {
+  padding: 5px 9px;
+  font-size: 13px;
+  height: 30px;
+  box-sizing: border-box;
+}

@@ -5,12 +5,13 @@ import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import Combobox from '../components/Combobox.jsx'
+import { apiListAllEnrollments, apiListGroupMembers } from '../data/api.js'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), note: '' }
+const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '', lesson_date: todayStr(), start_time: '', note: '' }
 const EMPTY_GROUP_RECORD = { group_id: '', student_ids: [], record_date: todayStr(), note: '' }
 
 export default function LessonRecordsPage() {
@@ -37,10 +38,28 @@ export default function LessonRecordsPage() {
   const [filterTeacher, setFilterTeacher] = useState('')
   const [filterCourse, setFilterCourse]   = useState('')
 
+  // 選課關聯：student → courseIds, group → studentIds
+  const [studentCourseMap, setStudentCourseMap] = useState({}) // { studentId: Set }
+  const [groupMemberMap, setGroupMemberMap]     = useState({}) // { groupId: Set }
+
   useEffect(() => {
     loadStudents(); loadTeachers(); loadCourses()
     loadGroups(); loadGroupRecords()
     loadLessons({})
+    apiListAllEnrollments().then(({ courses, groups }) => {
+      const sc = {}
+      for (const r of courses) {
+        if (!sc[r.student_id]) sc[r.student_id] = new Set()
+        sc[r.student_id].add(r.course_id)
+      }
+      const gm = {}
+      for (const r of groups) {
+        if (!gm[r.group_id]) gm[r.group_id] = new Set()
+        gm[r.group_id].add(r.student_id)
+      }
+      setStudentCourseMap(sc)
+      setGroupMemberMap(gm)
+    }).catch(() => {})
   }, [loadStudents, loadTeachers, loadCourses, loadGroups, loadGroupRecords, loadLessons])
 
   function handleFilter(e) {
@@ -67,8 +86,8 @@ export default function LessonRecordsPage() {
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
     setSaving(true); setError('')
     try {
-      await createLesson({ ...form, hours, unit_price: null, teacher_unit_price: null })
-      setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date })
+      await createLesson({ ...form, hours, start_time: form.start_time || null, unit_price: null, teacher_unit_price: null })
+      setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date, start_time: form.start_time })
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
   }
@@ -156,10 +175,48 @@ export default function LessonRecordsPage() {
   const { groups, records: groupRecords } = groupState
 
   function handleCourseChange(id, isEdit = false) {
+    const course = courseState.courses.find(c => c.id === id)
+    const defaultTid = course?.default_teacher_id || null
     if (isEdit) {
-      setEditForm(f => ({ ...f, course_id: id }))
+      setEditForm(f => ({
+        ...f,
+        course_id: id,
+        // 切到新課程時，若該課有預設老師，且老師欄目前是空的或還沒被使用者改過，就自動帶入
+        teacher_id: defaultTid && !f.teacher_id ? defaultTid : (defaultTid && f.course_id !== id ? defaultTid : f.teacher_id),
+      }))
     } else {
-      setForm(f => ({ ...f, course_id: id }))
+      setForm(f => ({
+        ...f,
+        course_id: id,
+        teacher_id: defaultTid ? defaultTid : f.teacher_id,
+      }))
+    }
+  }
+
+  // 學生選定後，課程 Combobox 只剩他選的家教課（沒選任何學生時則顯示全部）
+  function coursesForStudent(studentId) {
+    if (!studentId) return courses
+    const allowed = studentCourseMap[studentId]
+    if (!allowed) return []
+    return courses.filter(c => allowed.has(c.id))
+  }
+
+  // 團課選定後，學生 Combobox 只剩 group_members 內的成員
+  function studentsForGroup(groupId) {
+    if (!groupId) return students
+    const allowed = groupMemberMap[groupId]
+    if (!allowed) return []
+    return students.filter(s => allowed.has(s.id))
+  }
+
+  // 切換選團課 / 學生時也要記得載入剛剛尚未進來的對應名單
+  async function handleGroupSelectInForm(id) {
+    setGroupForm(f => ({ ...f, group_id: id, student_ids: [] }))
+    if (id && !groupMemberMap[id]) {
+      try {
+        const rows = await apiListGroupMembers(id)
+        setGroupMemberMap(prev => ({ ...prev, [id]: new Set(rows.map(r => r.id)) }))
+      } catch {}
     }
   }
 
@@ -199,17 +256,21 @@ export default function LessonRecordsPage() {
               <Combobox
                 items={students}
                 value={form.student_id}
-                onChange={id => setForm(f => ({ ...f, student_id: id }))}
+                onChange={id => setForm(f => ({ ...f, student_id: id, course_id: '' }))}
                 placeholder="搜尋學生…"
               />
             </label>
             <label>課程
               <Combobox
-                items={courses}
+                key={`new-course-${form.student_id}`}
+                items={coursesForStudent(form.student_id)}
                 value={form.course_id}
                 onChange={id => handleCourseChange(id)}
-                placeholder="搜尋課程…"
+                placeholder={form.student_id ? '搜尋課程…' : '請先選學生'}
               />
+              {form.student_id && coursesForStudent(form.student_id).length === 0 && (
+                <div className="error-msg" style={{ fontSize: 12, marginTop: 2 }}>該學生尚未選任何家教課，請先到「學生名冊」設定。</div>
+              )}
             </label>
             <label>老師
               <Combobox
@@ -228,6 +289,12 @@ export default function LessonRecordsPage() {
             <label>日期
               <input type="date" value={form.lesson_date}
                 onChange={e => setForm(f => ({ ...f, lesson_date: e.target.value }))}
+              />
+            </label>
+            <label>開始時間
+              <input type="time" value={form.start_time}
+                onChange={e => setForm(f => ({ ...f, start_time: e.target.value }))}
+                step="900"
               />
             </label>
             <label>備註
@@ -253,7 +320,7 @@ export default function LessonRecordsPage() {
               <Combobox
                 items={groups}
                 value={groupForm.group_id}
-                onChange={id => setGroupForm(f => ({ ...f, group_id: id }))}
+                onChange={handleGroupSelectInForm}
                 placeholder="搜尋團課…"
               />
             </label>
@@ -272,12 +339,15 @@ export default function LessonRecordsPage() {
           </div>
           <label>學生（可複選）
             <Combobox
-              key={groupForm.student_ids.length}
-              items={students.filter(s => !groupForm.student_ids.includes(s.id))}
+              key={`grp-stu-${groupForm.group_id}-${groupForm.student_ids.length}`}
+              items={studentsForGroup(groupForm.group_id).filter(s => !groupForm.student_ids.includes(s.id))}
               value=""
               onChange={addGroupStudent}
-              placeholder="搜尋學生加入…"
+              placeholder={groupForm.group_id ? '搜尋學生加入…' : '請先選團課'}
             />
+            {groupForm.group_id && studentsForGroup(groupForm.group_id).length === 0 && (
+              <div className="error-msg" style={{ fontSize: 12, marginTop: 2 }}>該團課尚未報名任何學生，請先到「團課管理」或「學生名冊」設定。</div>
+            )}
             {groupForm.student_ids.length > 0 && (
               <div className="chip-list">
                 {groupForm.student_ids.map(id => {
@@ -356,16 +426,17 @@ export default function LessonRecordsPage() {
                       <Combobox
                         items={students}
                         value={editForm.student_id}
-                        onChange={id => setEditForm(f => ({ ...f, student_id: id }))}
+                        onChange={id => setEditForm(f => ({ ...f, student_id: id, course_id: '' }))}
                         placeholder="搜尋學生…"
                       />
                     </td>
                     <td>
                       <Combobox
-                        items={courses}
+                        key={`edit-course-${editForm.student_id}`}
+                        items={coursesForStudent(editForm.student_id)}
                         value={editForm.course_id}
                         onChange={id => handleCourseChange(id, true)}
-                        placeholder="搜尋課程…"
+                        placeholder={editForm.student_id ? '搜尋課程…' : '請先選學生'}
                       />
                     </td>
                     <td>
@@ -400,6 +471,7 @@ export default function LessonRecordsPage() {
                           teacher_id: l.teacher_id,
                           hours: String(l.hours),
                           lesson_date: l.lesson_date,
+                          start_time: l.start_time ? String(l.start_time).slice(0, 5) : '',
                           note: l.note,
                         })
                       }}>編輯</button>

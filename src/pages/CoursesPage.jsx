@@ -1,24 +1,28 @@
 import { useState, useEffect } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
+import { useTeachers } from '../contexts/TeachersContext.jsx'
+import Combobox from '../components/Combobox.jsx'
 import { apiReorderCourses } from '../data/api.js'
-import EyeIcon from '../components/EyeIcon.jsx'
 
 export default function CoursesPage() {
   const { state, loadCourses, createCourse, updateCourse, removeCourse } = useCourses()
+  const { state: teachersState, loadTeachers } = useTeachers()
   const { courses, loading } = state
+  const { teachers } = teachersState
 
   const [newName, setNewName]                   = useState('')
   const [newRate, setNewRate]                   = useState('')
   const [newTeacherRate, setNewTeacherRate]     = useState('')
-  const [newDiscountPct, setNewDiscountPct]     = useState('100')
+  const [newDiscountAmt, setNewDiscountAmt]     = useState('0')
+  const [newDefaultTeacher, setNewDefaultTeacher] = useState('')
   const [editId, setEditId]                     = useState(null)
   const [editName, setEditName]                 = useState('')
   const [editRate, setEditRate]                 = useState('')
   const [editTeacherRate, setEditTeacherRate]   = useState('')
-  const [editDiscountPct, setEditDiscountPct]   = useState('100')
+  const [editDiscountAmt, setEditDiscountAmt]   = useState('0')
+  const [editDefaultTeacher, setEditDefaultTeacher] = useState('')
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
-  const [showAmounts, setShowAmounts]           = useState(false)
 
   // 拖曳排序
   const [dragId, setDragId]   = useState(null)
@@ -54,11 +58,10 @@ export default function CoursesPage() {
   const displayCourses = orderOverride ?? courses
 
   function amt(value) {
-    if (!showAmounts) return '••••'
     return parseFloat(value).toLocaleString()
   }
 
-  useEffect(() => { loadCourses() }, [loadCourses])
+  useEffect(() => { loadCourses(); loadTeachers() }, [loadCourses, loadTeachers])
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -68,12 +71,12 @@ export default function CoursesPage() {
     if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入學費'); return }
     const teacherHourlyRate = parseFloat(newTeacherRate)
     if (isNaN(teacherHourlyRate) || teacherHourlyRate <= 0) { setError('請輸入老師時薪'); return }
-    const pct = parseFloat(newDiscountPct)
-    if (isNaN(pct) || pct <= 0 || pct > 500) { setError('遞減百分比格式不正確（0–500）'); return }
+    const discAmt = parseFloat(newDiscountAmt || '0')
+    if (isNaN(discAmt) || discAmt < 0 || discAmt > 100000) { setError('每多一人折扣金額格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await createCourse(name, hourlyRate, teacherHourlyRate, pct / 100)
-      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountPct('100')
+      await createCourse(name, hourlyRate, teacherHourlyRate, discAmt, newDefaultTeacher || null)
+      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountAmt('0'); setNewDefaultTeacher('')
     }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -86,10 +89,10 @@ export default function CoursesPage() {
     if (isNaN(hourly_rate) || hourly_rate < 0) { setError('學費格式不正確'); return }
     const teacher_hourly_rate = parseFloat(editTeacherRate)
     if (isNaN(teacher_hourly_rate) || teacher_hourly_rate < 0) { setError('老師時薪格式不正確'); return }
-    const pct = parseFloat(editDiscountPct)
-    if (isNaN(pct) || pct <= 0 || pct > 500) { setError('遞減百分比格式不正確（0–500）'); return }
+    const discAmt = parseFloat(editDiscountAmt || '0')
+    if (isNaN(discAmt) || discAmt < 0 || discAmt > 100000) { setError('每多一人折扣金額格式不正確'); return }
     setSaving(true); setError('')
-    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_multiplier: pct / 100 }); setEditId(null) }
+    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_per_student: discAmt, default_teacher_id: editDefaultTeacher || null }); setEditId(null) }
     catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
@@ -106,9 +109,6 @@ export default function CoursesPage() {
     <div className="page">
       <div className="page-header">
         <h1>家教課目錄</h1>
-        <button className="btn-sm" onClick={() => setShowAmounts(v => !v)} title={showAmounts ? '隱藏金額' : '顯示金額'}>
-          <EyeIcon open={showAmounts} />{showAmounts ? '隱藏金額' : '顯示金額'}
-        </button>
       </div>
 
       <div className="lesson-form-card">
@@ -140,20 +140,28 @@ export default function CoursesPage() {
             value={newTeacherRate}
             onChange={e => setNewTeacherRate(e.target.value)}
           />
-          <span className="input-with-suffix" title="N 人時學費 = 預設時薪 × (此百分比 ÷ 100)^(N-1)。100 = 不打折">
+          <span className="input-with-suffix" title="N 人時學費 = 預設時薪 − 此金額 × (N-1)。0 = 不打折">
             <input
               className="add-input"
-              style={{ width: '180px' }}
-              placeholder="每多一人乘 (例如 90)"
+              style={{ width: '200px' }}
+              placeholder="每多一人 −（例如 100）"
               type="number"
-              min="1"
-              max="200"
+              min="0"
               step="1"
-              value={newDiscountPct}
-              onChange={e => setNewDiscountPct(e.target.value)}
+              value={newDiscountAmt}
+              onChange={e => setNewDiscountAmt(e.target.value)}
             />
-            <span className="input-suffix">%</span>
+            <span className="input-suffix">元</span>
           </span>
+          <div className="combobox-cell" style={{ width: 180 }}>
+            <Combobox
+              items={teachers}
+              value={newDefaultTeacher}
+              onChange={setNewDefaultTeacher}
+              placeholder="預設老師（選填）"
+              allLabel="（無預設）"
+            />
+          </div>
           <button
             className="btn-primary"
             type="submit"
@@ -174,9 +182,18 @@ export default function CoursesPage() {
       ) : courses.length === 0 ? (
         <div className="empty-hint">尚未新增任何家教課</div>
       ) : (
-        <table className="entity-table">
+        <table className="entity-table courses-table">
+          <colgroup>
+            <col style={{ width: 36 }} />
+            <col />
+            <col style={{ width: 100 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 110 }} />
+            <col style={{ width: 160 }} />
+            <col style={{ width: 150 }} />
+          </colgroup>
           <thead>
-            <tr><th aria-label="拖曳排序" style={{ width: 36 }}></th><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 ×</th><th></th></tr>
+            <tr><th aria-label="拖曳排序"></th><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 −</th><th>預設老師</th><th></th></tr>
           </thead>
           <tbody>
             {displayCourses.map(c => (
@@ -242,17 +259,31 @@ export default function CoursesPage() {
                     <input
                       className="inline-edit-input"
                       type="number"
-                      min="1"
-                      max="200"
+                      min="0"
                       step="1"
-                      value={editDiscountPct}
-                      onChange={e => setEditDiscountPct(e.target.value)}
+                      value={editDiscountAmt}
+                      onChange={e => setEditDiscountAmt(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
                     />
                   ) : (
-                    c.discount_multiplier && parseFloat(c.discount_multiplier) !== 1
-                      ? `${Math.round(parseFloat(c.discount_multiplier) * 10000) / 100}%`
+                    c.discount_per_student && parseFloat(c.discount_per_student) > 0
+                      ? `−${parseFloat(c.discount_per_student).toLocaleString()}`
                       : '—'
+                  )}
+                </td>
+                <td>
+                  {editId === c.id ? (
+                    <div className="combobox-cell">
+                      <Combobox
+                        items={teachers}
+                        value={editDefaultTeacher}
+                        onChange={setEditDefaultTeacher}
+                        placeholder="（無）"
+                        allLabel="（無）"
+                      />
+                    </div>
+                  ) : (
+                    teachers.find(t => t.id === c.default_teacher_id)?.name || '—'
                   )}
                 </td>
                 <td className="row-actions">
@@ -268,7 +299,8 @@ export default function CoursesPage() {
                         setEditName(c.name)
                         setEditRate(String(c.hourly_rate))
                         setEditTeacherRate(String(c.teacher_hourly_rate ?? 0))
-                        setEditDiscountPct(c.discount_multiplier != null ? String(Math.round(parseFloat(c.discount_multiplier) * 10000) / 100) : '100')
+                        setEditDiscountAmt(c.discount_per_student != null ? String(parseFloat(c.discount_per_student)) : '0')
+                        setEditDefaultTeacher(c.default_teacher_id || '')
                       }}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(c.id)} disabled={saving}>刪除</button>
                     </>
