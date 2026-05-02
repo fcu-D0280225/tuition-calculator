@@ -4095,6 +4095,63 @@ select.catalog-input.catalog-select {
 .schedule-item-sub { font-size: 11px; opacity: 0.85; }
 .schedule-no-time-list { margin: 0; padding-left: 1.2em; line-height: 1.8; }
 
+/* 請假狀態 */
+.schedule-item--leave {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #7f1d1d;
+  text-decoration: line-through;
+  text-decoration-color: rgba(127, 29, 29, 0.5);
+}
+.schedule-item--leave .schedule-item-title { text-decoration: line-through; }
+.leave-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  background: #fecaca;
+  color: #7f1d1d;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 4px;
+  text-decoration: none;
+  vertical-align: middle;
+}
+.schedule-item-leave-btn {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.schedule-item:hover .schedule-item-leave-btn,
+.schedule-item--leave .schedule-item-leave-btn { opacity: 1; }
+.schedule-item-leave-btn:hover { background: #fff; }
+
+/* 請假 modal */
+.leave-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.leave-modal {
+  background: var(--card, #fff);
+  border-radius: 8px;
+  padding: 20px;
+  width: min(420px, 92vw);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
 /* 家教課表格固定寬度 + Combobox 在表格內穩定佔位（避免編輯時整列跳動） */
 .courses-table { table-layout: fixed; }
 .courses-table td, .courses-table th { vertical-align: middle; }

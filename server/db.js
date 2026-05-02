@@ -383,6 +383,52 @@ export async function initSchema() {
       INDEX idx_payment_period (period_from, period_to)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS leave_requests (
+      id           VARCHAR(64)   NOT NULL PRIMARY KEY,
+      student_id   VARCHAR(64)   NOT NULL,
+      course_id    VARCHAR(64)   NOT NULL,
+      leave_date   DATE          NOT NULL,
+      reason       VARCHAR(512)  NOT NULL,
+      created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+      FOREIGN KEY (course_id)  REFERENCES courses(id)  ON DELETE CASCADE,
+      INDEX idx_leave_student (student_id, leave_date),
+      INDEX idx_leave_date    (leave_date)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+}
+
+// ── Leave Requests ───────────────────────────────────────────────────────────
+
+export async function insertLeaveRequest({ id, studentId, courseId, leaveDate, reason }) {
+  await pool.query(
+    'INSERT INTO leave_requests (id, student_id, course_id, leave_date, reason) VALUES (?, ?, ?, ?, ?)',
+    [id, studentId, courseId, leaveDate, reason]
+  )
+}
+
+export async function listStudentLeaveRequests(studentId, { from, to } = {}) {
+  const where = ['lr.student_id = ?']
+  const params = [studentId]
+  if (from) { where.push('lr.leave_date >= ?'); params.push(from) }
+  if (to)   { where.push('lr.leave_date <= ?'); params.push(to) }
+  const [rows] = await pool.query(
+    `SELECT lr.id, lr.student_id, lr.course_id, lr.leave_date, lr.reason, lr.created_at,
+            c.name AS course_name
+       FROM leave_requests lr
+       JOIN courses c ON c.id = lr.course_id
+      WHERE ${where.join(' AND ')}
+      ORDER BY lr.leave_date DESC, lr.created_at DESC`,
+    params
+  )
+  return rows
+}
+
+export async function deleteLeaveRequest(id) {
+  const [r] = await pool.query('DELETE FROM leave_requests WHERE id = ?', [id])
+  return r.affectedRows > 0
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────

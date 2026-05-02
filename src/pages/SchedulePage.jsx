@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
-import { apiListLessons, apiListGroupRecords } from '../data/api.js'
+import {
+  apiListLessons, apiListGroupRecords,
+  apiListStudentLeaveRequests, apiCreateLeaveRequest, apiDeleteLeaveRequest,
+} from '../data/api.js'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -42,8 +45,14 @@ export default function SchedulePage() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
   const [lessons, setLessons] = useState([])
   const [groupRecords, setGroupRecords] = useState([])
+  const [leaveRequests, setLeaveRequests] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // 請假 modal 狀態
+  const [leaveModal, setLeaveModal] = useState(null) // { lessonId, studentId, studentName, courseId, courseName, leaveDate, reason }
+  const [leaveSaving, setLeaveSaving] = useState(false)
+  const [leaveErr, setLeaveErr] = useState('')
 
   useEffect(() => { loadStudents(); loadTeachers(); loadGroups() }, [loadStudents, loadTeachers, loadGroups])
 
@@ -51,8 +60,16 @@ export default function SchedulePage() {
   const fromStr = fmtDate(weekStart)
   const toStr   = fmtDate(weekEnd)
 
+  async function reloadLeaves(studentId) {
+    if (!studentId) { setLeaveRequests([]); return }
+    try {
+      const lr = await apiListStudentLeaveRequests(studentId, { from: fromStr, to: toStr })
+      setLeaveRequests(lr)
+    } catch { /* keep silent — UI without 請假 標記 is acceptable */ }
+  }
+
   useEffect(() => {
-    if (!personId) { setLessons([]); setGroupRecords([]); return }
+    if (!personId) { setLessons([]); setGroupRecords([]); setLeaveRequests([]); return }
     let cancelled = false
     setLoading(true); setError('')
     const lessonReq = apiListLessons(
@@ -63,15 +80,73 @@ export default function SchedulePage() {
     const groupReq = mode === 'student'
       ? apiListGroupRecords({ from: fromStr, to: toStr, student_id: personId })
       : Promise.resolve([])
-    Promise.all([lessonReq, groupReq])
-      .then(([ls, grs]) => {
+    const leaveReq = mode === 'student'
+      ? apiListStudentLeaveRequests(personId, { from: fromStr, to: toStr })
+      : Promise.resolve([])
+    Promise.all([lessonReq, groupReq, leaveReq])
+      .then(([ls, grs, lvs]) => {
         if (cancelled) return
-        setLessons(ls); setGroupRecords(grs)
+        setLessons(ls); setGroupRecords(grs); setLeaveRequests(lvs)
       })
       .catch(() => { if (!cancelled) setError('載入課表失敗') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [mode, personId, fromStr, toStr])
+
+  // (student_id, course_id, leave_date) → leave request
+  const leaveMap = useMemo(() => {
+    const m = new Map()
+    for (const lv of leaveRequests) {
+      const key = `${lv.student_id}::${lv.course_id}::${String(lv.leave_date).slice(0, 10)}`
+      m.set(key, lv)
+    }
+    return m
+  }, [leaveRequests])
+
+  function findLeaveForLesson(l) {
+    if (!l) return null
+    return leaveMap.get(`${l.student_id || personId}::${l.course_id}::${String(l.lesson_date).slice(0, 10)}`) || null
+  }
+
+  function openLeaveModal(lesson) {
+    setLeaveErr('')
+    setLeaveModal({
+      lessonId: lesson.id,
+      studentId: lesson.student_id || personId,
+      studentName: lesson.student_name || '',
+      courseId: lesson.course_id,
+      courseName: lesson.course_name,
+      leaveDate: String(lesson.lesson_date).slice(0, 10),
+      reason: '',
+    })
+  }
+
+  async function submitLeave() {
+    if (!leaveModal) return
+    const reason = leaveModal.reason.trim()
+    if (!reason) { setLeaveErr('請填寫請假原因'); return }
+    setLeaveSaving(true); setLeaveErr('')
+    try {
+      await apiCreateLeaveRequest({
+        student_id: leaveModal.studentId,
+        course_id:  leaveModal.courseId,
+        leave_date: leaveModal.leaveDate,
+        reason,
+      })
+      await reloadLeaves(mode === 'student' ? personId : leaveModal.studentId)
+      setLeaveModal(null)
+    } catch (e) {
+      setLeaveErr('送出失敗：' + (e?.message?.includes('400') ? '請檢查資料格式' : '伺服器錯誤'))
+    } finally { setLeaveSaving(false) }
+  }
+
+  async function cancelLeave(leaveId) {
+    if (!window.confirm('確定要取消這筆請假？')) return
+    try {
+      await apiDeleteLeaveRequest(leaveId)
+      await reloadLeaves(personId)
+    } catch { setError('取消請假失敗') }
+  }
 
   const personList = mode === 'student' ? studentsState.students : teachersState.teachers
   const personLabel = mode === 'student' ? '學生' : '老師'
@@ -94,6 +169,7 @@ export default function SchedulePage() {
         title: l.course_name,
         sub: mode === 'student' ? l.teacher_name : l.student_name,
         note: l.note,
+        lesson: l,
       })
     }
     for (const gr of groupRecords) {
@@ -125,6 +201,7 @@ export default function SchedulePage() {
         title: l.course_name,
         sub: mode === 'student' ? l.teacher_name : l.student_name,
         hours: l.hours,
+        lesson: l,
       })),
     ]
   ), [lessons, mode])
@@ -200,18 +277,39 @@ export default function SchedulePage() {
                   const top = (startOffsetMin / 60) * HOUR_PX
                   const height = (it.durationMin / 60) * HOUR_PX
                   if (top + height < 0 || top > HOUR_PX * (MAX_HOUR - MIN_HOUR + 1)) return null
+                  const leave = it.kind === 'lesson' && mode === 'student' ? findLeaveForLesson(it.lesson) : null
+                  const isOnLeave = !!leave
                   return (
                     <div
                       key={`${it.kind}-${it.id}`}
-                      className={`schedule-item schedule-item--${it.kind}`}
+                      className={`schedule-item schedule-item--${it.kind}${isOnLeave ? ' schedule-item--leave' : ''}`}
                       style={{ top: Math.max(0, top), height: Math.max(20, height) }}
-                      title={it.note || ''}
+                      title={leave ? `(請假) ${leave.reason}` : (it.note || '')}
                     >
                       <div className="schedule-item-time">
                         {pad(Math.floor(it.startMin / 60))}:{pad(it.startMin % 60)}
                       </div>
-                      <div className="schedule-item-title">{it.title}</div>
+                      <div className="schedule-item-title">
+                        {isOnLeave && <span className="leave-tag">(請假)</span>}
+                        {it.title}
+                      </div>
                       {it.sub && <div className="schedule-item-sub">{it.sub}</div>}
+                      {it.kind === 'lesson' && mode === 'student' && (
+                        isOnLeave ? (
+                          <button
+                            type="button"
+                            className="schedule-item-leave-btn"
+                            onClick={(e) => { e.stopPropagation(); cancelLeave(leave.id) }}
+                            title={`原因：${leave.reason}（點擊取消請假）`}
+                          >取消請假</button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="schedule-item-leave-btn"
+                            onClick={(e) => { e.stopPropagation(); openLeaveModal(it.lesson) }}
+                          >請假</button>
+                        )
+                      )}
                     </div>
                   )
                 })}
@@ -223,14 +321,62 @@ export default function SchedulePage() {
             <div style={{ marginTop: 24 }}>
               <div className="form-section-title" style={{ marginBottom: 8 }}>未排時段的紀錄</div>
               <ul className="schedule-no-time-list">
-                {noTimeItems.map(it => (
-                  <li key={it.id}>
-                    {it.date}・{it.title}
-                    {it.sub && <span style={{ color: 'var(--muted)' }}>（{it.sub}）</span>}
-                    {it.hours && <span style={{ color: 'var(--muted)' }}>・{it.hours} 小時</span>}
-                  </li>
-                ))}
+                {noTimeItems.map(it => {
+                  const leave = it.kind === 'lesson' && mode === 'student' ? findLeaveForLesson(it.lesson) : null
+                  return (
+                    <li key={it.id}>
+                      {it.date}・{leave && <span className="leave-tag">(請假)</span>}{it.title}
+                      {it.sub && <span style={{ color: 'var(--muted)' }}>（{it.sub}）</span>}
+                      {it.hours && <span style={{ color: 'var(--muted)' }}>・{it.hours} 小時</span>}
+                      {it.kind === 'lesson' && mode === 'student' && (
+                        leave ? (
+                          <button className="btn-sm" style={{ marginLeft: 8 }} onClick={() => cancelLeave(leave.id)}>取消請假</button>
+                        ) : (
+                          <button className="btn-sm" style={{ marginLeft: 8 }} onClick={() => openLeaveModal(it.lesson)}>請假</button>
+                        )
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
+            </div>
+          )}
+
+          {leaveModal && (
+            <div className="leave-modal-overlay" onClick={() => !leaveSaving && setLeaveModal(null)}>
+              <div className="leave-modal" onClick={e => e.stopPropagation()}>
+                <h3 style={{ marginTop: 0 }}>申請請假</h3>
+                <div style={{ color: 'var(--muted)', marginBottom: 12, fontSize: 14 }}>
+                  {leaveModal.studentName ? `${leaveModal.studentName}・` : ''}{leaveModal.courseName}
+                </div>
+                <label style={{ display: 'block', marginBottom: 12 }}>
+                  <div style={{ marginBottom: 4 }}>請假日期</div>
+                  <input
+                    type="date"
+                    value={leaveModal.leaveDate}
+                    onChange={e => setLeaveModal(m => ({ ...m, leaveDate: e.target.value }))}
+                    disabled={leaveSaving}
+                  />
+                </label>
+                <label style={{ display: 'block', marginBottom: 12 }}>
+                  <div style={{ marginBottom: 4 }}>請假原因 <span style={{ color: 'var(--danger, #d33)' }}>*</span></div>
+                  <textarea
+                    rows={4}
+                    value={leaveModal.reason}
+                    onChange={e => setLeaveModal(m => ({ ...m, reason: e.target.value }))}
+                    placeholder="例如：身體不適、家庭因素…"
+                    disabled={leaveSaving}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                  />
+                </label>
+                {leaveErr && <div className="error-msg">{leaveErr}</div>}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+                  <button className="btn-sm" type="button" onClick={() => setLeaveModal(null)} disabled={leaveSaving}>取消</button>
+                  <button className="btn-sm btn-primary" type="button" onClick={submitLeave} disabled={leaveSaving}>
+                    {leaveSaving ? '送出中⋯' : '送出'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>

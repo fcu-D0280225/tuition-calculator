@@ -169,6 +169,20 @@ export const apiSettlementTuition = (from, to) =>
 export const apiSettlementSalary = (from, to) =>
   request(`/settlement/salary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
 
+// ── Leave Requests ────────────────────────────────────────────────────────────
+
+export const apiListStudentLeaveRequests = (studentId, { from, to } = {}) => {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to)   params.set('to', to)
+  const qs = params.toString()
+  return request(`/students/${encodeURIComponent(studentId)}/leave-requests${qs ? '?' + qs : ''}`)
+}
+export const apiCreateLeaveRequest = (body) =>
+  request('/leave-requests', { method: 'POST', body: JSON.stringify(body) })
+export const apiDeleteLeaveRequest = (id) =>
+  request(`/leave-requests/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
 // ── Share Tokens ──────────────────────────────────────────────────────────────
 
 export const apiCreateShareToken = (studentId, { from, to, expires_days } = {}) =>

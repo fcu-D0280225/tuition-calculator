@@ -25,6 +25,8 @@ import {
   insertShareToken, getShareTokenByToken, getStudentBill,
   // payment records
   listPaymentRecords, insertPaymentRecord, deletePaymentRecord,
+  // leave requests
+  insertLeaveRequest, listStudentLeaveRequests, deleteLeaveRequest,
 } from './db.js'
 import { initAuthSchema, requireAuth, registerAuthRoutes, registerAdminRoutes } from './auth.js'
 
@@ -606,6 +608,42 @@ app.get('/api/settlement/salary', async (req, res) => {
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   try { res.json(await settlementSalary(from, to)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Leave Requests ────────────────────────────────────────────────────────────
+
+app.get('/api/students/:id/leave-requests', async (req, res) => {
+  const { from, to } = req.query
+  if (from && !DATE_RE.test(from)) return res.status(400).json({ error: 'invalid_from' })
+  if (to   && !DATE_RE.test(to))   return res.status(400).json({ error: 'invalid_to' })
+  try { res.json(await listStudentLeaveRequests(req.params.id, { from, to })) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.post('/api/leave-requests', async (req, res) => {
+  const { student_id, course_id, leave_date, reason } = req.body || {}
+  if (!student_id) return res.status(400).json({ error: 'student_id_required' })
+  if (!course_id)  return res.status(400).json({ error: 'course_id_required' })
+  if (!leave_date || !DATE_RE.test(leave_date)) return res.status(400).json({ error: 'invalid_leave_date' })
+  const cleanReason = typeof reason === 'string' ? reason.trim() : ''
+  if (!cleanReason) return res.status(400).json({ error: 'reason_required' })
+  if (cleanReason.length > 512) return res.status(400).json({ error: 'reason_too_long' })
+  const id = genId('lvr')
+  try {
+    await insertLeaveRequest({ id, studentId: student_id, courseId: course_id, leaveDate: leave_date, reason: cleanReason })
+    res.status(201).json({ id, student_id, course_id, leave_date, reason: cleanReason })
+  } catch (e) {
+    if (e.code === 'ER_NO_REFERENCED_ROW_2') return res.status(404).json({ error: 'student_or_course_not_found' })
+    console.error(e); res.status(500).json({ error: 'failed' })
+  }
+})
+
+app.delete('/api/leave-requests/:id', async (req, res) => {
+  try {
+    const ok = await deleteLeaveRequest(req.params.id)
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Share Tokens ──────────────────────────────────────────────────────────────
