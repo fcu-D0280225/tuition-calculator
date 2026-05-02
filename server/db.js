@@ -304,6 +304,39 @@ export async function initSchema() {
     await pool.query(`SET @rn := 0`)
     await pool.query(`UPDATE courses SET sort_order = (@rn := @rn + 10) ORDER BY name ASC, id ASC`)
   }
+
+  // Migration: 加 groups.sort_order
+  const [gSortCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'sort_order'`
+  )
+  if (gSortCols.length === 0) {
+    await pool.query('ALTER TABLE `groups` ADD COLUMN sort_order INT NOT NULL DEFAULT 0')
+    await pool.query(`SET @rn := 0`)
+    await pool.query('UPDATE `groups` SET sort_order = (@rn := @rn + 10) ORDER BY monthly_fee DESC, id ASC')
+  }
+
+  // Migration: 加 teachers.sort_order
+  const [tSortCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'teachers' AND COLUMN_NAME = 'sort_order'`
+  )
+  if (tSortCols.length === 0) {
+    await pool.query(`ALTER TABLE teachers ADD COLUMN sort_order INT NOT NULL DEFAULT 0`)
+    await pool.query(`SET @rn := 0`)
+    await pool.query(`UPDATE teachers SET sort_order = (@rn := @rn + 10) ORDER BY created_at DESC, id DESC`)
+  }
+
+  // Migration: 加 students.sort_order
+  const [sSortCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'students' AND COLUMN_NAME = 'sort_order'`
+  )
+  if (sSortCols.length === 0) {
+    await pool.query(`ALTER TABLE students ADD COLUMN sort_order INT NOT NULL DEFAULT 0`)
+    await pool.query(`SET @rn := 0`)
+    await pool.query(`UPDATE students SET sort_order = (@rn := @rn + 10) ORDER BY created_at DESC, id DESC`)
+  }
   // Migration: 早期版本曾經把 discount_multiplier 加在 groups 上，現在不用了，留欄位不影響但忽略
 
 
@@ -435,9 +468,16 @@ export async function deleteLeaveRequest(id) {
 
 export async function listStudents() {
   const [rows] = await pool.query(
-    'SELECT id, name, contact_name, contact_phone FROM students ORDER BY created_at DESC, id DESC'
+    'SELECT id, name, contact_name, contact_phone, sort_order FROM students ORDER BY sort_order ASC, created_at DESC, id DESC'
   )
   return rows
+}
+
+export async function reorderStudents(orderedIds) {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
+  const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
+  const sql = `UPDATE students SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?)`
+  await pool.query(sql, [...orderedIds, orderedIds])
 }
 
 export async function insertStudent({ id, name, contactName, contactPhone }) {
@@ -527,9 +567,16 @@ export async function listStudentCourses(studentId) {
 
 export async function listTeachers() {
   const [rows] = await pool.query(
-    'SELECT id, name FROM teachers ORDER BY created_at DESC, id DESC'
+    'SELECT id, name, sort_order FROM teachers ORDER BY sort_order ASC, created_at DESC, id DESC'
   )
   return rows
+}
+
+export async function reorderTeachers(orderedIds) {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
+  const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
+  const sql = `UPDATE teachers SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?)`
+  await pool.query(sql, [...orderedIds, orderedIds])
 }
 
 export async function insertTeacher({ id, name }) {
@@ -917,9 +964,16 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note FROM `groups` ORDER BY monthly_fee DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
   )
   return rows.map(r => ({ ...r, duration_hours: parseFloat(r.duration_hours) }))
+}
+
+export async function reorderGroups(orderedIds) {
+  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
+  const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
+  const sql = 'UPDATE `groups` SET sort_order = CASE id ' + cases + ' ELSE sort_order END WHERE id IN (?)'
+  await pool.query(sql, [...orderedIds, orderedIds])
 }
 
 export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note }) {

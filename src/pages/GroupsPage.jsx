@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
-import { apiListGroupMembers, apiSetGroupMembers } from '../data/api.js'
+import { apiListGroupMembers, apiSetGroupMembers, apiReorderGroups } from '../data/api.js'
 
 const WEEKDAYS = [
   { value: 0, label: '日' },
@@ -71,6 +71,37 @@ export default function GroupsPage() {
   const [memberSaving, setMemberSaving]   = useState(false)
   // 各團課人數快取（id -> count）
   const [memberCounts, setMemberCounts] = useState({})
+
+  // 拖曳排序
+  const [dragId, setDragId]   = useState(null)
+  const [overId, setOverId]   = useState(null)
+  const [orderOverride, setOrderOverride] = useState(null)
+
+  function startDrag(id) { setDragId(id) }
+  function endDrag() { setDragId(null); setOverId(null) }
+
+  async function handleDrop(targetId) {
+    if (!dragId || dragId === targetId) { endDrag(); return }
+    const baseList = orderOverride ?? state.groups
+    const list = baseList.map(g => g.id)
+    const fromIdx = list.indexOf(dragId)
+    const toIdx   = list.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
+    const next = list.slice()
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, dragId)
+    const idMap = new Map(state.groups.map(g => [g.id, g]))
+    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
+    endDrag()
+    try {
+      await apiReorderGroups(next)
+      await loadGroups()
+      setOrderOverride(null)
+    } catch {
+      setError('排序儲存失敗')
+      setOrderOverride(null)
+    }
+  }
 
   function amt(value) {
     return parseFloat(value).toLocaleString()
@@ -190,6 +221,7 @@ export default function GroupsPage() {
   }
 
   const { groups, loading } = state
+  const displayGroups = orderOverride ?? groups
 
   return (
     <div className="page">
@@ -290,12 +322,36 @@ export default function GroupsPage() {
           <div className="empty-hint">尚未新增任何團課</div>
         ) : (
           <table className="entity-table">
+            <colgroup>
+              <col style={{ width: 36 }} />
+              <col />
+              <col />
+              <col />
+              <col />
+              <col />
+              <col />
+              <col />
+              <col />
+            </colgroup>
             <thead>
-              <tr><th>團課名稱</th><th>上課星期</th><th>上課時段</th><th>持續時間</th><th>月費</th><th>報名人數</th><th>備註</th><th></th></tr>
+              <tr><th aria-label="拖曳排序"></th><th>團課名稱</th><th>上課星期</th><th>上課時段</th><th>持續時間</th><th>月費</th><th>報名人數</th><th>備註</th><th></th></tr>
             </thead>
             <tbody>
-              {groups.map(g => (
-                <tr key={g.id}>
+              {displayGroups.map(g => (
+                <tr
+                  key={g.id}
+                  className={`${dragId === g.id ? 'row-dragging' : ''} ${overId === g.id ? 'row-drop-target' : ''}`}
+                  onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(g.id) } }}
+                  onDragLeave={() => { if (overId === g.id) setOverId(null) }}
+                  onDrop={e => { e.preventDefault(); handleDrop(g.id) }}
+                >
+                  <td
+                    className="drag-handle"
+                    draggable={editId === null}
+                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(g.id) }}
+                    onDragEnd={endDrag}
+                    title="拖曳調整順序"
+                  >⋮⋮</td>
                   <td>
                     {editId === g.id ? (
                       <input

@@ -2,12 +2,17 @@ import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
-import { apiListStudentCourses, apiGetStudentEnrollment, apiSetStudentEnrollment } from '../data/api.js'
+import { useTeachers } from '../contexts/TeachersContext.jsx'
+import {
+  apiGetStudentEnrollment, apiSetStudentEnrollment, apiReorderStudents,
+  apiListStudentCourses,
+} from '../data/api.js'
 
 export default function StudentsPage() {
   const { state, loadStudents, createStudent, updateStudent, removeStudent } = useStudents()
   const { state: coursesState, loadCourses } = useCourses()
   const { state: groupsState, loadGroups } = useGroups()
+  const { state: teachersState, loadTeachers } = useTeachers()
   const { students, loading } = state
 
   const [newName, setNewName]           = useState('')
@@ -22,8 +27,10 @@ export default function StudentsPage() {
   const [error, setError]               = useState('')
   const [saving, setSaving]             = useState(false)
 
-  const [expandedId, setExpandedId]     = useState(null)
-  const [coursesById, setCoursesById]   = useState({}) // id → { loading, error, items }
+  const [expandedId, setExpandedId]         = useState(null)
+  const [enrollmentById, setEnrollmentById] = useState({}) // id → { loading, error, course_ids, group_ids }
+  const [historyById, setHistoryById]       = useState({}) // id → { loading, error, items }
+  const [removingKey, setRemovingKey]       = useState(null)
 
   // 選課 modal
   const [enrollStudent, setEnrollStudent] = useState(null) // { id, name }
@@ -32,7 +39,41 @@ export default function StudentsPage() {
   const [enrollLoading, setEnrollLoading] = useState(false)
   const [enrollSaving, setEnrollSaving]   = useState(false)
 
-  useEffect(() => { loadStudents(); loadCourses(); loadGroups() }, [loadStudents, loadCourses, loadGroups])
+  // 拖曳排序
+  const [dragId, setDragId] = useState(null)
+  const [overId, setOverId] = useState(null)
+  const [orderOverride, setOrderOverride] = useState(null)
+
+  useEffect(() => { loadStudents(); loadCourses(); loadGroups(); loadTeachers() },
+    [loadStudents, loadCourses, loadGroups, loadTeachers])
+
+  function startDrag(id) { setDragId(id) }
+  function endDrag() { setDragId(null); setOverId(null) }
+
+  async function handleDrop(targetId) {
+    if (!dragId || dragId === targetId) { endDrag(); return }
+    const baseList = orderOverride ?? students
+    const list = baseList.map(s => s.id)
+    const fromIdx = list.indexOf(dragId)
+    const toIdx   = list.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
+    const next = list.slice()
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, dragId)
+    const idMap = new Map(students.map(s => [s.id, s]))
+    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
+    endDrag()
+    try {
+      await apiReorderStudents(next)
+      await loadStudents()
+      setOrderOverride(null)
+    } catch {
+      setError('排序儲存失敗')
+      setOrderOverride(null)
+    }
+  }
+
+  const displayStudents = orderOverride ?? students
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -81,6 +122,22 @@ export default function StudentsPage() {
     finally { setSaving(false) }
   }
 
+  async function loadEnrollment(studentId) {
+    setEnrollmentById(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || {}), loading: true } }))
+    try {
+      const data = await apiGetStudentEnrollment(studentId)
+      setEnrollmentById(prev => ({
+        ...prev,
+        [studentId]: { loading: false, course_ids: data.course_ids || [], group_ids: data.group_ids || [] },
+      }))
+    } catch {
+      setEnrollmentById(prev => ({
+        ...prev,
+        [studentId]: { loading: false, error: true, course_ids: [], group_ids: [] },
+      }))
+    }
+  }
+
   async function openEnrollEditor(s) {
     setEnrollStudent({ id: s.id, name: s.name })
     setEnrollDraftCourses(new Set())
@@ -121,6 +178,15 @@ export default function StudentsPage() {
         course_ids: Array.from(enrollDraftCourses),
         group_ids:  Array.from(enrollDraftGroups),
       })
+      // 同步展開列的快取（如果剛好展開的就是這位學生）
+      setEnrollmentById(prev => ({
+        ...prev,
+        [enrollStudent.id]: {
+          loading: false,
+          course_ids: Array.from(enrollDraftCourses),
+          group_ids:  Array.from(enrollDraftGroups),
+        },
+      }))
       setEnrollStudent(null)
     } catch {
       setError('儲存選課失敗')
@@ -129,19 +195,57 @@ export default function StudentsPage() {
     }
   }
 
+  async function removeEnrollment(studentId, kind, id) {
+    const key = `${studentId}:${kind}:${id}`
+    if (removingKey) return
+    const current = enrollmentById[studentId]
+    if (!current) return
+    const courseIds = kind === 'course' ? current.course_ids.filter(x => x !== id) : current.course_ids
+    const groupIds  = kind === 'group'  ? current.group_ids.filter(x => x !== id)  : current.group_ids
+    setRemovingKey(key)
+    // 樂觀更新
+    setEnrollmentById(prev => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], course_ids: courseIds, group_ids: groupIds },
+    }))
+    try {
+      await apiSetStudentEnrollment(studentId, { course_ids: courseIds, group_ids: groupIds })
+    } catch {
+      setError('移除失敗')
+      // 失敗就重新拉一次回來
+      loadEnrollment(studentId)
+    } finally {
+      setRemovingKey(null)
+    }
+  }
+
+  async function loadHistory(studentId) {
+    setHistoryById(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || {}), loading: true } }))
+    try {
+      const items = await apiListStudentCourses(studentId)
+      setHistoryById(prev => ({ ...prev, [studentId]: { loading: false, items } }))
+    } catch {
+      setHistoryById(prev => ({ ...prev, [studentId]: { loading: false, error: true, items: [] } }))
+    }
+  }
+
   const toggleExpand = useCallback(async (id) => {
     if (editId === id) return // 編輯中不展開
     if (expandedId === id) { setExpandedId(null); return }
     setExpandedId(id)
-    if (coursesById[id]?.items) return // 已載入
-    setCoursesById(prev => ({ ...prev, [id]: { loading: true } }))
-    try {
-      const items = await apiListStudentCourses(id)
-      setCoursesById(prev => ({ ...prev, [id]: { loading: false, items } }))
-    } catch {
-      setCoursesById(prev => ({ ...prev, [id]: { loading: false, error: true, items: [] } }))
-    }
-  }, [editId, expandedId, coursesById])
+    if (!enrollmentById[id]?.course_ids) await loadEnrollment(id)
+    if (!historyById[id]?.items)         await loadHistory(id)
+  }, [editId, expandedId, enrollmentById, historyById])
+
+  function teacherName(id) {
+    return teachersState.teachers.find(t => t.id === id)?.name || ''
+  }
+  function courseLabel(c) {
+    const tName = c.default_teacher_id ? teacherName(c.default_teacher_id) : ''
+    return tName ? `${c.name} - ${tName}` : c.name
+  }
+  function courseById(id)  { return coursesState.courses.find(c => c.id === id) }
+  function groupById(id)   { return groupsState.groups.find(g => g.id === id) }
 
   return (
     <div className="page">
@@ -179,8 +283,16 @@ export default function StudentsPage() {
         <div className="empty-hint">尚未新增任何學生</div>
       ) : (
         <table className="entity-table">
+          <colgroup>
+            <col style={{ width: 36 }} />
+            <col />
+            <col />
+            <col />
+            <col style={{ width: 220 }} />
+          </colgroup>
           <thead>
             <tr>
+              <th aria-label="拖曳排序"></th>
               <th>學生姓名</th>
               <th>聯絡人</th>
               <th>聯絡電話</th>
@@ -188,13 +300,26 @@ export default function StudentsPage() {
             </tr>
           </thead>
           <tbody>
-            {students.map(s => {
+            {displayStudents.map(s => {
               const isEditing  = editId === s.id
               const isExpanded = expandedId === s.id
-              const courseInfo = coursesById[s.id]
+              const enrollInfo = enrollmentById[s.id]
+              const historyInfo = historyById[s.id]
               return (
                 <Fragment key={s.id}>
-                  <tr>
+                  <tr
+                    className={`${dragId === s.id ? 'row-dragging' : ''} ${overId === s.id ? 'row-drop-target' : ''}`}
+                    onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(s.id) } }}
+                    onDragLeave={() => { if (overId === s.id) setOverId(null) }}
+                    onDrop={e => { e.preventDefault(); handleDrop(s.id) }}
+                  >
+                    <td
+                      className="drag-handle"
+                      draggable={editId === null}
+                      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(s.id) }}
+                      onDragEnd={endDrag}
+                      title="拖曳調整順序"
+                    >⋮⋮</td>
                     <td>
                       {isEditing ? (
                         <input
@@ -254,18 +379,69 @@ export default function StudentsPage() {
                   </tr>
                   {isExpanded && !isEditing && (
                     <tr className="expanded-row">
-                      <td colSpan={4}>
+                      <td colSpan={5}>
                         <div className="expanded-section">
-                          <div className="expanded-label">上過的課程</div>
-                          {courseInfo?.loading ? (
+                          <div className="expanded-label">已選課程</div>
+                          {enrollInfo?.loading ? (
                             <div className="loading">載入中⋯</div>
-                          ) : courseInfo?.error ? (
+                          ) : enrollInfo?.error ? (
                             <div className="error-msg">載入失敗</div>
-                          ) : !courseInfo?.items?.length ? (
+                          ) : (() => {
+                            const courseIds = enrollInfo?.course_ids || []
+                            const groupIds  = enrollInfo?.group_ids  || []
+                            if (!courseIds.length && !groupIds.length) {
+                              return <div className="empty-hint" style={{ textAlign: 'left', padding: 0 }}>尚未選任何課程</div>
+                            }
+                            return (
+                              <ul className="enrollment-list">
+                                {courseIds.map(cid => {
+                                  const c = courseById(cid)
+                                  if (!c) return null
+                                  const key = `${s.id}:course:${cid}`
+                                  return (
+                                    <li key={`c-${cid}`} className="enrollment-item">
+                                      <span className="enrollment-name">{courseLabel(c)}</span>
+                                      <button
+                                        type="button"
+                                        className="btn-sm btn-danger"
+                                        disabled={removingKey === key}
+                                        onClick={() => removeEnrollment(s.id, 'course', cid)}
+                                      >移除</button>
+                                    </li>
+                                  )
+                                })}
+                                {groupIds.map(gid => {
+                                  const g = groupById(gid)
+                                  if (!g) return null
+                                  const key = `${s.id}:group:${gid}`
+                                  return (
+                                    <li key={`g-${gid}`} className="enrollment-item">
+                                      <span className="enrollment-name">
+                                        {g.name}
+                                        <span style={{ color: 'var(--muted)', marginLeft: 6 }}>（團課）</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="btn-sm btn-danger"
+                                        disabled={removingKey === key}
+                                        onClick={() => removeEnrollment(s.id, 'group', gid)}
+                                      >移除</button>
+                                    </li>
+                                  )
+                                })}
+                              </ul>
+                            )
+                          })()}
+                          <div className="expanded-label" style={{ marginTop: 16 }}>已上過的課程</div>
+                          {historyInfo?.loading ? (
+                            <div className="loading">載入中⋯</div>
+                          ) : historyInfo?.error ? (
+                            <div className="error-msg">載入失敗</div>
+                          ) : !historyInfo?.items?.length ? (
                             <div className="empty-hint" style={{ textAlign: 'left', padding: 0 }}>尚無上課紀錄</div>
                           ) : (
                             <ul style={{ margin: 0, paddingLeft: '1.2em', lineHeight: 1.8 }}>
-                              {courseInfo.items.map(it => (
+                              {historyInfo.items.map(it => (
                                 <li key={`${it.course_id}::${it.teacher_id}`}>
                                   {it.course_name}
                                   <span style={{ color: 'var(--muted)' }}>（{it.teacher_name}）</span>
@@ -311,7 +487,7 @@ export default function StudentsPage() {
                             checked={enrollDraftCourses.has(c.id)}
                             onChange={() => toggleEnrollCourse(c.id)}
                           />
-                          <span className="attendance-name">{c.name}</span>
+                          <span className="attendance-name">{courseLabel(c)}</span>
                         </label>
                       ))}
                     </div>

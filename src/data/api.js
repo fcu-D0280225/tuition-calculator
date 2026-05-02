@@ -53,6 +53,7 @@ export const apiListStudents    = ()           => request('/students')
 export const apiCreateStudent   = (body)       => request('/students', { method: 'POST', body: JSON.stringify(typeof body === 'string' ? { name: body } : body) })
 export const apiUpdateStudent   = (id, patch)  => request(`/students/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteStudent   = (id)         => request(`/students/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiReorderStudents = (ids)        => request('/students/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 export const apiListStudentCourses = (id)      => request(`/students/${encodeURIComponent(id)}/courses`)
 export const apiGetStudentEnrollment = (id)    => request(`/students/${encodeURIComponent(id)}/enrollment`)
 export const apiSetStudentEnrollment = (id, body) =>
@@ -65,6 +66,7 @@ export const apiListTeachers    = ()           => request('/teachers')
 export const apiCreateTeacher   = (name)       => request('/teachers', { method: 'POST', body: JSON.stringify({ name }) })
 export const apiRenameTeacher   = (id, name)   => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 export const apiDeleteTeacher   = (id)         => request(`/teachers/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiReorderTeachers = (ids)        => request('/teachers/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 
 // ── Courses ───────────────────────────────────────────────────────────────────
 
@@ -101,6 +103,7 @@ export const apiListGroups   = ()         => request('/groups')
 export const apiCreateGroup  = (group)    => request('/groups', { method: 'POST', body: JSON.stringify(group) })
 export const apiUpdateGroup  = (id, patch) => request(`/groups/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteGroup  = (id)       => request(`/groups/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiReorderGroups = (ids)     => request('/groups/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 
 // ── Group Records ─────────────────────────────────────────────────────────────
 

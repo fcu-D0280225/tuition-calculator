@@ -5,9 +5,9 @@ import {
   initSchema,
   // students
   listStudents, insertStudent, updateStudent, deleteStudent, listStudentCourses,
-  getStudentEnrollment, setStudentEnrollment, listAllEnrollments,
+  getStudentEnrollment, setStudentEnrollment, listAllEnrollments, reorderStudents,
   // teachers
-  listTeachers, insertTeacher, updateTeacherName, deleteTeacher,
+  listTeachers, insertTeacher, updateTeacherName, deleteTeacher, reorderTeachers,
   // courses
   listCourses, insertCourse, updateCourse, deleteCourse, reorderCourses,
   // lessons
@@ -16,7 +16,7 @@ import {
   listMaterials, insertMaterial, updateMaterial, deleteMaterial,
   listMaterialRecords, insertMaterialRecord, updateMaterialRecord, deleteMaterialRecord,
   // groups
-  listGroups, insertGroup, updateGroup, deleteGroup,
+  listGroups, insertGroup, updateGroup, deleteGroup, reorderGroups,
   listGroupRecords, insertGroupRecord, updateGroupRecord, deleteGroupRecord,
   listGroupMembers, setGroupMembers,
   // settlement
@@ -148,6 +148,15 @@ app.put('/api/students/:id/enrollment', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
+app.put('/api/students/reorder', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
+  if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
+  try {
+    await reorderStudents(ids)
+    res.json(await listStudents())
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
 app.get('/api/enrollments', async (_req, res) => {
   try { res.json(await listAllEnrollments()) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -184,6 +193,15 @@ app.delete('/api/teachers/:id', async (req, res) => {
     const ok = await deleteTeacher(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.put('/api/teachers/reorder', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
+  if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
+  try {
+    await reorderTeachers(ids)
+    res.json(await listTeachers())
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -501,6 +519,15 @@ app.delete('/api/groups/:id', async (req, res) => {
     const ok = await deleteGroup(req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.put('/api/groups/reorder', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
+  if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
+  try {
+    await reorderGroups(ids)
+    res.json(await listGroups())
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

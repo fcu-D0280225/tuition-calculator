@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
+import { useCourses } from '../contexts/CoursesContext.jsx'
+import { useTeachers } from '../contexts/TeachersContext.jsx'
 import {
   apiListGroupRecords, apiCreateGroupRecord, apiDeleteGroupRecord,
   apiListGroupMembers, apiSetGroupMembers,
+  apiListLessons, apiCreateLesson, apiDeleteLesson,
+  apiListAllEnrollments,
 } from '../data/api.js'
 import { genId } from '../utils/ids.js'
 
@@ -32,9 +36,21 @@ function openLineShare(msg) {
 export default function AttendancePage() {
   const { state: groupsState, loadGroups } = useGroups()
   const { state: studentsState, loadStudents } = useStudents()
+  const { state: coursesState, loadCourses } = useCourses()
+  const { state: teachersState, loadTeachers } = useTeachers()
+
+  // 'group' = 團課點名； 'tutoring' = 家教課點名
+  const [mode, setMode] = useState('group')
 
   const [selectedGroup, setSelectedGroup] = useState('')
   const [selectedDate, setSelectedDate]   = useState(todayStr)
+
+  // 家教課專用
+  const [selectedCourse, setSelectedCourse]   = useState('')
+  const [selectedTeacher, setSelectedTeacher] = useState('')
+  const [tutoringHours, setTutoringHours]     = useState('1')
+  const [tutoringStart, setTutoringStart]     = useState('')
+  const [courseMemberIds, setCourseMemberIds] = useState(new Set())
 
   // student_id -> record_id
   const [existingMap, setExistingMap] = useState({})
@@ -61,19 +77,42 @@ export default function AttendancePage() {
 
   useEffect(() => { loadGroups() },   [loadGroups])
   useEffect(() => { loadStudents() }, [loadStudents])
+  useEffect(() => { loadCourses() },  [loadCourses])
+  useEffect(() => { loadTeachers() }, [loadTeachers])
 
   // 切換團課時拉應到名單
   useEffect(() => {
-    if (!selectedGroup) {
+    if (mode !== 'group' || !selectedGroup) {
       setMemberIds(new Set())
       return
     }
     apiListGroupMembers(selectedGroup)
       .then(rows => setMemberIds(new Set(rows.map(r => r.id))))
       .catch(() => {})
-  }, [selectedGroup])
+  }, [mode, selectedGroup])
 
-  // 切換團課/日期：載入該日點名紀錄
+  // 切換到家教課模式 / 切換家教課時，拉該課程的選課學生（透過 enrollments）
+  useEffect(() => {
+    if (mode !== 'tutoring' || !selectedCourse) {
+      setCourseMemberIds(new Set())
+      return
+    }
+    apiListAllEnrollments()
+      .then(({ courses }) => {
+        const ids = new Set(courses.filter(r => r.course_id === selectedCourse).map(r => r.student_id))
+        setCourseMemberIds(ids)
+      })
+      .catch(() => {})
+  }, [mode, selectedCourse])
+
+  // 選家教課時自動帶預設老師
+  useEffect(() => {
+    if (mode !== 'tutoring' || !selectedCourse) return
+    const c = coursesState.courses.find(c => c.id === selectedCourse)
+    if (c?.default_teacher_id && !selectedTeacher) setSelectedTeacher(c.default_teacher_id)
+  }, [mode, selectedCourse, coursesState.courses, selectedTeacher])
+
+  // 切換團課/家教課/日期：載入該日點名紀錄
   useEffect(() => {
     setLoaded(false)
     setChecked(new Set())
@@ -82,13 +121,20 @@ export default function AttendancePage() {
     setAttendedNames([])
     setError('')
 
-    if (!selectedGroup || !selectedDate) return
+    if (mode === 'group') {
+      if (!selectedGroup || !selectedDate) return
+    } else {
+      if (!selectedCourse || !selectedTeacher || !selectedDate) return
+    }
 
     const abortCtrl = new AbortController()
     loadAbortRef.current = abortCtrl
 
     setFetching(true)
-    apiListGroupRecords({ from: selectedDate, to: selectedDate, group_id: selectedGroup })
+    const fetcher = mode === 'group'
+      ? apiListGroupRecords({ from: selectedDate, to: selectedDate, group_id: selectedGroup })
+      : apiListLessons({ from: selectedDate, to: selectedDate, course_id: selectedCourse, teacher_id: selectedTeacher })
+    fetcher
       .then(records => {
         if (abortCtrl.signal.aborted) return
         const map = {}
@@ -110,7 +156,7 @@ export default function AttendancePage() {
       })
 
     return () => { abortCtrl.abort() }
-  }, [selectedGroup, selectedDate])
+  }, [mode, selectedGroup, selectedDate, selectedCourse, selectedTeacher])
 
   function toggleStudent(studentId) {
     setChecked(prev => {
@@ -123,9 +169,12 @@ export default function AttendancePage() {
     setAttendedNames([])
   }
 
+  // 在家教課模式下，應到名單來自選課；團課模式來自 group_members
+  const effectiveMemberIds = mode === 'tutoring' ? courseMemberIds : memberIds
+
   // 全選/取消：只針對應到名單
   function handleToggleAllRoster() {
-    const rosterStudents = studentsState.students.filter(s => memberIds.has(s.id))
+    const rosterStudents = studentsState.students.filter(s => effectiveMemberIds.has(s.id))
     const all = rosterStudents.map(s => s.id)
     const allChecked = all.length > 0 && all.every(id => checked.has(id))
     setChecked(prev => {
@@ -154,24 +203,43 @@ export default function AttendancePage() {
         if (!isPresent && wasPresent) toDelete.push(existingMap[s.id])
       }
 
-      await Promise.all([
-        ...toCreate.map(student_id =>
-          apiCreateGroupRecord({
-            id:          genId('grr'),
-            group_id:    selectedGroup,
-            student_id,
-            record_date: selectedDate,
-            note:        '',
-          })
-        ),
-        ...toDelete.map(id => apiDeleteGroupRecord(id)),
-      ])
+      if (mode === 'group') {
+        await Promise.all([
+          ...toCreate.map(student_id =>
+            apiCreateGroupRecord({
+              id:          genId('grr'),
+              group_id:    selectedGroup,
+              student_id,
+              record_date: selectedDate,
+              note:        '',
+            })
+          ),
+          ...toDelete.map(id => apiDeleteGroupRecord(id)),
+        ])
+      } else {
+        const hours = parseFloat(tutoringHours)
+        if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); setSaving(false); return }
+        await Promise.all([
+          ...toCreate.map(student_id =>
+            apiCreateLesson({
+              student_id,
+              course_id:   selectedCourse,
+              teacher_id:  selectedTeacher,
+              hours,
+              lesson_date: selectedDate,
+              start_time:  tutoringStart || null,
+              unit_price:  null,
+              teacher_unit_price: null,
+              note:        '',
+            })
+          ),
+          ...toDelete.map(id => apiDeleteLesson(id)),
+        ])
+      }
 
-      const fresh = await apiListGroupRecords({
-        from: selectedDate,
-        to:   selectedDate,
-        group_id: selectedGroup,
-      })
+      const fresh = mode === 'group'
+        ? await apiListGroupRecords({ from: selectedDate, to: selectedDate, group_id: selectedGroup })
+        : await apiListLessons({ from: selectedDate, to: selectedDate, course_id: selectedCourse, teacher_id: selectedTeacher })
       const newMap = {}
       const newChecked = new Set()
       for (const r of fresh) {
@@ -186,7 +254,7 @@ export default function AttendancePage() {
         .map(s => s.name)
       setAttendedNames(names)
 
-      const rosterCount = studentsState.students.filter(s => memberIds.has(s.id)).length
+      const rosterCount = studentsState.students.filter(s => effectiveMemberIds.has(s.id)).length
       setSuccessMsg(`已儲存！出席 ${newChecked.size} 人${rosterCount ? ` / 應到 ${rosterCount} 人` : ''}`)
     } catch {
       setError('儲存失敗，請再試一次')
@@ -225,11 +293,18 @@ export default function AttendancePage() {
 
   const { groups }   = groupsState
   const { students } = studentsState
+  const { courses }  = coursesState
+  const { teachers } = teachersState
   const selectedGroupName = groups.find(g => g.id === selectedGroup)?.name || ''
+  const selectedCourseName = courses.find(c => c.id === selectedCourse)?.name || ''
+  const selectedTeacherName = teachers.find(t => t.id === selectedTeacher)?.name || ''
+  const headerLabel = mode === 'group'
+    ? selectedGroupName
+    : (selectedCourseName ? `${selectedCourseName}・${selectedTeacherName}` : '')
 
   // 切兩堆：應到 / 其他
-  const rosterStudents = students.filter(s => memberIds.has(s.id))
-  const otherStudents  = students.filter(s => !memberIds.has(s.id))
+  const rosterStudents = students.filter(s => effectiveMemberIds.has(s.id))
+  const otherStudents  = students.filter(s => !effectiveMemberIds.has(s.id))
   const rosterFilterLower = rosterFilter.trim().toLowerCase()
   const filteredForRoster = rosterFilterLower
     ? students.filter(s => s.name.toLowerCase().includes(rosterFilterLower))
@@ -261,7 +336,7 @@ export default function AttendancePage() {
               <button
                 type="button"
                 className="btn-line-share"
-                onClick={() => openLineShare(buildLineMessage(selectedGroupName, selectedDate, attendedNames))}
+                onClick={() => openLineShare(buildLineMessage(headerLabel, selectedDate, attendedNames))}
               >
                 <span className="btn-line-icon">LINE</span>
                 傳到班級群組
@@ -271,22 +346,83 @@ export default function AttendancePage() {
         </div>
       )}
 
+      {/* ── 模式切換 ── */}
+      <div className="add-mode-switcher">
+        <button
+          type="button"
+          className={`mode-toggle${mode === 'group' ? ' active' : ''}`}
+          onClick={() => setMode('group')}
+          aria-pressed={mode === 'group'}
+        >團課點名</button>
+        <button
+          type="button"
+          className={`mode-toggle${mode === 'tutoring' ? ' active' : ''}`}
+          onClick={() => setMode('tutoring')}
+          aria-pressed={mode === 'tutoring'}
+        >家教課點名</button>
+      </div>
+
       {/* ── 選擇課堂 ── */}
       <div className="lesson-form-card">
         <div className="form-section-title">選擇課堂</div>
         <div className="lesson-form">
           <div className="lesson-form-row">
-            <label>團課
-              <select
-                value={selectedGroup}
-                onChange={e => setSelectedGroup(e.target.value)}
-              >
-                <option value="">── 請選擇團課 ──</option>
-                {groups.map(g => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-            </label>
+            {mode === 'group' ? (
+              <label>團課
+                <select
+                  value={selectedGroup}
+                  onChange={e => setSelectedGroup(e.target.value)}
+                >
+                  <option value="">── 請選擇團課 ──</option>
+                  {groups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <>
+                <label>家教課
+                  <select
+                    value={selectedCourse}
+                    onChange={e => { setSelectedCourse(e.target.value); setSelectedTeacher('') }}
+                  >
+                    <option value="">── 請選擇家教課 ──</option>
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>老師
+                  <select
+                    value={selectedTeacher}
+                    onChange={e => setSelectedTeacher(e.target.value)}
+                  >
+                    <option value="">── 請選擇老師 ──</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>時數
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={tutoringHours}
+                    onChange={e => setTutoringHours(e.target.value)}
+                    className="hours-input"
+                  />
+                </label>
+                <label>開始時間
+                  <input
+                    type="time"
+                    step="900"
+                    value={tutoringStart}
+                    onChange={e => setTutoringStart(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
             <label>日期
               <input
                 type="date"
@@ -308,7 +444,7 @@ export default function AttendancePage() {
       {!fetching && loaded && (
         <div className="lesson-form-card">
           <div className="form-section-title attendance-header-row">
-            <span>{selectedGroupName}・{selectedDate}</span>
+            <span>{headerLabel}・{selectedDate}</span>
             <span className="attendance-count">
               出席 <strong>{presentCount}</strong>
               {rosterCount > 0 && <> / 應到 {rosterCount}</>} 人
@@ -322,14 +458,18 @@ export default function AttendancePage() {
               {/* 應到名單 */}
               <div className="attendance-section-label attendance-roster-header">
                 <span>應到名單（{rosterCount} 人）</span>
-                <button type="button" className="btn-link" onClick={openRosterEditor}>
-                  管理應到名單
-                </button>
+                {mode === 'group' && (
+                  <button type="button" className="btn-link" onClick={openRosterEditor}>
+                    管理應到名單
+                  </button>
+                )}
               </div>
 
               {rosterCount === 0 ? (
                 <div className="empty-hint">
-                  尚未設定本班應到學生。請點上方「管理應到名單」加入學員。
+                  {mode === 'group'
+                    ? '尚未設定本班應到學生。請點上方「管理應到名單」加入學員。'
+                    : '此家教課尚無已選課學生。請到「學生名冊」幫學生選課。'}
                 </div>
               ) : (
                 <div className="attendance-list">

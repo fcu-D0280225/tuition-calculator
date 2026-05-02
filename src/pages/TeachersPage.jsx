@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
+import { apiReorderTeachers } from '../data/api.js'
 
 export default function TeachersPage() {
   const { state, loadTeachers, createTeacher, renameTeacher, removeTeacher } = useTeachers()
@@ -10,6 +11,39 @@ export default function TeachersPage() {
   const [editVal, setEditVal]   = useState('')
   const [error, setError]       = useState('')
   const [saving, setSaving]     = useState(false)
+
+  // 拖曳排序
+  const [dragId, setDragId] = useState(null)
+  const [overId, setOverId] = useState(null)
+  const [orderOverride, setOrderOverride] = useState(null)
+
+  function startDrag(id) { setDragId(id) }
+  function endDrag() { setDragId(null); setOverId(null) }
+
+  async function handleDrop(targetId) {
+    if (!dragId || dragId === targetId) { endDrag(); return }
+    const baseList = orderOverride ?? teachers
+    const list = baseList.map(t => t.id)
+    const fromIdx = list.indexOf(dragId)
+    const toIdx   = list.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
+    const next = list.slice()
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, dragId)
+    const idMap = new Map(teachers.map(t => [t.id, t]))
+    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
+    endDrag()
+    try {
+      await apiReorderTeachers(next)
+      await loadTeachers()
+      setOrderOverride(null)
+    } catch {
+      setError('排序儲存失敗')
+      setOrderOverride(null)
+    }
+  }
+
+  const displayTeachers = orderOverride ?? teachers
 
   useEffect(() => { loadTeachers() }, [loadTeachers])
 
@@ -64,12 +98,30 @@ export default function TeachersPage() {
         <div className="empty-hint">尚未新增任何老師</div>
       ) : (
         <table className="entity-table">
+          <colgroup>
+            <col style={{ width: 36 }} />
+            <col />
+            <col style={{ width: 150 }} />
+          </colgroup>
           <thead>
-            <tr><th>老師姓名</th><th></th></tr>
+            <tr><th aria-label="拖曳排序"></th><th>老師姓名</th><th></th></tr>
           </thead>
           <tbody>
-            {teachers.map(t => (
-              <tr key={t.id}>
+            {displayTeachers.map(t => (
+              <tr
+                key={t.id}
+                className={`${dragId === t.id ? 'row-dragging' : ''} ${overId === t.id ? 'row-drop-target' : ''}`}
+                onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(t.id) } }}
+                onDragLeave={() => { if (overId === t.id) setOverId(null) }}
+                onDrop={e => { e.preventDefault(); handleDrop(t.id) }}
+              >
+                <td
+                  className="drag-handle"
+                  draggable={editId === null}
+                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(t.id) }}
+                  onDragEnd={endDrag}
+                  title="拖曳調整順序"
+                >⋮⋮</td>
                 <td>
                   {editId === t.id ? (
                     <input

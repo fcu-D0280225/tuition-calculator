@@ -2299,6 +2299,31 @@ select.catalog-input.catalog-select {
   padding: 4px 8px;
 }
 
+.nav-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius-sm, 4px);
+  transition: color 0.12s, background 0.12s;
+}
+.nav-section-toggle:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+.nav-section-chev {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  text-align: center;
+}
+.nav-section.collapsed { gap: 0; }
+
 /* nav-tab：左側選單項目 */
 .nav-tab {
   display: block;
@@ -3966,6 +3991,30 @@ select.catalog-input.catalog-select {
 }
 .entity-table tr.row-drop-target td {
   border-top: 2px solid var(--accent);
+}
+
+/* ── Enrollment list（已選課程） ────────────────────────────────────────── */
+.enrollment-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.enrollment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+}
+.enrollment-name {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── Disclosure button（展開／收起） ────────────────────────────────────── */

@@ -3,8 +3,11 @@ import { AppProviders } from './contexts/AppProviders.jsx'
 import CoursesPage       from './pages/CoursesPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
 import TeachersPage      from './pages/TeachersPage.jsx'
-import LessonRecordsPage from './pages/LessonRecordsPage.jsx'
+import TutoringLessonsPage from './pages/TutoringLessonsPage.jsx'
+import GroupLessonsPage    from './pages/GroupLessonsPage.jsx'
 import SettlementPage    from './pages/SettlementPage.jsx'
+import TuitionSettlementPage from './pages/TuitionSettlementPage.jsx'
+import SalarySettlementPage  from './pages/SalarySettlementPage.jsx'
 import MaterialsPage     from './pages/MaterialsPage.jsx'
 import GroupsPage        from './pages/GroupsPage.jsx'
 import DashboardPage     from './pages/DashboardPage.jsx'
@@ -15,7 +18,6 @@ import LoginPage         from './pages/LoginPage.jsx'
 import { apiAuthMe, apiAuthLogout } from './data/api.js'
 
 const NAV = [
-  { type: 'tab', id: 'dashboard', label: '財務總覽' },
   { type: 'group', key: 'courses', label: '課程', children: [
     { id: 'courses', label: '家教課' },
     { id: 'groups',  label: '團課' },
@@ -24,18 +26,35 @@ const NAV = [
     { id: 'students', label: '學生' },
     { id: 'teachers', label: '老師' },
   ]},
+  { type: 'group', key: 'lessons', label: '上課紀錄', children: [
+    { id: 'lessons_tutoring', label: '家教課上課紀錄' },
+    { id: 'lessons_group',    label: '團課上課紀錄' },
+  ]},
   { type: 'group', key: 'records', label: '紀錄', children: [
-    { id: 'lessons',    label: '上課紀錄' },
     { id: 'attendance', label: '點名' },
     { id: 'materials',  label: '教材' },
   ]},
   { type: 'tab', id: 'schedule', label: '課表' },
-  { type: 'tab', id: 'settlement', label: '結算' },
+  { type: 'group', key: 'settlement', label: '結算', children: [
+    { id: 'settlement_tuition', label: '學費結算' },
+    { id: 'settlement_salary',  label: '老師薪資結算' },
+    { id: 'settlement',         label: '結算總覽' },
+  ]},
   { type: 'tab', id: 'users', label: '使用者管理' },
+  { type: 'tab', id: 'dashboard', label: '財務總覽' },
 ]
 
 function filterNav(perms, isAdmin) {
-  const has = id => isAdmin || perms.includes(id) || (id === 'users' && isAdmin)
+  const has = id => {
+    if (isAdmin) return true
+    if (perms.includes(id)) return true
+    // 舊 'lessons' 權限視同包含拆分後的兩個頁
+    if ((id === 'lessons_tutoring' || id === 'lessons_group') && perms.includes('lessons')) return true
+    // 舊 'settlement' 權限視同含三個結算子頁
+    if ((id === 'settlement_tuition' || id === 'settlement_salary') && perms.includes('settlement')) return true
+    if (id === 'users' && isAdmin) return true
+    return false
+  }
   return NAV
     .map(item => {
       if (item.type === 'tab') {
@@ -60,6 +79,21 @@ export default function App() {
   const [tab, setTab] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [] })
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const raw = localStorage.getItem('nav_collapsed_groups')
+      return new Set(raw ? JSON.parse(raw) : [])
+    } catch { return new Set() }
+  })
+
+  function toggleGroup(key) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      try { localStorage.setItem('nav_collapsed_groups', JSON.stringify(Array.from(next))) } catch {}
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -138,30 +172,45 @@ export default function App() {
             >✕</button>
           </div>
           <nav className="app-nav">
-            {visibleNav.map(item => item.type === 'group' ? (
-              <div className="nav-section" key={item.key}>
-                <div className="nav-section-label">{item.label}</div>
-                {item.children.map(c => (
+            {visibleNav.map(item => {
+              if (item.type !== 'group') {
+                return (
                   <button
-                    key={c.id}
+                    key={item.id}
                     type="button"
-                    className={`nav-tab ${tab === c.id ? 'active' : ''}`}
-                    onClick={() => navigate(c.id)}
+                    className={`nav-tab ${tab === item.id ? 'active' : ''}`}
+                    onClick={() => navigate(item.id)}
                   >
-                    {c.label}
+                    {item.label}
                   </button>
-                ))}
-              </div>
-            ) : (
-              <button
-                key={item.id}
-                type="button"
-                className={`nav-tab ${tab === item.id ? 'active' : ''}`}
-                onClick={() => navigate(item.id)}
-              >
-                {item.label}
-              </button>
-            ))}
+                )
+              }
+              const containsActive = item.children.some(c => c.id === tab)
+              const collapsed = collapsedGroups.has(item.key) && !containsActive
+              return (
+                <div className={`nav-section${collapsed ? ' collapsed' : ''}`} key={item.key}>
+                  <button
+                    type="button"
+                    className="nav-section-label nav-section-toggle"
+                    onClick={() => toggleGroup(item.key)}
+                    aria-expanded={!collapsed}
+                  >
+                    <span className="nav-section-chev" aria-hidden="true">{collapsed ? '▸' : '▾'}</span>
+                    <span>{item.label}</span>
+                  </button>
+                  {!collapsed && item.children.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`nav-tab ${tab === c.id ? 'active' : ''}`}
+                      onClick={() => navigate(c.id)}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              )
+            })}
             {visibleNav.length === 0 && (
               <div className="empty-hint" style={{ padding: '12px 8px' }}>尚未指派任何頁面權限</div>
             )}
@@ -192,8 +241,11 @@ export default function App() {
 
           <main className="app-main">
             {tab === 'dashboard'  && <DashboardPage />}
-            {tab === 'lessons'    && <LessonRecordsPage />}
-            {tab === 'settlement' && <SettlementPage />}
+            {tab === 'lessons_tutoring' && <TutoringLessonsPage />}
+            {tab === 'lessons_group'    && <GroupLessonsPage />}
+            {tab === 'settlement'         && <SettlementPage />}
+            {tab === 'settlement_tuition' && <TuitionSettlementPage />}
+            {tab === 'settlement_salary'  && <SalarySettlementPage />}
             {tab === 'students'   && <StudentsPage />}
             {tab === 'teachers'   && <TeachersPage />}
             {tab === 'courses'    && <CoursesPage />}
