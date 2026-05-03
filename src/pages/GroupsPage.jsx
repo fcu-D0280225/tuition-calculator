@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import Combobox from '../components/Combobox.jsx'
 import { apiListGroupMembers, apiReorderGroups } from '../data/api.js'
 
@@ -51,11 +52,12 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', note: '', default_teacher_id: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', teacher_hourly_rate: '', note: '', default_teacher_id: '' }
 
 export default function GroupsPage() {
   const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
   const { state: teachersState, loadTeachers } = useTeachers()
+  const { canViewRates } = useAuth()
 
   const [newGroup, setNewGroup]   = useState(EMPTY_GROUP)
   const [editId, setEditId]       = useState(null)
@@ -133,9 +135,11 @@ export default function GroupsPage() {
     if (isNaN(fee) || fee <= 0) { setError('請輸入月費'); return }
     const dh = newGroup.duration_hours === '' ? 0 : parseFloat(newGroup.duration_hours)
     if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
+    const thr = newGroup.teacher_hourly_rate === '' ? 0 : parseFloat(newGroup.teacher_hourly_rate)
+    if (isNaN(thr) || thr < 0) { setError('老師時薪格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, note: newGroup.note, default_teacher_id: newGroup.default_teacher_id || null })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, teacher_hourly_rate: thr, note: newGroup.note, default_teacher_id: newGroup.default_teacher_id || null })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -150,6 +154,7 @@ export default function GroupsPage() {
       monthly_fee: g.monthly_fee != null ? String(g.monthly_fee) : '',
       start_time: g.start_time ? String(g.start_time).slice(0, 5) : '',
       duration_hours: g.duration_hours != null ? String(g.duration_hours) : '',
+      teacher_hourly_rate: g.teacher_hourly_rate != null ? String(g.teacher_hourly_rate) : '',
       note: g.note || '',
       default_teacher_id: g.default_teacher_id || '',
     })
@@ -162,9 +167,11 @@ export default function GroupsPage() {
     if (isNaN(fee) || fee < 0) { setError('月費格式不正確'); return }
     const dh = editGroup.duration_hours === '' ? 0 : parseFloat(editGroup.duration_hours)
     if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
+    const thr = editGroup.teacher_hourly_rate === '' ? 0 : parseFloat(editGroup.teacher_hourly_rate)
+    if (isNaN(thr) || thr < 0) { setError('老師時薪格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, note: editGroup.note, default_teacher_id: editGroup.default_teacher_id || null })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, teacher_hourly_rate: thr, note: editGroup.note, default_teacher_id: editGroup.default_teacher_id || null })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -232,6 +239,18 @@ export default function GroupsPage() {
                 onChange={e => setNewGroup(g => ({ ...g, monthly_fee: e.target.value }))}
               />
             </label>
+            {canViewRates && (
+              <label title="團課老師時薪：每堂課（duration_hours 小時）老師可拿的鐘點費">老師時薪（元/小時）
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="例如 500"
+                  value={newGroup.teacher_hourly_rate}
+                  onChange={e => setNewGroup(g => ({ ...g, teacher_hourly_rate: e.target.value }))}
+                />
+              </label>
+            )}
             <label>開始時間
               <input
                 type="time"
@@ -296,13 +315,26 @@ export default function GroupsPage() {
               <col style={{ width: 170 }} />
               <col style={{ width: 100 }} />
               <col style={{ width: 90 }} />
+              {canViewRates && <col style={{ width: 100 }} />}
               <col style={{ width: 130 }} />
               <col style={{ width: 80 }} />
               <col />
               <col style={{ width: 130 }} />
             </colgroup>
             <thead>
-              <tr><th aria-label="拖曳排序"></th><th>團課名稱</th><th>上課星期</th><th>上課時段</th><th>持續時間</th><th>月費</th><th>預設老師</th><th>報名人數</th><th>備註</th><th></th></tr>
+              <tr>
+                <th aria-label="拖曳排序"></th>
+                <th>團課名稱</th>
+                <th>上課星期</th>
+                <th>上課時段</th>
+                <th>持續時間</th>
+                <th>月費</th>
+                {canViewRates && <th>老師時薪</th>}
+                <th>預設老師</th>
+                <th>報名人數</th>
+                <th>備註</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
               {displayGroups.map(g => (
@@ -382,6 +414,20 @@ export default function GroupsPage() {
                       />
                     ) : (g.monthly_fee > 0 ? amt(g.monthly_fee) : '—')}
                   </td>
+                  {canViewRates && (
+                    <td>
+                      {editId === g.id ? (
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          className="inline-edit-input"
+                          value={editGroup.teacher_hourly_rate}
+                          onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
+                        />
+                      ) : (g.teacher_hourly_rate > 0 ? amt(g.teacher_hourly_rate) : '—')}
+                    </td>
+                  )}
                   <td>
                     {editId === g.id ? (
                       <div className="combobox-cell">

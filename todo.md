@@ -16,7 +16,7 @@
 - ✅ 點名表（含請假）
 
 ### 第二階段：行政管理與成本模組
-- ✅ 老師時薪建檔（= 課程的 `teacher_hourly_rate`，可逐筆覆寫）
+- ✅ 老師時薪建檔（家教課 = `courses.teacher_hourly_rate`，團課 = `groups.teacher_hourly_rate`，可逐筆覆寫家教課）
 - ✅ 上課時數匯總 → 應付薪資
 - ✅ 使用者權限設定（群組／個別）
 - ☑️ 介面顯示設定（已有 `view_rates` 控制金額欄位；其他角色化 UX 視需求延伸）

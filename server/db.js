@@ -372,6 +372,15 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE group_records ADD INDEX idx_gr_teacher (teacher_id, record_date)`)
   }
 
+  // Migration: 加 groups.teacher_hourly_rate（團課老師時薪，用於薪資結算）
+  const [gThrCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'teacher_hourly_rate'`
+  )
+  if (gThrCols.length === 0) {
+    await pool.query('ALTER TABLE `groups` ADD COLUMN teacher_hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0')
+  }
+
   // Migration: 加 groups.default_teacher_id（點名時自動帶入的老師）
   const [gDefTcols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -1262,7 +1271,7 @@ export async function settlementSalary(from, to) {
   const map = new Map()
   for (const row of rows) {
     if (!map.has(row.teacher_id)) {
-      map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: new Map(), total: 0 })
+      map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: new Map(), groups: new Map(), total: 0 })
     }
     const teacher = map.get(row.teacher_id)
     const key     = `${row.course_id}::${row.hourly_rate}`
@@ -1276,10 +1285,53 @@ export async function settlementSalary(from, to) {
     teacher.total += Math.round(h * entry.hourly_rate)
   }
 
+  // 團課薪資：每一個 (group, record_date, teacher) 為一堂，無論該堂出席學生多少；
+  // 排除 pre_enroll（尚未開始）與沒指派老師的紀錄。
+  const [groupRows] = await pool.query(
+    `SELECT gr.teacher_id,
+            t.name                          AS teacher_name,
+            gr.group_id,
+            g.name                          AS group_name,
+            g.duration_hours                AS duration_hours,
+            g.teacher_hourly_rate           AS hourly_rate,
+            gr.record_date
+       FROM group_records gr
+       JOIN \`groups\` g ON g.id = gr.group_id
+       JOIN teachers   t ON t.id = gr.teacher_id
+      WHERE gr.record_date >= ? AND gr.record_date <= ?
+        AND gr.teacher_id IS NOT NULL
+        AND gr.status <> 'pre_enroll'
+      GROUP BY gr.teacher_id, t.name, gr.group_id, g.name, g.duration_hours, g.teacher_hourly_rate, gr.record_date
+      ORDER BY t.name ASC, g.name ASC, gr.record_date ASC`,
+    [from, to]
+  )
+  for (const row of groupRows) {
+    if (!map.has(row.teacher_id)) {
+      map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: new Map(), groups: new Map(), total: 0 })
+    }
+    const teacher = map.get(row.teacher_id)
+    const rate = parseFloat(row.hourly_rate || 0)
+    const dh   = parseFloat(row.duration_hours || 0)
+    const key  = `${row.group_id}::${rate}::${dh}`
+    if (!teacher.groups.has(key)) {
+      teacher.groups.set(key, {
+        group_id: row.group_id, group_name: row.group_name,
+        duration_hours: dh, hourly_rate: rate,
+        session_count: 0, total_hours: 0, amount: 0,
+      })
+    }
+    const entry = teacher.groups.get(key)
+    entry.session_count += 1
+    entry.total_hours = Math.round((entry.session_count * dh) * 100) / 100
+    entry.amount = Math.round(entry.total_hours * rate)
+    teacher.total += Math.round(dh * rate)
+  }
+
   return Array.from(map.values()).map(t => ({
     teacher_id: t.teacher_id,
     teacher_name: t.teacher_name,
     courses: Array.from(t.courses.values()),
+    groups:  Array.from(t.groups.values()),
     total: t.total,
   }))
 }
@@ -1393,9 +1445,13 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note, default_teacher_id, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, note, default_teacher_id, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
   )
-  return rows.map(r => ({ ...r, duration_hours: parseFloat(r.duration_hours) }))
+  return rows.map(r => ({
+    ...r,
+    duration_hours: parseFloat(r.duration_hours),
+    teacher_hourly_rate: parseFloat(r.teacher_hourly_rate || 0),
+  }))
 }
 
 export async function reorderGroups(orderedIds) {
@@ -1405,23 +1461,24 @@ export async function reorderGroups(orderedIds) {
   await pool.query(sql, [...orderedIds, orderedIds])
 }
 
-export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note, defaultTeacherId }) {
+export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, note, defaultTeacherId }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, note || '', defaultTeacherId || null]
+    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, teacherHourlyRate ?? 0, note || '', defaultTeacherId || null]
   )
 }
 
-export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note, defaultTeacherId }) {
+export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, note, defaultTeacherId }) {
   const sets = []; const params = []
-  if (name             !== undefined) { sets.push('name = ?');               params.push(name) }
-  if (weekdays         !== undefined) { sets.push('weekdays = ?');           params.push(weekdays || '') }
-  if (durationMonths   !== undefined) { sets.push('duration_months = ?');    params.push(durationMonths) }
-  if (monthlyFee       !== undefined) { sets.push('monthly_fee = ?');        params.push(monthlyFee) }
-  if (startTime        !== undefined) { sets.push('start_time = ?');         params.push(startTime || null) }
-  if (durationHours    !== undefined) { sets.push('duration_hours = ?');     params.push(durationHours) }
-  if (note             !== undefined) { sets.push('note = ?');               params.push(note || '') }
-  if (defaultTeacherId !== undefined) { sets.push('default_teacher_id = ?'); params.push(defaultTeacherId || null) }
+  if (name              !== undefined) { sets.push('name = ?');                params.push(name) }
+  if (weekdays          !== undefined) { sets.push('weekdays = ?');            params.push(weekdays || '') }
+  if (durationMonths    !== undefined) { sets.push('duration_months = ?');     params.push(durationMonths) }
+  if (monthlyFee        !== undefined) { sets.push('monthly_fee = ?');         params.push(monthlyFee) }
+  if (startTime         !== undefined) { sets.push('start_time = ?');          params.push(startTime || null) }
+  if (durationHours     !== undefined) { sets.push('duration_hours = ?');      params.push(durationHours) }
+  if (teacherHourlyRate !== undefined) { sets.push('teacher_hourly_rate = ?'); params.push(teacherHourlyRate) }
+  if (note              !== undefined) { sets.push('note = ?');                params.push(note || '') }
+  if (defaultTeacherId  !== undefined) { sets.push('default_teacher_id = ?');  params.push(defaultTeacherId || null) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ?`, params)
