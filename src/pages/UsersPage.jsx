@@ -6,16 +6,21 @@ import {
 } from '../data/api.js'
 
 const NAV_OPTIONS = [
-  { id: 'dashboard',  label: '財務總覽' },
-  { id: 'courses',    label: '家教課' },
-  { id: 'groups',     label: '團課' },
-  { id: 'lessons',    label: '上課紀錄' },
-  { id: 'attendance', label: '點名' },
-  { id: 'materials',  label: '教材' },
-  { id: 'schedule',   label: '課表' },
-  { id: 'settlement', label: '結算' },
-  { id: 'students',   label: '學生' },
-  { id: 'teachers',   label: '老師' },
+  { id: 'dashboard',         label: '財務總覽' },
+  { id: 'courses',           label: '家教課' },
+  { id: 'groups',            label: '團課' },
+  { id: 'lessons',           label: '上課紀錄' },
+  { id: 'lessons_tutoring',  label: '家教課上課紀錄' },
+  { id: 'lessons_group',     label: '團課上課紀錄' },
+  { id: 'attendance',        label: '點名' },
+  { id: 'materials',         label: '教材' },
+  { id: 'schedule',          label: '課表' },
+  { id: 'settlement',        label: '結算' },
+  { id: 'settlement_tuition',label: '學費結算' },
+  { id: 'settlement_salary', label: '老師薪資結算' },
+  { id: 'students',          label: '學生' },
+  { id: 'teachers',          label: '老師' },
+  { id: 'misc',              label: '雜項支出' },
 ]
 
 const EMPTY_NEW_USER  = { username: '', password: '', group_id: '', teacher_id: '' }
