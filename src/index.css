@@ -2332,7 +2332,8 @@ select.catalog-input.catalog-select {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  padding: 4px 8px;
+  padding: 12px 8px;
+  min-height: 44px;
 }
 
 .nav-section-toggle {
@@ -2365,8 +2366,8 @@ select.catalog-input.catalog-select {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 8px 12px;
-  min-height: 36px;
+  padding: 10px 12px;
+  min-height: 44px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   font-size: 14px;
@@ -2637,7 +2638,6 @@ select.catalog-input.catalog-select {
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
 }
 
@@ -2941,7 +2941,6 @@ select.catalog-input.catalog-select {
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
 }
 
@@ -3035,7 +3034,6 @@ select.catalog-input.catalog-select {
   font-weight: 700;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
   border-bottom: 1px solid var(--border);
 }
 
@@ -4549,4 +4547,25 @@ select.catalog-input.catalog-select {
   background: var(--bg);
   border-radius: 8px;
   font-size: 14px;
+}
+
+/* ── 手機響應式：表格橫向捲動 ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .entity-table,
+  .lesson-table,
+  .settlement-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 防止儲存格文字折行，確保橫向捲動觸發 */
+  .entity-table th,
+  .entity-table td,
+  .lesson-table th,
+  .lesson-table td,
+  .settlement-table th,
+  .settlement-table td {
+    white-space: nowrap;
+  }
 }
