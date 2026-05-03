@@ -3,6 +3,7 @@ import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import Combobox from '../components/Combobox.jsx'
 import {
   apiListGroupRecords, apiCreateGroupRecord, apiUpdateGroupRecord, apiDeleteGroupRecord,
@@ -37,8 +38,8 @@ function openLineShare(msg) {
 }
 
 // 家教課：單一 session（同老師同開始時間）的點名卡
-function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBusy, onToggleLeave, onSaved, headerLabel, selectedDate }) {
-  const [teacherId, setTeacherId] = useState(session.teacher_id || '')
+function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBusy, onToggleLeave, onSaved, headerLabel, selectedDate, defaultTeacherId = '' }) {
+  const [teacherId, setTeacherId] = useState(session.teacher_id || defaultTeacherId || '')
   const [startTime, setStartTime] = useState(session.start_time || '')
   const [hours,     setHours]     = useState(session.hours || '1')
   const [checked,   setChecked]   = useState(new Set(session.attendedSet))
@@ -155,6 +156,7 @@ export default function AttendancePage() {
   const { state: studentsState, loadStudents } = useStudents()
   const { state: coursesState, loadCourses } = useCourses()
   const { state: teachersState, loadTeachers } = useTeachers()
+  const { teacher_id: ownTeacherId, is_admin: isAdmin } = useAuth()
 
   // 'group' = 團課點名； 'tutoring' = 家教課點名
   const [mode, setMode] = useState('group')
@@ -218,11 +220,13 @@ export default function AttendancePage() {
       .catch(() => {})
     const g = groupsState.groups.find(g => g.id === selectedGroup)
     if (g) {
-      setGroupTeacher(g.default_teacher_id || '')
+      // 老師帳號自動帶自己；其他人用該團課預設老師
+      const initialTeacher = (!isAdmin && ownTeacherId) ? ownTeacherId : (g.default_teacher_id || '')
+      setGroupTeacher(initialTeacher)
       setGroupStart(g.start_time ? String(g.start_time).slice(0, 5) : '')
       setGroupHours(g.duration_hours != null ? String(g.duration_hours) : '')
     }
-  }, [mode, selectedGroup, groupsState.groups])
+  }, [mode, selectedGroup, groupsState.groups, ownTeacherId, isAdmin])
 
   // 切換到家教課模式 / 切換家教課時，拉該課程的選課學生（透過 enrollments）
   useEffect(() => {
@@ -238,12 +242,17 @@ export default function AttendancePage() {
       .catch(() => {})
   }, [mode, selectedCourse])
 
-  // 選家教課時自動帶預設老師
+  // 選家教課時自動帶預設老師（老師帳號 = 自己；其他帳號用課程預設老師）
   useEffect(() => {
     if (mode !== 'tutoring' || !selectedCourse) return
+    if (selectedTeacher) return
+    if (!isAdmin && ownTeacherId) {
+      setSelectedTeacher(ownTeacherId)
+      return
+    }
     const c = coursesState.courses.find(c => c.id === selectedCourse)
-    if (c?.default_teacher_id && !selectedTeacher) setSelectedTeacher(c.default_teacher_id)
-  }, [mode, selectedCourse, coursesState.courses, selectedTeacher])
+    if (c?.default_teacher_id) setSelectedTeacher(c.default_teacher_id)
+  }, [mode, selectedCourse, coursesState.courses, selectedTeacher, ownTeacherId, isAdmin])
 
   // 切換團課/家教課/日期：載入該日點名紀錄
   useEffect(() => {
@@ -731,6 +740,7 @@ export default function AttendancePage() {
               onSaved={() => setReloadTick(t => t + 1)}
               headerLabel={headerLabel}
               selectedDate={selectedDate}
+              defaultTeacherId={(!isAdmin && ownTeacherId) ? ownTeacherId : ''}
             />
           ))
         )
