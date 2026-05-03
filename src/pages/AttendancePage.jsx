@@ -45,6 +45,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
   const [checked,   setChecked]   = useState(new Set(session.attendedSet))
   const [saving,    setSaving]    = useState(false)
   const [err,       setErr]       = useState('')
+  const [okMsg,     setOkMsg]     = useState('')
 
   const rosterIds = Object.keys(session.existingMap)
   const roster = allStudents.filter(s => rosterIds.includes(s.id))
@@ -68,7 +69,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
   }
 
   async function save() {
-    setSaving(true); setErr('')
+    setSaving(true); setErr(''); setOkMsg('')
     const h = parseFloat(hours)
     if (isNaN(h) || h <= 0) { setErr('請輸入有效時數'); setSaving(false); return }
     try {
@@ -80,6 +81,11 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
           status: checked.has(sid) ? 'attended' : 'pending',
         })
       ))
+      const attendedNames = roster.filter(s => checked.has(s.id)).map(s => s.name)
+      setOkMsg(
+        `已儲存點名！出席 ${attendedNames.length} / ${roster.length} 人` +
+        (attendedNames.length ? `（${attendedNames.join('、')}）` : '')
+      )
       onSaved?.()
     } catch (e) {
       setErr(`儲存失敗：${e?.message || e}`)
@@ -144,6 +150,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
       )}
 
       {err && <div className="error-msg">{err}</div>}
+      {okMsg && <div className="success-msg" style={{ marginTop: 8 }}>{okMsg}</div>}
       <button className="btn-primary" type="button" onClick={save} disabled={saving} style={{ marginTop: 12 }}>
         {saving ? '儲存中…' : '儲存點名'}
       </button>
