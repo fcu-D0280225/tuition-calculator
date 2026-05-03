@@ -20,7 +20,7 @@ import {
   listGroupRecords, insertGroupRecord, updateGroupRecord, deleteGroupRecord,
   listGroupMembers, setGroupMembers,
   // misc expenses
-  listMiscExpenses, insertMiscExpense, deleteMiscExpense, sumMiscExpensesByCategory,
+  listMiscExpenses, insertMiscExpense, updateMiscExpense, deleteMiscExpense, sumMiscExpensesByCategory,
   // material cost
   sumMaterialCost,
   // period locks
@@ -373,6 +373,22 @@ app.post('/api/misc-expenses', async (req, res) => {
   try {
     await insertMiscExpense({ id, name, category, amount, expenseDate: expense_date, note })
     res.status(201).json({ id, name, category, amount, expense_date, note })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.put('/api/misc-expenses/:id', async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
+  if (!name) return res.status(400).json({ error: 'name_required' })
+  const amount = parseFloat(req.body?.amount)
+  if (isNaN(amount) || amount < 0) return res.status(400).json({ error: 'invalid_amount' })
+  const expense_date = req.body?.expense_date
+  if (!expense_date || !/^\d{4}-\d{2}-\d{2}$/.test(expense_date)) return res.status(400).json({ error: 'invalid_expense_date' })
+  const note = typeof req.body?.note === 'string' ? req.body.note : ''
+  const category = typeof req.body?.category === 'string' && req.body.category.trim() ? req.body.category.trim() : '其他'
+  try {
+    const ok = await updateMiscExpense(req.params.id, { name, category, amount, expenseDate: expense_date, note })
+    if (!ok) return res.status(404).json({ error: 'not_found' })
+    res.json({ id: req.params.id, name, category, amount, expense_date, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { apiListMiscExpenses, apiCreateMiscExpense, apiDeleteMiscExpense } from '../data/api.js'
+import { apiListMiscExpenses, apiCreateMiscExpense, apiUpdateMiscExpense, apiDeleteMiscExpense } from '../data/api.js'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -17,6 +17,8 @@ export default function MiscPage() {
   const [loading, setLoading] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editForm,  setEditForm]  = useState(EMPTY)
 
   const reload = useCallback(async (filters = {}) => {
     setLoading(true)
@@ -63,6 +65,46 @@ export default function MiscPage() {
       setItems(prev => prev.filter(x => x.id !== id))
     } catch (e) {
       setError(`刪除失敗：${e?.message || e}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function startEdit(it) {
+    setEditingId(it.id)
+    setEditForm({
+      name:         it.name || '',
+      category:     it.category || '其他',
+      amount:       String(it.amount ?? ''),
+      expense_date: String(it.expense_date || '').slice(0, 10),
+      note:         it.note || '',
+    })
+    setError('')
+  }
+  function cancelEdit() {
+    setEditingId(null)
+    setEditForm(EMPTY)
+  }
+  async function handleUpdate(e) {
+    e.preventDefault()
+    const name = editForm.name.trim()
+    if (!name) { setError('請輸入名稱'); return }
+    const amount = parseFloat(editForm.amount)
+    if (isNaN(amount) || amount < 0) { setError('請輸入有效金額'); return }
+    if (!editForm.expense_date) { setError('請選擇日期'); return }
+    setSaving(true); setError('')
+    try {
+      const updated = await apiUpdateMiscExpense(editingId, {
+        name,
+        category:     editForm.category || '其他',
+        amount,
+        expense_date: editForm.expense_date,
+        note:         editForm.note.trim(),
+      })
+      setItems(prev => prev.map(x => x.id === editingId ? { ...x, ...updated, amount: parseFloat(updated.amount) } : x))
+      cancelEdit()
+    } catch (e) {
+      setError(`更新失敗：${e?.message || e}`)
     } finally {
       setSaving(false)
     }
@@ -177,7 +219,36 @@ export default function MiscPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map(it => (
+            {items.map(it => editingId === it.id ? (
+              <tr key={it.id}>
+                <td>
+                  <input type="date" value={editForm.expense_date}
+                    onChange={e => setEditForm(f => ({ ...f, expense_date: e.target.value }))} />
+                </td>
+                <td>
+                  <select value={editForm.category}
+                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </td>
+                <td>
+                  <input type="text" value={editForm.name}
+                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+                </td>
+                <td>
+                  <input type="number" min="0" step="1" value={editForm.amount}
+                    onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))} />
+                </td>
+                <td>
+                  <input type="text" value={editForm.note}
+                    onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} />
+                </td>
+                <td className="row-actions">
+                  <button className="btn-sm btn-primary" onClick={handleUpdate} disabled={saving}>儲存</button>
+                  <button className="btn-sm" onClick={cancelEdit} disabled={saving}>取消</button>
+                </td>
+              </tr>
+            ) : (
               <tr key={it.id}>
                 <td>{String(it.expense_date).slice(0, 10)}</td>
                 <td>{it.category || '其他'}</td>
@@ -185,7 +256,8 @@ export default function MiscPage() {
                 <td>{parseFloat(it.amount).toLocaleString()}</td>
                 <td className="note-cell">{it.note}</td>
                 <td className="row-actions">
-                  <button className="btn-sm btn-danger" onClick={() => handleDelete(it.id)} disabled={saving}>刪除</button>
+                  <button className="btn-sm" onClick={() => startEdit(it)} disabled={saving || editingId !== null}>編輯</button>
+                  <button className="btn-sm btn-danger" onClick={() => handleDelete(it.id)} disabled={saving || editingId !== null}>刪除</button>
                 </td>
               </tr>
             ))}

@@ -206,8 +206,9 @@ export const apiSumMiscExpensesByCategory = ({ from, to } = {}) => {
   const qs = params.toString()
   return request(`/misc-expenses/summary${qs ? '?' + qs : ''}`)
 }
-export const apiCreateMiscExpense = (body) => request('/misc-expenses', { method: 'POST', body: JSON.stringify(body) })
-export const apiDeleteMiscExpense = (id)   => request(`/misc-expenses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiCreateMiscExpense = (body)     => request('/misc-expenses', { method: 'POST', body: JSON.stringify(body) })
+export const apiUpdateMiscExpense = (id, body) => request(`/misc-expenses/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) })
+export const apiDeleteMiscExpense = (id)       => request(`/misc-expenses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
 // ── Period Locks ──────────────────────────────────────────────────────────────
 

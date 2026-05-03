@@ -793,6 +793,14 @@ export async function sumMiscExpensesByCategory({ from, to } = {}) {
   return rows.map(r => ({ category: r.category, total: parseFloat(r.total || 0) }))
 }
 
+export async function updateMiscExpense(id, { name, category, amount, expenseDate, note }) {
+  const [res] = await pool.query(
+    'UPDATE misc_expenses SET name = ?, category = ?, amount = ?, expense_date = ?, note = ? WHERE id = ?',
+    [name, category || '其他', amount, expenseDate, note || '', id]
+  )
+  return res.affectedRows > 0
+}
+
 export async function deleteMiscExpense(id) {
   const [res] = await pool.query('DELETE FROM misc_expenses WHERE id = ?', [id])
   return res.affectedRows > 0
