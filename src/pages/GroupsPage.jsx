@@ -310,16 +310,16 @@ export default function GroupsPage() {
           <table className="entity-table groups-table">
             <colgroup>
               <col style={{ width: 36 }} />
-              <col style={{ width: 160 }} />
-              <col style={{ width: 170 }} />
-              <col style={{ width: 170 }} />
-              <col style={{ width: 100 }} />
+              <col style={{ width: 140 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 140 }} />
               <col style={{ width: 90 }} />
-              {canViewRates && <col style={{ width: 100 }} />}
-              <col style={{ width: 130 }} />
               <col style={{ width: 80 }} />
+              {canViewRates && <col style={{ width: 90 }} />}
+              <col style={{ width: 110 }} />
+              <col style={{ width: 70 }} />
               <col />
-              <col style={{ width: 130 }} />
+              <col style={{ width: 120 }} />
             </colgroup>
             <thead>
               <tr>
