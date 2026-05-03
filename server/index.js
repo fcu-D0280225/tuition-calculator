@@ -21,6 +21,8 @@ import {
   listGroupMembers, setGroupMembers,
   // misc expenses
   listMiscExpenses, insertMiscExpense, deleteMiscExpense, sumMiscExpensesByCategory,
+  // material cost
+  sumMaterialCost,
   // period locks
   listPeriodLocks, insertPeriodLock, deletePeriodLock,
   isDateLocked, isLessonLocked, isGroupRecordLocked,
@@ -768,19 +770,20 @@ app.get('/api/settlement/profit-loss', async (req, res) => {
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   try {
-    const [tuition, salary, expensesByCat] = await Promise.all([
+    const [tuition, salary, expensesByCat, materialCost] = await Promise.all([
       settlementTuition(from, to),
       settlementSalary(from, to),
       sumMiscExpensesByCategory({ from, to }),
+      sumMaterialCost({ from, to }),
     ])
     const tuitionTotal = (tuition || []).reduce((s, st) => s + parseFloat(st.total || 0), 0)
     const salaryTotal  = (salary  || []).reduce((s, t)  => s + parseFloat(t.total  || 0), 0)
     const expenseTotal = expensesByCat.reduce((s, c) => s + parseFloat(c.total || 0), 0)
-    const profit = tuitionTotal - salaryTotal - expenseTotal
+    const profit = tuitionTotal - salaryTotal - materialCost - expenseTotal
     res.json({
       from, to,
       revenue: { tuition: tuitionTotal },
-      cost:    { salary: salaryTotal },
+      cost:    { salary: salaryTotal, materials: materialCost },
       expenses: {
         by_category: expensesByCat,
         total: expenseTotal,

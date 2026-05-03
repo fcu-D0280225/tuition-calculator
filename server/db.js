@@ -159,6 +159,7 @@ export async function initSchema() {
       student_id   VARCHAR(64)    NOT NULL,
       material_id  VARCHAR(64)    NOT NULL,
       quantity     DECIMAL(8,2)   NOT NULL DEFAULT 1,
+      unit_price   DECIMAL(10,2)  NULL DEFAULT NULL,
       record_date  DATE           NOT NULL,
       note         VARCHAR(256)   NOT NULL DEFAULT '',
       created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -395,6 +396,22 @@ export async function initSchema() {
       INDEX idx_misc_category (category)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  // Migration: material_records 補 unit_price 欄位（snapshot 當下教材單價，避免日後改價回溯改帳）
+  const [mrUnitCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_records' AND COLUMN_NAME = 'unit_price'`
+  )
+  if (mrUnitCols.length === 0) {
+    await pool.query(`ALTER TABLE material_records ADD COLUMN unit_price DECIMAL(10,2) NULL DEFAULT NULL AFTER quantity`)
+    // 既有紀錄用目前 materials.unit_price 回填，之後改價就不會動到舊紀錄
+    await pool.query(`
+      UPDATE material_records mr
+      JOIN materials m ON m.id = mr.material_id
+      SET mr.unit_price = m.unit_price
+      WHERE mr.unit_price IS NULL
+    `)
+  }
 
   // Migration: misc_expenses 補 category 欄位（房租／水電／行銷／其他）
   const [meCatCols] = await pool.query(
@@ -1305,7 +1322,8 @@ export async function listMaterialRecords({ from, to, studentId } = {}) {
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
   const [rows] = await pool.query(
     `SELECT mr.id, mr.student_id, s.name AS student_name,
-            mr.material_id, m.name AS material_name, m.unit_price,
+            mr.material_id, m.name AS material_name,
+            COALESCE(mr.unit_price, m.unit_price) AS unit_price,
             mr.quantity, mr.record_date, mr.note
      FROM material_records mr
      JOIN students  s ON s.id = mr.student_id
@@ -1317,21 +1335,49 @@ export async function listMaterialRecords({ from, to, studentId } = {}) {
   return rows
 }
 
-export async function insertMaterialRecord({ id, studentId, materialId, quantity, recordDate, note }) {
+export async function insertMaterialRecord({ id, studentId, materialId, quantity, recordDate, note, unitPrice }) {
+  // 沒指定就 snapshot 當下 materials.unit_price
+  let snapPrice = unitPrice
+  if (snapPrice === undefined || snapPrice === null) {
+    const [matRows] = await pool.query('SELECT unit_price FROM materials WHERE id = ? LIMIT 1', [materialId])
+    snapPrice = matRows[0]?.unit_price ?? 0
+  }
   await pool.query(
-    `INSERT INTO material_records (id, student_id, material_id, quantity, record_date, note)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, studentId, materialId, quantity ?? 1, recordDate, note || '']
+    `INSERT INTO material_records (id, student_id, material_id, quantity, unit_price, record_date, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, studentId, materialId, quantity ?? 1, snapPrice, recordDate, note || '']
   )
 }
 
-export async function updateMaterialRecord(id, { studentId, materialId, quantity, recordDate, note }) {
+export async function sumMaterialCost({ from, to } = {}) {
+  const conds = []; const params = []
+  if (from) { conds.push('mr.record_date >= ?'); params.push(from) }
+  if (to)   { conds.push('mr.record_date <= ?'); params.push(to) }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
+  const [rows] = await pool.query(
+    `SELECT COALESCE(SUM(mr.quantity * COALESCE(mr.unit_price, m.unit_price)), 0) AS total
+       FROM material_records mr
+       JOIN materials m ON m.id = mr.material_id
+       ${where}`,
+    params
+  )
+  return parseFloat(rows[0]?.total || 0)
+}
+
+export async function updateMaterialRecord(id, { studentId, materialId, quantity, recordDate, note, unitPrice }) {
   const sets = []; const params = []
   if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
   if (materialId !== undefined) { sets.push('material_id = ?'); params.push(materialId) }
   if (quantity   !== undefined) { sets.push('quantity = ?');    params.push(quantity) }
   if (recordDate !== undefined) { sets.push('record_date = ?'); params.push(recordDate) }
   if (note       !== undefined) { sets.push('note = ?');        params.push(note) }
+  // 換教材時自動 re-snapshot 當下的單價（除非呼叫端明確傳 unitPrice）
+  if (unitPrice !== undefined) {
+    sets.push('unit_price = ?'); params.push(unitPrice)
+  } else if (materialId !== undefined) {
+    const [mr] = await pool.query('SELECT unit_price FROM materials WHERE id = ? LIMIT 1', [materialId])
+    sets.push('unit_price = ?'); params.push(mr[0]?.unit_price ?? 0)
+  }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE material_records SET ${sets.join(', ')} WHERE id = ?`, params)

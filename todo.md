@@ -23,9 +23,10 @@
 - 同學生 + 同課程 + 同日重複建立會跳警告
 - 逐日可設定 `start_time`，每筆時數依課程預設
 
-### 4. 教材費用統計 ☑️
+### 4. 教材費用統計 ✅
 - `materials` / `material_records` 表 + `MaterialsPage`
-- **缺**：教材成本尚未進入損益／結算（目前只是紀錄）
+- 紀錄時 snapshot 當下的 `unit_price` 到 `material_records.unit_price`，避免日後改價回溯
+- 已併入損益報表的「教材成本」
 
 ### 5. 匯總報表（課時與收費） ✅
 - `SettlementPage` / `TuitionSettlementPage` / `SalarySettlementPage`
@@ -69,10 +70,10 @@
 - `misc_expenses.category` 欄位已加（房租／水電／行銷／其他），`MiscPage` 可選擇類別、依類別篩選 / 分類小計
 - 後端 `GET /api/misc-expenses/summary?from&to` 依類別彙總
 
-### 3. 全面損益報表 ☑️
-- 新增 `ProfitLossPage`：學費收入 − 老師薪資 − 營業費用（依類別分項）− 淨利
+### 3. 全面損益報表 ✅
+- 新增 `ProfitLossPage`：學費收入 − 老師薪資 − 教材成本 − 營業費用（依類別分項）− 淨利
 - 後端 `GET /api/settlement/profit-loss?from&to`
-- **缺**：教材成本（待 `material_records.unit_price` snapshot 完成後加入）
+- 教材成本以「紀錄當下」的單價 snapshot 計算（`material_records.unit_price`）
 
 ---
 
@@ -82,10 +83,11 @@
 
 - [x] **雜支分類**：`misc_expenses.category` + UI ✅（2026-05-03 完成）
 - [x] **損益報表頁面**：`ProfitLossPage` ✅（2026-05-03 完成，待教材成本）
-- [ ] **教材成本進入損益**（⚠️ 需確認再做）：
-  - `material_records` 需加 `unit_price` snapshot（目前是即時用 `materials.unit_price` × quantity 算）
-  - 影響：歷史紀錄調價會回溯改變過去帳目（已存在 vs 想要的行為？）
-  - **暫停等確認**：是否在 `material_records` 加 `unit_price` 欄位 + migration 把現有資料回填？
+- [x] **教材成本進入損益** ✅（2026-05-03 完成）
+  - `material_records.unit_price` snapshot 欄位 + migration 回填既有資料
+  - `insertMaterialRecord` 預設 snapshot 當下的 `materials.unit_price`；`updateMaterialRecord` 換教材時自動 re-snapshot
+  - `listMaterialRecords` 用 `COALESCE(mr.unit_price, m.unit_price)`，舊資料無 snapshot 時 fallback 用當前單價
+  - P&L 端點新增 `cost.materials`，UI 加列「教材成本」
 - [ ] **角色化欄位顯示**（⚠️ 需確認再做）：
   - 老師登入後上課紀錄 / 課表只顯示堂數、時數、學生，不顯示時薪 / 學費
   - 財務角色看不到出席勾選等老師專屬操作

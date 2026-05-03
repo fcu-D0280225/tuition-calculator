@@ -69,6 +69,11 @@ export default function ProfitLossPage() {
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>− {amt(data.cost.salary)} 元</td>
               </tr>
 
+              <tr style={{ background: 'var(--danger-light)' }}>
+                <th style={{ textAlign: 'left' }}>教材成本</th>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>− {amt(data.cost.materials || 0)} 元</td>
+              </tr>
+
               <tr>
                 <th style={{ textAlign: 'left' }}>
                   營業費用合計
@@ -98,7 +103,7 @@ export default function ProfitLossPage() {
           </table>
 
           <div style={{ marginTop: 12, color: 'var(--muted)', fontSize: 12 }}>
-            注意：教材成本目前尚未列入此表（待實作）。
+            教材成本以「紀錄當下」的單價 snapshot 計算，日後調整教材單價不會回溯改變過去帳目。
           </div>
         </div>
       )}
