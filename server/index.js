@@ -443,7 +443,7 @@ app.patch('/api/lessons/:id', async (req, res) => {
   const update = {}
   if (student_id        !== undefined) update.studentId        = student_id
   if (course_id         !== undefined) update.courseId         = course_id
-  if (teacher_id        !== undefined) update.teacherId        = teacher_id
+  if (teacher_id        !== undefined) update.teacherId        = (teacher_id === null || teacher_id === '') ? null : String(teacher_id)
   if (hours             !== undefined) update.hours            = parseFloat(hours)
   if (lesson_date       !== undefined) update.lessonDate       = lesson_date
   if (start_time        !== undefined) update.startTime        = (start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(start_time)) ? start_time : null

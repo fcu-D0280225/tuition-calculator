@@ -74,7 +74,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
     try {
       await Promise.all(rosterIds.map(sid =>
         apiUpdateLesson(session.existingMap[sid], {
-          teacher_id: teacherId,
+          teacher_id: teacherId || null,
           hours: h,
           start_time: startTime || null,
           status: checked.has(sid) ? 'attended' : 'pending',
@@ -457,7 +457,7 @@ export default function AttendancePage() {
         await Promise.all(
           Array.from(rosterIds).map(sid =>
             apiUpdateLesson(existingMap[sid], {
-              teacher_id: selectedTeacher,
+              teacher_id: selectedTeacher || null,
               hours,
               start_time: tutoringStart || null,
               status: checked.has(sid) ? 'attended' : 'pending',
