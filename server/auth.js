@@ -19,6 +19,7 @@ export const VALID_NAV_IDS = [
   'settlement',
   'settlement_tuition',
   'settlement_salary',
+  'profit_loss',
   'students',
   'teachers',
   'schedule',

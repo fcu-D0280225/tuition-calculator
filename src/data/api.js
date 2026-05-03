@@ -191,12 +191,20 @@ export const apiDeletePaymentRecord = (id) =>
 
 // ── Misc Expenses ─────────────────────────────────────────────────────────────
 
-export const apiListMiscExpenses = ({ from, to } = {}) => {
+export const apiListMiscExpenses = ({ from, to, category } = {}) => {
+  const params = new URLSearchParams()
+  if (from)     params.set('from', from)
+  if (to)       params.set('to', to)
+  if (category) params.set('category', category)
+  const qs = params.toString()
+  return request(`/misc-expenses${qs ? '?' + qs : ''}`)
+}
+export const apiSumMiscExpensesByCategory = ({ from, to } = {}) => {
   const params = new URLSearchParams()
   if (from) params.set('from', from)
   if (to)   params.set('to', to)
   const qs = params.toString()
-  return request(`/misc-expenses${qs ? '?' + qs : ''}`)
+  return request(`/misc-expenses/summary${qs ? '?' + qs : ''}`)
 }
 export const apiCreateMiscExpense = (body) => request('/misc-expenses', { method: 'POST', body: JSON.stringify(body) })
 export const apiDeleteMiscExpense = (id)   => request(`/misc-expenses/${encodeURIComponent(id)}`, { method: 'DELETE' })
@@ -214,6 +222,9 @@ export const apiSettlementTuition = (from, to) =>
 
 export const apiSettlementSalary = (from, to) =>
   request(`/settlement/salary?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+
+export const apiProfitLoss = (from, to) =>
+  request(`/settlement/profit-loss?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
 
 // ── Leave Requests ────────────────────────────────────────────────────────────
 

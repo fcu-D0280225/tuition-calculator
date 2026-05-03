@@ -20,7 +20,7 @@ import {
   listGroupRecords, insertGroupRecord, updateGroupRecord, deleteGroupRecord,
   listGroupMembers, setGroupMembers,
   // misc expenses
-  listMiscExpenses, insertMiscExpense, deleteMiscExpense,
+  listMiscExpenses, insertMiscExpense, deleteMiscExpense, sumMiscExpensesByCategory,
   // period locks
   listPeriodLocks, insertPeriodLock, deletePeriodLock,
   isDateLocked, isLessonLocked, isGroupRecordLocked,
@@ -347,8 +347,14 @@ app.delete('/api/period-locks/:id', async (req, res) => {
 // ── Misc Expenses ─────────────────────────────────────────────────────────────
 
 app.get('/api/misc-expenses', async (req, res) => {
+  const { from, to, category } = req.query
+  try { res.json(await listMiscExpenses({ from, to, category })) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.get('/api/misc-expenses/summary', async (req, res) => {
   const { from, to } = req.query
-  try { res.json(await listMiscExpenses({ from, to })) }
+  try { res.json(await sumMiscExpensesByCategory({ from, to })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -360,10 +366,11 @@ app.post('/api/misc-expenses', async (req, res) => {
   const expense_date = req.body?.expense_date
   if (!expense_date || !/^\d{4}-\d{2}-\d{2}$/.test(expense_date)) return res.status(400).json({ error: 'invalid_expense_date' })
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
+  const category = typeof req.body?.category === 'string' && req.body.category.trim() ? req.body.category.trim() : '其他'
   const id = `me_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   try {
-    await insertMiscExpense({ id, name, amount, expenseDate: expense_date, note })
-    res.status(201).json({ id, name, amount, expense_date, note })
+    await insertMiscExpense({ id, name, category, amount, expenseDate: expense_date, note })
+    res.status(201).json({ id, name, category, amount, expense_date, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -755,6 +762,32 @@ app.get('/api/settlement/salary', async (req, res) => {
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   try { res.json(await settlementSalary(from, to)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.get('/api/settlement/profit-loss', async (req, res) => {
+  const { from, to } = req.query
+  if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
+  try {
+    const [tuition, salary, expensesByCat] = await Promise.all([
+      settlementTuition(from, to),
+      settlementSalary(from, to),
+      sumMiscExpensesByCategory({ from, to }),
+    ])
+    const tuitionTotal = (tuition || []).reduce((s, st) => s + parseFloat(st.total || 0), 0)
+    const salaryTotal  = (salary  || []).reduce((s, t)  => s + parseFloat(t.total  || 0), 0)
+    const expenseTotal = expensesByCat.reduce((s, c) => s + parseFloat(c.total || 0), 0)
+    const profit = tuitionTotal - salaryTotal - expenseTotal
+    res.json({
+      from, to,
+      revenue: { tuition: tuitionTotal },
+      cost:    { salary: salaryTotal },
+      expenses: {
+        by_category: expensesByCat,
+        total: expenseTotal,
+      },
+      profit,
+    })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Leave Requests ────────────────────────────────────────────────────────────

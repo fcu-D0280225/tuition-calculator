@@ -386,13 +386,25 @@ export async function initSchema() {
     CREATE TABLE IF NOT EXISTS misc_expenses (
       id           VARCHAR(64)    NOT NULL PRIMARY KEY,
       name         VARCHAR(128)   NOT NULL,
+      category     VARCHAR(32)    NOT NULL DEFAULT '其他',
       amount       DECIMAL(10,2)  NOT NULL DEFAULT 0,
       expense_date DATE           NOT NULL,
       note         VARCHAR(256)   NOT NULL DEFAULT '',
       created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_misc_date (expense_date)
+      INDEX idx_misc_date (expense_date),
+      INDEX idx_misc_category (category)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  // Migration: misc_expenses 補 category 欄位（房租／水電／行銷／其他）
+  const [meCatCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'misc_expenses' AND COLUMN_NAME = 'category'`
+  )
+  if (meCatCols.length === 0) {
+    await pool.query(`ALTER TABLE misc_expenses ADD COLUMN category VARCHAR(32) NOT NULL DEFAULT '其他' AFTER name`)
+    await pool.query(`ALTER TABLE misc_expenses ADD INDEX idx_misc_category (category)`)
+  }
 
   // Migration: 把 lesson_records.teacher_id 改成 nullable（允許未指派老師的上課紀錄）
   const [lrTeacherCol] = await pool.query(
@@ -723,23 +735,36 @@ export async function isGroupRecordLocked(id) {
 
 // ── Misc Expenses ────────────────────────────────────────────────────────────
 
-export async function listMiscExpenses({ from, to } = {}) {
+export async function listMiscExpenses({ from, to, category } = {}) {
   const conds = []; const params = []
-  if (from) { conds.push('expense_date >= ?'); params.push(from) }
-  if (to)   { conds.push('expense_date <= ?'); params.push(to) }
+  if (from)     { conds.push('expense_date >= ?'); params.push(from) }
+  if (to)       { conds.push('expense_date <= ?'); params.push(to) }
+  if (category) { conds.push('category = ?');      params.push(category) }
   const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
   const [rows] = await pool.query(
-    `SELECT id, name, amount, expense_date, note FROM misc_expenses ${where} ORDER BY expense_date DESC, created_at DESC`,
+    `SELECT id, name, category, amount, expense_date, note FROM misc_expenses ${where} ORDER BY expense_date DESC, created_at DESC`,
     params
   )
   return rows.map(r => ({ ...r, amount: parseFloat(r.amount) }))
 }
 
-export async function insertMiscExpense({ id, name, amount, expenseDate, note }) {
+export async function insertMiscExpense({ id, name, category, amount, expenseDate, note }) {
   await pool.query(
-    'INSERT INTO misc_expenses (id, name, amount, expense_date, note) VALUES (?, ?, ?, ?, ?)',
-    [id, name, amount, expenseDate, note || '']
+    'INSERT INTO misc_expenses (id, name, category, amount, expense_date, note) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, name, category || '其他', amount, expenseDate, note || '']
   )
+}
+
+export async function sumMiscExpensesByCategory({ from, to } = {}) {
+  const conds = []; const params = []
+  if (from) { conds.push('expense_date >= ?'); params.push(from) }
+  if (to)   { conds.push('expense_date <= ?'); params.push(to) }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
+  const [rows] = await pool.query(
+    `SELECT category, SUM(amount) AS total FROM misc_expenses ${where} GROUP BY category ORDER BY category ASC`,
+    params
+  )
+  return rows.map(r => ({ category: r.category, total: parseFloat(r.total || 0) }))
 }
 
 export async function deleteMiscExpense(id) {

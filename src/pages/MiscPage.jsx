@@ -5,13 +5,15 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const EMPTY = { name: '', amount: '', expense_date: todayStr(), note: '' }
+const CATEGORIES = ['房租', '水電', '行銷', '其他']
+const EMPTY = { name: '', category: '其他', amount: '', expense_date: todayStr(), note: '' }
 
 export default function MiscPage() {
   const [items, setItems]     = useState([])
   const [form, setForm]       = useState(EMPTY)
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo,   setFilterTo]   = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [error,   setError]   = useState('')
@@ -39,11 +41,12 @@ export default function MiscPage() {
     if (!form.expense_date) { setError('請選擇日期'); return }
     setSaving(true); setError('')
     try {
-      await apiCreateMiscExpense({ name, amount, expense_date: form.expense_date, note: form.note.trim() })
-      setForm({ ...EMPTY, expense_date: form.expense_date })
+      await apiCreateMiscExpense({ name, category: form.category || '其他', amount, expense_date: form.expense_date, note: form.note.trim() })
+      setForm({ ...EMPTY, category: form.category, expense_date: form.expense_date })
       await reload({
         from: filterFrom || undefined,
         to:   filterTo   || undefined,
+        category: filterCategory || undefined,
       })
     } catch (e) {
       setError(`新增失敗：${e?.message || e}`)
@@ -67,14 +70,23 @@ export default function MiscPage() {
 
   function handleFilter(e) {
     e.preventDefault()
-    reload({ from: filterFrom || undefined, to: filterTo || undefined })
+    reload({
+      from: filterFrom || undefined,
+      to:   filterTo   || undefined,
+      category: filterCategory || undefined,
+    })
   }
   function resetFilter() {
-    setFilterFrom(''); setFilterTo('')
+    setFilterFrom(''); setFilterTo(''); setFilterCategory('')
     reload({})
   }
 
   const total = items.reduce((s, it) => s + parseFloat(it.amount || 0), 0)
+  const subtotalByCategory = items.reduce((map, it) => {
+    const k = it.category || '其他'
+    map[k] = (map[k] || 0) + parseFloat(it.amount || 0)
+    return map
+  }, {})
 
   return (
     <div className="page">
@@ -86,6 +98,14 @@ export default function MiscPage() {
         <div className="form-section-title">新增雜項</div>
         <form className="lesson-form" onSubmit={handleAdd}>
           <div className="lesson-form-row">
+            <label>類別
+              <select
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+              >
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </label>
             <label>名稱
               <input type="text" placeholder="例如：水電費"
                 value={form.name}
@@ -121,10 +141,24 @@ export default function MiscPage() {
         <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} title="開始日期" />
         <span>—</span>
         <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} title="結束日期" />
+        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)} title="類別篩選">
+          <option value="">全部類別</option>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
         <button className="btn-sm btn-primary" type="submit">篩選</button>
         <button className="btn-sm" type="button" onClick={resetFilter}>重設</button>
         <span style={{ marginLeft: 12, color: 'var(--muted)' }}>合計：<strong>{total.toLocaleString()}</strong> 元</span>
       </form>
+
+      {items.length > 0 && Object.keys(subtotalByCategory).length > 1 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, margin: '8px 0 12px', fontSize: 13, color: 'var(--muted)' }}>
+          {CATEGORIES.filter(c => subtotalByCategory[c]).map(c => (
+            <span key={c} style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 999 }}>
+              {c}：<strong style={{ color: 'var(--text)' }}>{subtotalByCategory[c].toLocaleString()}</strong> 元
+            </span>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="loading">載入中⋯</div>
@@ -135,6 +169,7 @@ export default function MiscPage() {
           <thead>
             <tr>
               <th>日期</th>
+              <th>類別</th>
               <th>名稱</th>
               <th>金額</th>
               <th>備註</th>
@@ -145,6 +180,7 @@ export default function MiscPage() {
             {items.map(it => (
               <tr key={it.id}>
                 <td>{String(it.expense_date).slice(0, 10)}</td>
+                <td>{it.category || '其他'}</td>
                 <td>{it.name}</td>
                 <td>{parseFloat(it.amount).toLocaleString()}</td>
                 <td className="note-cell">{it.note}</td>
