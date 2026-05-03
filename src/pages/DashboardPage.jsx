@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiSettlementTuition, apiSettlementSalary, apiListMiscExpenses } from '../data/api.js'
+import { apiSettlementTuition, apiSettlementSalary, apiListMiscExpenses, apiProfitLoss } from '../data/api.js'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -72,6 +72,7 @@ export default function DashboardPage() {
   const [tuition, setTuition] = useState(null)
   const [salary, setSalary]   = useState(null)
   const [misc, setMisc]       = useState(null)
+  const [pl, setPl]           = useState(null) // 損益匯總（含教材成本 + 雜支分類）
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
@@ -83,12 +84,13 @@ export default function DashboardPage() {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const [t, s, m] = await Promise.all([
+      const [t, s, m, p] = await Promise.all([
         apiSettlementTuition(from, to),
         apiSettlementSalary(from, to),
         apiListMiscExpenses({ from, to }).catch(() => []),
+        apiProfitLoss(from, to).catch(() => null),
       ])
-      setTuition(t); setSalary(s); setMisc(m)
+      setTuition(t); setSalary(s); setMisc(m); setPl(p)
     } catch {
       setError('載入資料失敗')
     } finally {
@@ -96,11 +98,14 @@ export default function DashboardPage() {
     }
   }
 
-  const totalIncome  = tuition ? tuition.reduce((sum, s) => sum + s.total, 0) : 0
-  const salaryTotal  = salary  ? salary.reduce((sum, t) => sum + t.total, 0)  : 0
-  const miscTotal    = misc    ? misc.reduce((sum, m) => sum + parseFloat(m.amount || 0), 0) : 0
-  const totalExpense = salaryTotal + miscTotal
-  const netProfit    = totalIncome - totalExpense
+  // 收入：以結算學費為準（與 P&L 端點一致）
+  const totalIncome  = pl?.revenue?.tuition ?? (tuition ? tuition.reduce((sum, s) => sum + s.total, 0) : 0)
+  const salaryTotal  = pl?.cost?.salary    ?? (salary  ? salary.reduce((sum, t) => sum + t.total, 0)  : 0)
+  const materialCost = pl?.cost?.materials ?? 0
+  const miscTotal    = pl?.expenses?.total ?? (misc ? misc.reduce((sum, m) => sum + parseFloat(m.amount || 0), 0) : 0)
+  const totalExpense = salaryTotal + materialCost + miscTotal
+  const netProfit    = pl?.profit ?? (totalIncome - totalExpense)
+  const expenseCategories = pl?.expenses?.by_category || []
 
   const studentBars = (tuition || []).map(s => ({ label: s.student_name, value: s.total }))
   const teacherBars = (salary  || []).map(t => ({ label: t.teacher_name, value: t.total }))
@@ -110,7 +115,7 @@ export default function DashboardPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>財務總覽</h1>
+        <h1>財務總覽（損益）</h1>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>
@@ -143,7 +148,9 @@ export default function DashboardPage() {
             <div className="dashboard-card dashboard-card--expense">
               <div className="dashboard-card-label">總支出</div>
               <div className="dashboard-card-value">{amt(totalExpense)}</div>
-              <div className="dashboard-card-sub">老師薪資 {amt(salaryTotal)}　＋雜項 {amt(miscTotal)}</div>
+              <div className="dashboard-card-sub">
+                老師薪資 {amt(salaryTotal)}　＋教材 {amt(materialCost)}　＋雜項 {amt(miscTotal)}
+              </div>
             </div>
             <div className={`dashboard-card ${netProfit >= 0 ? 'dashboard-card--profit' : 'dashboard-card--loss'}`}>
               <div className="dashboard-card-label">淨利</div>
@@ -153,6 +160,17 @@ export default function DashboardPage() {
               <div className="dashboard-card-sub">收入 − 支出</div>
             </div>
           </div>
+
+          {expenseCategories.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '8px 0 16px', fontSize: 13, color: 'var(--muted)' }}>
+              <span>營業費用分類：</span>
+              {expenseCategories.map(c => (
+                <span key={c.category} style={{ padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 999 }}>
+                  {c.category}：<strong style={{ color: 'var(--text)' }}>{amt(Math.round(c.total))}</strong>
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* ── 柱狀圖 ── */}
           <div className="settlement-section">

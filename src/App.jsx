@@ -11,7 +11,6 @@ import GroupLessonsPage    from './pages/GroupLessonsPage.jsx'
 import SettlementPage    from './pages/SettlementPage.jsx'
 import TuitionSettlementPage from './pages/TuitionSettlementPage.jsx'
 import SalarySettlementPage  from './pages/SalarySettlementPage.jsx'
-import ProfitLossPage        from './pages/ProfitLossPage.jsx'
 import MiscPage              from './pages/MiscPage.jsx'
 import MaterialsPage     from './pages/MaterialsPage.jsx'
 import GroupsPage        from './pages/GroupsPage.jsx'
@@ -45,7 +44,6 @@ const NAV = [
     { id: 'settlement_tuition', label: '學費結算' },
     { id: 'settlement_salary',  label: '老師薪資結算' },
     { id: 'settlement',         label: '結算總覽' },
-    { id: 'profit_loss',        label: '損益報表' },
   ]},
   { type: 'group', key: 'admin', label: '管理', children: [
     { id: 'dashboard', label: '財務總覽' },
@@ -60,7 +58,9 @@ function filterNav(perms, isAdmin) {
     // 舊 'lessons' 權限視同包含拆分後的兩個頁
     if ((id === 'lessons_tutoring' || id === 'lessons_group') && perms.includes('lessons')) return true
     // 舊 'settlement' 權限視同含三個結算子頁
-    if ((id === 'settlement_tuition' || id === 'settlement_salary' || id === 'profit_loss') && perms.includes('settlement')) return true
+    if ((id === 'settlement_tuition' || id === 'settlement_salary') && perms.includes('settlement')) return true
+    // 損益報表已併入「財務總覽」：給 profit_loss 權限的人，自動視為有 dashboard 權限
+    if (id === 'dashboard' && perms.includes('profit_loss')) return true
     if (id === 'users' && isAdmin) return true
     return false
   }
@@ -334,7 +334,6 @@ export default function App() {
             {tab === 'settlement'         && <SettlementPage />}
             {tab === 'settlement_tuition' && <TuitionSettlementPage />}
             {tab === 'settlement_salary'  && <SalarySettlementPage />}
-            {tab === 'profit_loss'        && <ProfitLossPage />}
             {tab === 'misc'               && <MiscPage />}
             {tab === 'students'   && <StudentsPage onEnroll={openStudentEnroll} />}
             {tab === 'student_enroll' && enrollContext && (
