@@ -20,6 +20,8 @@ export const VALID_NAV_IDS = [
   'settlement_tuition',
   'settlement_salary',
   'profit_loss',
+  // 功能權限（非實際 nav）：是否可看時薪/金額欄位
+  'view_rates',
   'students',
   'teachers',
   'schedule',
@@ -126,10 +128,24 @@ export async function initAuthSchema() {
       'attendance',
       'lessons', 'lessons_tutoring', 'lessons_group',
       'schedule', 'students', 'materials', 'courses', 'groups',
+      // 注意：刻意不含 'view_rates'，老師預設看不到時薪/金額
     ]
     const values = teacherPerms.map(n => [teacherGroupId, n])
     await pool.query('INSERT INTO auth_group_permissions (group_id, nav_id) VALUES ?', [values])
   }
+
+  // Migration: 既有的非「老師」群組，若還沒有 view_rates 權限就補上一筆
+  // （新加入的功能權限，舊用戶要保持看得到時薪／金額）
+  await pool.query(
+    `INSERT IGNORE INTO auth_group_permissions (group_id, nav_id)
+     SELECT g.id, 'view_rates'
+       FROM auth_groups g
+       WHERE g.name <> '老師'
+         AND NOT EXISTS (
+           SELECT 1 FROM auth_group_permissions p
+            WHERE p.group_id = g.id AND p.nav_id = 'view_rates'
+         )`
+  )
 
   const [rows] = await pool.query('SELECT COUNT(*) AS n FROM auth_users')
   if (rows[0].n === 0) {

@@ -21,6 +21,8 @@ const NAV_OPTIONS = [
   { id: 'students',          label: '學生' },
   { id: 'teachers',          label: '老師' },
   { id: 'misc',              label: '雜項支出' },
+  { id: 'profit_loss',       label: '損益報表' },
+  { id: 'view_rates',        label: '【功能】顯示時薪／金額' },
 ]
 
 const EMPTY_NEW_USER  = { username: '', password: '', group_id: '', teacher_id: '' }

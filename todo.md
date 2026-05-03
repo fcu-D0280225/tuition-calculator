@@ -56,7 +56,8 @@
 
 ### 4. 介面顯示設定（角色化 UX） ☑️
 - 已有 nav-level 權限控制
-- **缺**：頁面內欄位的角色化（例如：老師看不到金額、財務看不到出席詳情）；需要在後端 API 與前端依 `is_admin` / 群組過濾
+- 新增 `view_rates` 功能權限：預設老師群組看不到時薪／金額（CoursesPage 的學費／老師時薪／每多一人折扣 columns 都會自動隱藏）
+- **未做**：其他金額欄位（雜項、教材單價／小計）目前未隱藏；視之後需求再延伸
 
 ---
 
@@ -88,11 +89,12 @@
   - `insertMaterialRecord` 預設 snapshot 當下的 `materials.unit_price`；`updateMaterialRecord` 換教材時自動 re-snapshot
   - `listMaterialRecords` 用 `COALESCE(mr.unit_price, m.unit_price)`，舊資料無 snapshot 時 fallback 用當前單價
   - P&L 端點新增 `cost.materials`，UI 加列「教材成本」
-- [ ] **角色化欄位顯示**（⚠️ 需確認再做）：
-  - 老師登入後上課紀錄 / 課表只顯示堂數、時數、學生，不顯示時薪 / 學費
-  - 財務角色看不到出席勾選等老師專屬操作
-  - 影響：API 與多個頁面顯示邏輯都要動，老師帳號目前看到的欄位會改變
-  - **暫停等確認**：要藏哪些欄位？是依 `auth_groups.name = '老師'` 判斷、還是另外加角色 flag？
+- [x] **角色化欄位顯示（金額）** ✅（2026-05-03 完成）
+  - 新增 `view_rates` 功能權限（VALID_NAV_IDS 內，UsersPage 顯示為「【功能】顯示時薪／金額」）
+  - 預設老師群組不含此權限；既有非老師群組由 migration 自動補上 `view_rates`，不影響現有可見性
+  - 新增 `AuthContext` / `useAuth()` 暴露 `canViewRates`
+  - CoursesPage 列表與新增表單依 `canViewRates` 隱藏「學費／老師時薪／每多一人」欄位
+  - 後續若要藏更多欄位（教材單價、雜支金額），讀同一個 flag 即可
 
 ### 中優先（體驗強化）
 

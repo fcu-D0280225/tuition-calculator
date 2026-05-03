@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
+import { AuthProvider } from './contexts/AuthContext.jsx'
 import CoursesPage       from './pages/CoursesPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
 import StudentEnrollPage from './pages/StudentEnrollPage.jsx'
@@ -200,6 +201,12 @@ export default function App() {
   }
 
   return (
+    <AuthProvider value={{
+      user: authState.user,
+      is_admin: authState.is_admin,
+      permissions: authState.permissions,
+      teacher_id: authState.teacher_id,
+    }}>
     <AppProviders>
       <div className="app-shell">
         {sidebarOpen && (
@@ -329,5 +336,6 @@ export default function App() {
         </div>
       </div>
     </AppProviders>
+    </AuthProvider>
   )
 }

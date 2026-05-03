@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import Combobox from '../components/Combobox.jsx'
 import { apiReorderCourses } from '../data/api.js'
 
 export default function CoursesPage() {
   const { state, loadCourses, createCourse, updateCourse, removeCourse } = useCourses()
   const { state: teachersState, loadTeachers } = useTeachers()
+  const { canViewRates } = useAuth()
   const { courses, loading } = state
   const { teachers } = teachersState
   const activeTeachers = teachers.filter(t => t.active !== 0)
@@ -130,36 +132,40 @@ export default function CoursesPage() {
                 onChange={e => setNewName(e.target.value)}
               />
             </label>
-            <label>學費（元/小時）
-              <input
-                type="number"
-                min="0"
-                step="1"
-                placeholder="例如 600"
-                value={newRate}
-                onChange={e => setNewRate(e.target.value)}
-              />
-            </label>
-            <label>老師時薪（元/小時）
-              <input
-                type="number"
-                min="0"
-                step="1"
-                placeholder="例如 400"
-                value={newTeacherRate}
-                onChange={e => setNewTeacherRate(e.target.value)}
-              />
-            </label>
-            <label title="N 人時學費 = 學費 − 此金額 × (N-1)。0 = 不打折">每多一人 −（元）
-              <input
-                type="number"
-                min="0"
-                step="1"
-                placeholder="例如 100"
-                value={newDiscountAmt}
-                onChange={e => setNewDiscountAmt(e.target.value)}
-              />
-            </label>
+            {canViewRates && (
+              <>
+                <label>學費（元/小時）
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="例如 600"
+                    value={newRate}
+                    onChange={e => setNewRate(e.target.value)}
+                  />
+                </label>
+                <label>老師時薪（元/小時）
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="例如 400"
+                    value={newTeacherRate}
+                    onChange={e => setNewTeacherRate(e.target.value)}
+                  />
+                </label>
+                <label title="N 人時學費 = 學費 − 此金額 × (N-1)。0 = 不打折">每多一人 −（元）
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="例如 100"
+                    value={newDiscountAmt}
+                    onChange={e => setNewDiscountAmt(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
             <label title="每堂課的預設時數，學生選課建立上課紀錄時會帶入">每堂時數
               <input
                 type="number"
@@ -186,8 +192,8 @@ export default function CoursesPage() {
             disabled={
               saving
               || !newName.trim()
-              || !newRate.trim() || parseFloat(newRate) <= 0
-              || !newTeacherRate.trim() || parseFloat(newTeacherRate) <= 0
+              || (canViewRates && (!newRate.trim() || parseFloat(newRate) <= 0))
+              || (canViewRates && (!newTeacherRate.trim() || parseFloat(newTeacherRate) <= 0))
             }
           >新增家教課</button>
         </form>
@@ -204,15 +210,24 @@ export default function CoursesPage() {
           <colgroup>
             <col style={{ width: 36 }} />
             <col />
-            <col style={{ width: 100 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 110 }} />
+            {canViewRates && <col style={{ width: 100 }} />}
+            {canViewRates && <col style={{ width: 110 }} />}
+            {canViewRates && <col style={{ width: 110 }} />}
             <col style={{ width: 100 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 150 }} />
           </colgroup>
           <thead>
-            <tr><th aria-label="拖曳排序"></th><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 −</th><th>每堂時數</th><th>預設老師</th><th></th></tr>
+            <tr>
+              <th aria-label="拖曳排序"></th>
+              <th>家教課名稱</th>
+              {canViewRates && <th>學費</th>}
+              {canViewRates && <th>老師時薪</th>}
+              {canViewRates && <th>每多一人 −</th>}
+              <th>每堂時數</th>
+              <th>預設老師</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
             {displayCourses.map(c => (
@@ -243,53 +258,59 @@ export default function CoursesPage() {
                     c.name
                   )}
                 </td>
-                <td>
-                  {editId === c.id ? (
-                    <input
-                      className="inline-edit-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={editRate}
-                      onChange={e => setEditRate(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (
-                    amt(c.hourly_rate)
-                  )}
-                </td>
-                <td>
-                  {editId === c.id ? (
-                    <input
-                      className="inline-edit-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={editTeacherRate}
-                      onChange={e => setEditTeacherRate(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (
-                    amt(c.teacher_hourly_rate ?? 0)
-                  )}
-                </td>
-                <td>
-                  {editId === c.id ? (
-                    <input
-                      className="inline-edit-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={editDiscountAmt}
-                      onChange={e => setEditDiscountAmt(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (
-                    c.discount_per_student && parseFloat(c.discount_per_student) > 0
-                      ? `−${parseFloat(c.discount_per_student).toLocaleString()}`
-                      : '—'
-                  )}
-                </td>
+                {canViewRates && (
+                  <td>
+                    {editId === c.id ? (
+                      <input
+                        className="inline-edit-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={editRate}
+                        onChange={e => setEditRate(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                      />
+                    ) : (
+                      amt(c.hourly_rate)
+                    )}
+                  </td>
+                )}
+                {canViewRates && (
+                  <td>
+                    {editId === c.id ? (
+                      <input
+                        className="inline-edit-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={editTeacherRate}
+                        onChange={e => setEditTeacherRate(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                      />
+                    ) : (
+                      amt(c.teacher_hourly_rate ?? 0)
+                    )}
+                  </td>
+                )}
+                {canViewRates && (
+                  <td>
+                    {editId === c.id ? (
+                      <input
+                        className="inline-edit-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={editDiscountAmt}
+                        onChange={e => setEditDiscountAmt(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                      />
+                    ) : (
+                      c.discount_per_student && parseFloat(c.discount_per_student) > 0
+                        ? `−${parseFloat(c.discount_per_student).toLocaleString()}`
+                        : '—'
+                    )}
+                  </td>
+                )}
                 <td>
                   {editId === c.id ? (
                     <input
