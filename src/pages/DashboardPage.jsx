@@ -127,6 +127,10 @@ export default function DashboardPage() {
 
       {error && <div className="error-msg">{error}</div>}
 
+      {!hasData && !loading && !error && (
+        <div className="empty-hint">選擇上方日期區間，點「產生報表」查看財務概況</div>
+      )}
+
       {hasData && (
         <>
           {/* ── 總覽卡片 ── */}

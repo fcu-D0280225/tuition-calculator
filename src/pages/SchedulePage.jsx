@@ -239,7 +239,7 @@ export default function SchedulePage() {
       {error && <div className="error-msg">{error}</div>}
 
       {!personId ? (
-        <div className="empty-hint">請先選擇{personLabel}</div>
+        <div className="empty-hint">請從上方選擇{personLabel}，即可查看當週課表</div>
       ) : loading ? (
         <div className="loading">載入中⋯</div>
       ) : (
