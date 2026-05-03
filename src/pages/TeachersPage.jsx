@@ -3,12 +3,14 @@ import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { apiReorderTeachers } from '../data/api.js'
 
 export default function TeachersPage() {
-  const { state, loadTeachers, createTeacher, renameTeacher, removeTeacher } = useTeachers()
+  const { state, loadTeachers, createTeacher, updateTeacher, removeTeacher } = useTeachers()
   const { teachers, loading } = state
 
   const [newName, setNewName]   = useState('')
+  const [newPhone, setNewPhone] = useState('')
   const [editId, setEditId]     = useState(null)
-  const [editVal, setEditVal]   = useState('')
+  const [editName, setEditName]   = useState('')
+  const [editPhone, setEditPhone] = useState('')
   const [error, setError]       = useState('')
   const [saving, setSaving]     = useState(false)
 
@@ -52,17 +54,28 @@ export default function TeachersPage() {
     const name = newName.trim()
     if (!name) return
     setSaving(true); setError('')
-    try { await createTeacher(name); setNewName('') }
+    try {
+      await createTeacher({ name, contact_phone: newPhone.trim() })
+      setNewName(''); setNewPhone('')
+    }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
   }
 
-  async function handleRename(id) {
-    const name = editVal.trim()
+  function startEdit(t) {
+    setEditId(t.id)
+    setEditName(t.name)
+    setEditPhone(t.contact_phone || '')
+  }
+
+  async function handleSaveEdit(id) {
+    const name = editName.trim()
     if (!name) return
     setSaving(true); setError('')
-    try { await renameTeacher(id, name); setEditId(null) }
-    catch { setError('更新失敗') }
+    try {
+      await updateTeacher(id, { name, contact_phone: editPhone.trim() })
+      setEditId(null)
+    } catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
 
@@ -87,6 +100,12 @@ export default function TeachersPage() {
           value={newName}
           onChange={e => setNewName(e.target.value)}
         />
+        <input
+          className="add-input"
+          placeholder="聯絡電話（選填）"
+          value={newPhone}
+          onChange={e => setNewPhone(e.target.value)}
+        />
         <button className="btn-primary" type="submit" disabled={saving || !newName.trim()}>新增老師</button>
       </form>
 
@@ -101,10 +120,11 @@ export default function TeachersPage() {
           <colgroup>
             <col style={{ width: 36 }} />
             <col />
+            <col />
             <col style={{ width: 150 }} />
           </colgroup>
           <thead>
-            <tr><th aria-label="拖曳排序"></th><th>老師姓名</th><th></th></tr>
+            <tr><th aria-label="拖曳排序"></th><th>老師姓名</th><th>聯絡電話</th><th></th></tr>
           </thead>
           <tbody>
             {displayTeachers.map(t => (
@@ -127,23 +147,37 @@ export default function TeachersPage() {
                     <input
                       autoFocus
                       className="inline-edit-input"
-                      value={editVal}
-                      onChange={e => setEditVal(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleRename(t.id); if (e.key === 'Escape') setEditId(null) }}
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(t.id); if (e.key === 'Escape') setEditId(null) }}
                     />
                   ) : (
                     t.name
                   )}
                 </td>
+                <td>
+                  {editId === t.id ? (
+                    <input
+                      className="inline-edit-input"
+                      placeholder="聯絡電話"
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value)}
+                    />
+                  ) : (
+                    t.contact_phone
+                      ? <a href={`tel:${t.contact_phone}`}>{t.contact_phone}</a>
+                      : <span style={{ color: 'var(--muted)' }}>—</span>
+                  )}
+                </td>
                 <td className="row-actions">
                   {editId === t.id ? (
                     <>
-                      <button className="btn-sm btn-primary" onClick={() => handleRename(t.id)} disabled={saving}>儲存</button>
+                      <button className="btn-sm btn-primary" onClick={() => handleSaveEdit(t.id)} disabled={saving}>儲存</button>
                       <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
                     </>
                   ) : (
                     <>
-                      <button className="btn-sm" onClick={() => { setEditId(t.id); setEditVal(t.name) }}>改名</button>
+                      <button className="btn-sm" onClick={() => startEdit(t)}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(t.id)} disabled={saving}>刪除</button>
                     </>
                   )}

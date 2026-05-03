@@ -8,6 +8,7 @@ import GroupLessonsPage    from './pages/GroupLessonsPage.jsx'
 import SettlementPage    from './pages/SettlementPage.jsx'
 import TuitionSettlementPage from './pages/TuitionSettlementPage.jsx'
 import SalarySettlementPage  from './pages/SalarySettlementPage.jsx'
+import MiscPage              from './pages/MiscPage.jsx'
 import MaterialsPage     from './pages/MaterialsPage.jsx'
 import GroupsPage        from './pages/GroupsPage.jsx'
 import DashboardPage     from './pages/DashboardPage.jsx'
@@ -33,6 +34,7 @@ const NAV = [
   { type: 'group', key: 'records', label: '紀錄', children: [
     { id: 'attendance', label: '點名' },
     { id: 'materials',  label: '教材' },
+    { id: 'misc',       label: '雜項支出' },
   ]},
   { type: 'tab', id: 'schedule', label: '課表' },
   { type: 'group', key: 'settlement', label: '結算', children: [
@@ -40,8 +42,10 @@ const NAV = [
     { id: 'settlement_salary',  label: '老師薪資結算' },
     { id: 'settlement',         label: '結算總覽' },
   ]},
-  { type: 'tab', id: 'users', label: '使用者管理' },
-  { type: 'tab', id: 'dashboard', label: '財務總覽' },
+  { type: 'group', key: 'admin', label: '管理', children: [
+    { id: 'dashboard', label: '財務總覽' },
+    { id: 'users',     label: '使用者管理' },
+  ]},
 ]
 
 function filterNav(perms, isAdmin) {
@@ -185,8 +189,7 @@ export default function App() {
                   </button>
                 )
               }
-              const containsActive = item.children.some(c => c.id === tab)
-              const collapsed = collapsedGroups.has(item.key) && !containsActive
+              const collapsed = collapsedGroups.has(item.key)
               return (
                 <div className={`nav-section${collapsed ? ' collapsed' : ''}`} key={item.key}>
                   <button
@@ -246,6 +249,7 @@ export default function App() {
             {tab === 'settlement'         && <SettlementPage />}
             {tab === 'settlement_tuition' && <TuitionSettlementPage />}
             {tab === 'settlement_salary'  && <SalarySettlementPage />}
+            {tab === 'misc'               && <MiscPage />}
             {tab === 'students'   && <StudentsPage />}
             {tab === 'teachers'   && <TeachersPage />}
             {tab === 'courses'    && <CoursesPage />}

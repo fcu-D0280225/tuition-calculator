@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiSettlementTuition, apiSettlementSalary } from '../data/api.js'
+import { apiSettlementTuition, apiSettlementSalary, apiListMiscExpenses } from '../data/api.js'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -71,6 +71,7 @@ export default function DashboardPage() {
   const [to, setTo]     = useState(lastDayOfMonth)
   const [tuition, setTuition] = useState(null)
   const [salary, setSalary]   = useState(null)
+  const [misc, setMisc]       = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
@@ -82,11 +83,12 @@ export default function DashboardPage() {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const [t, s] = await Promise.all([
+      const [t, s, m] = await Promise.all([
         apiSettlementTuition(from, to),
         apiSettlementSalary(from, to),
+        apiListMiscExpenses({ from, to }).catch(() => []),
       ])
-      setTuition(t); setSalary(s)
+      setTuition(t); setSalary(s); setMisc(m)
     } catch {
       setError('載入資料失敗')
     } finally {
@@ -95,7 +97,9 @@ export default function DashboardPage() {
   }
 
   const totalIncome  = tuition ? tuition.reduce((sum, s) => sum + s.total, 0) : 0
-  const totalExpense = salary  ? salary.reduce((sum, t) => sum + t.total, 0)  : 0
+  const salaryTotal  = salary  ? salary.reduce((sum, t) => sum + t.total, 0)  : 0
+  const miscTotal    = misc    ? misc.reduce((sum, m) => sum + parseFloat(m.amount || 0), 0) : 0
+  const totalExpense = salaryTotal + miscTotal
   const netProfit    = totalIncome - totalExpense
 
   const studentBars = (tuition || []).map(s => ({ label: s.student_name, value: s.total }))
@@ -135,7 +139,7 @@ export default function DashboardPage() {
             <div className="dashboard-card dashboard-card--expense">
               <div className="dashboard-card-label">總支出</div>
               <div className="dashboard-card-value">{amt(totalExpense)}</div>
-              <div className="dashboard-card-sub">老師薪資</div>
+              <div className="dashboard-card-sub">老師薪資 {amt(salaryTotal)}　＋雜項 {amt(miscTotal)}</div>
             </div>
             <div className={`dashboard-card ${netProfit >= 0 ? 'dashboard-card--profit' : 'dashboard-card--loss'}`}>
               <div className="dashboard-card-label">淨利</div>

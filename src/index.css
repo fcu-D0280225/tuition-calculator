@@ -2786,6 +2786,7 @@ select.catalog-input.catalog-select {
 
 .lesson-form select,
 .lesson-form input[type="date"],
+.lesson-form input[type="time"],
 .lesson-form input[type="text"],
 .lesson-form input[type="number"] {
   padding: 7px 10px;
@@ -3315,6 +3316,15 @@ select.catalog-input.catalog-select {
   border-color: var(--accent);
   color: var(--accent-dark);
   font-weight: 600;
+}
+.attendance-item--leave {
+  background: #fff8e1;
+  border-color: #ffb300;
+  color: #8d6e00;
+}
+.attendance-item--leave:hover {
+  background: #fff3c4;
+  border-color: #f59f00;
 }
 
 .attendance-item-all {
@@ -3993,6 +4003,29 @@ select.catalog-input.catalog-select {
   border-top: 2px solid var(--accent);
 }
 
+/* ── Lesson status tag ─────────────────────────────────────────────────── */
+.status-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-tag.status-attended { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+.status-tag.status-pending  { background: #eceff1; color: #546e7a; border-color: #b0bec5; }
+.status-tag.status-leave    { background: #fff3e0; color: #ef6c00; border-color: #ffcc80; }
+.status-tag.status-pre      { background: #f3e5f5; color: #6a1b9a; border-color: #ce93d8; }
+
+/* ── Inline time + duration edit cell ──────────────────────────────────── */
+.time-duration-edit {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.time-duration-edit > input { flex: 1; min-width: 0; }
+
 /* ── Enrollment list（已選課程） ────────────────────────────────────────── */
 .enrollment-list {
   list-style: none;
@@ -4211,4 +4244,54 @@ select.catalog-input.catalog-select {
   font-size: 13px;
   height: 30px;
   box-sizing: border-box;
+}
+
+/* add-form 內的 combobox 對齊 add-input：相同高度、padding、圓角 */
+.add-form .combobox-cell .combobox-input {
+  padding: 9px 12px;
+  font-size: 14px;
+  height: auto;
+  border-radius: var(--radius-md);
+}
+
+/* entity-table / lesson-table inline 編輯時的 combobox：對齊 inline-edit-input 高度 */
+.entity-table td .combobox-cell .combobox-input,
+.lesson-table  td .combobox-cell .combobox-input {
+  padding: 5px 9px;
+  font-size: 13px;
+  height: 30px;
+  box-sizing: border-box;
+}
+
+/* entity-table / lesson-table 編輯欄位不要把列撐爆：讓 input/select 跟著欄寬 */
+.entity-table td .inline-edit-input,
+.entity-table td select.inline-edit-input,
+.lesson-table  td .inline-edit-input,
+.lesson-table  td select.inline-edit-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+/* lesson-table 編輯模式 td 對齊（避免文字下沉） */
+.lesson-table td { vertical-align: middle; }
+
+/* 團課管理表格：fixed layout，避免內容把整列撐到超出螢幕 */
+.groups-table { table-layout: fixed; }
+.groups-table td, .groups-table th {
+  vertical-align: middle;
+  word-break: break-word;
+}
+/* 團課編輯時的 weekday picker 換行 */
+.groups-table .weekday-picker {
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.groups-table .weekday-chip {
+  padding: 2px 6px;
+  font-size: 12px;
+}
+/* 編輯模式下的時段（時間 + 時數）寬度收斂 */
+.groups-table .time-duration-edit > input {
+  width: 0;
+  min-width: 0;
 }

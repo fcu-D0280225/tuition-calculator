@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
-import { useStudents } from '../contexts/StudentsContext.jsx'
-import { apiListGroupMembers, apiSetGroupMembers, apiReorderGroups } from '../data/api.js'
+import { useTeachers } from '../contexts/TeachersContext.jsx'
+import Combobox from '../components/Combobox.jsx'
+import { apiListGroupMembers, apiReorderGroups } from '../data/api.js'
 
 const WEEKDAYS = [
   { value: 0, label: '日' },
@@ -50,11 +51,11 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', note: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', note: '', default_teacher_id: '' }
 
 export default function GroupsPage() {
   const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
-  const { state: studentsState, loadStudents } = useStudents()
+  const { state: teachersState, loadTeachers } = useTeachers()
 
   const [newGroup, setNewGroup]   = useState(EMPTY_GROUP)
   const [editId, setEditId]       = useState(null)
@@ -63,12 +64,6 @@ export default function GroupsPage() {
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
 
-  // 「報名學生」面板
-  const [memberGroup, setMemberGroup]   = useState(null)   // { id, name }
-  const [memberDraft, setMemberDraft]   = useState(new Set())
-  const [memberFilter, setMemberFilter] = useState('')
-  const [memberLoading, setMemberLoading] = useState(false)
-  const [memberSaving, setMemberSaving]   = useState(false)
   // 各團課人數快取（id -> count）
   const [memberCounts, setMemberCounts] = useState({})
 
@@ -108,7 +103,7 @@ export default function GroupsPage() {
   }
 
   useEffect(() => { loadGroups() }, [loadGroups])
-  useEffect(() => { loadStudents() }, [loadStudents])
+  useEffect(() => { loadTeachers() }, [loadTeachers])
 
   // 每個團課拉一次成員人數來顯示
   useEffect(() => {
@@ -128,44 +123,6 @@ export default function GroupsPage() {
     return () => { cancelled = true }
   }, [state.groups, memberCounts])
 
-  async function openMemberEditor(g) {
-    setMemberGroup({ id: g.id, name: g.name })
-    setMemberFilter('')
-    setMemberLoading(true)
-    try {
-      const rows = await apiListGroupMembers(g.id)
-      setMemberDraft(new Set(rows.map(r => r.id)))
-    } catch {
-      setMemberDraft(new Set())
-      setError('讀取報名名單失敗')
-    } finally {
-      setMemberLoading(false)
-    }
-  }
-
-  function toggleMemberDraft(studentId) {
-    setMemberDraft(prev => {
-      const next = new Set(prev)
-      if (next.has(studentId)) next.delete(studentId)
-      else next.add(studentId)
-      return next
-    })
-  }
-
-  async function saveMembers() {
-    if (!memberGroup || memberSaving) return
-    setMemberSaving(true)
-    try {
-      const rows = await apiSetGroupMembers(memberGroup.id, Array.from(memberDraft))
-      setMemberCounts(prev => ({ ...prev, [memberGroup.id]: rows.length }))
-      setMemberGroup(null)
-    } catch {
-      setError('儲存報名名單失敗')
-    } finally {
-      setMemberSaving(false)
-    }
-  }
-
   async function handleAddGroup(e) {
     e.preventDefault()
     const name = newGroup.name.trim()
@@ -178,7 +135,7 @@ export default function GroupsPage() {
     if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, note: newGroup.note })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, note: newGroup.note, default_teacher_id: newGroup.default_teacher_id || null })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -194,6 +151,7 @@ export default function GroupsPage() {
       start_time: g.start_time ? String(g.start_time).slice(0, 5) : '',
       duration_hours: g.duration_hours != null ? String(g.duration_hours) : '',
       note: g.note || '',
+      default_teacher_id: g.default_teacher_id || '',
     })
   }
 
@@ -206,7 +164,7 @@ export default function GroupsPage() {
     if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, note: editGroup.note })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, note: editGroup.note, default_teacher_id: editGroup.default_teacher_id || null })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -293,6 +251,15 @@ export default function GroupsPage() {
                 onChange={e => setNewGroup(g => ({ ...g, duration_hours: e.target.value }))}
               />
             </label>
+            <label>預設老師
+              <Combobox
+                items={teachersState.teachers}
+                value={newGroup.default_teacher_id}
+                onChange={tid => setNewGroup(g => ({ ...g, default_teacher_id: tid }))}
+                placeholder="（選填）"
+                allLabel="（無預設）"
+              />
+            </label>
             <label>備註
               <input
                 type="text"
@@ -321,20 +288,21 @@ export default function GroupsPage() {
         ) : groups.length === 0 ? (
           <div className="empty-hint">尚未新增任何團課</div>
         ) : (
-          <table className="entity-table">
+          <table className="entity-table groups-table">
             <colgroup>
               <col style={{ width: 36 }} />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 170 }} />
+              <col style={{ width: 170 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 80 }} />
               <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
-              <col />
+              <col style={{ width: 130 }} />
             </colgroup>
             <thead>
-              <tr><th aria-label="拖曳排序"></th><th>團課名稱</th><th>上課星期</th><th>上課時段</th><th>持續時間</th><th>月費</th><th>報名人數</th><th>備註</th><th></th></tr>
+              <tr><th aria-label="拖曳排序"></th><th>團課名稱</th><th>上課星期</th><th>上課時段</th><th>持續時間</th><th>月費</th><th>預設老師</th><th>報名人數</th><th>備註</th><th></th></tr>
             </thead>
             <tbody>
               {displayGroups.map(g => (
@@ -374,17 +342,16 @@ export default function GroupsPage() {
                   </td>
                   <td>
                     {editId === g.id ? (
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                        <input type="time" step="900" className="inline-edit-input" style={{ width: 110 }}
+                      <div className="time-duration-edit">
+                        <input type="time" step="900" className="inline-edit-input"
                           value={editGroup.start_time}
                           onChange={e => setEditGroup(eg => ({ ...eg, start_time: e.target.value }))}
                         />
-                        <span style={{ color: 'var(--muted)' }}>×</span>
-                        <input type="number" min="0" max="24" step="0.5" className="inline-edit-input" style={{ width: 70 }}
+                        <input type="number" min="0" max="24" step="0.5" className="inline-edit-input"
+                          placeholder="時數"
                           value={editGroup.duration_hours}
                           onChange={e => setEditGroup(eg => ({ ...eg, duration_hours: e.target.value }))}
                         />
-                        <span style={{ color: 'var(--muted)' }}>小時</span>
                       </div>
                     ) : (g.start_time ? `${String(g.start_time).slice(0, 5)}（${parseFloat(g.duration_hours || 0)} 小時）` : '—')}
                   </td>
@@ -415,6 +382,19 @@ export default function GroupsPage() {
                       />
                     ) : (g.monthly_fee > 0 ? amt(g.monthly_fee) : '—')}
                   </td>
+                  <td>
+                    {editId === g.id ? (
+                      <div className="combobox-cell">
+                        <Combobox
+                          items={teachersState.teachers}
+                          value={editGroup.default_teacher_id}
+                          onChange={tid => setEditGroup(eg => ({ ...eg, default_teacher_id: tid }))}
+                          placeholder="（無）"
+                          allLabel="（無）"
+                        />
+                      </div>
+                    ) : (teachersState.teachers.find(t => t.id === g.default_teacher_id)?.name || '—')}
+                  </td>
                   <td>{memberCounts[g.id] ?? '—'} 人</td>
                   <td className="note-cell">
                     {editId === g.id ? (
@@ -434,7 +414,6 @@ export default function GroupsPage() {
                       </>
                     ) : (
                       <>
-                        <button className="btn-sm" onClick={() => openMemberEditor(g)}>報名學生</button>
                         <button className="btn-sm" onClick={() => startEdit(g)}>編輯</button>
                         <button className="btn-sm btn-danger" onClick={() => handleDeleteGroup(g.id)} disabled={saving}>刪除</button>
                       </>
@@ -447,64 +426,6 @@ export default function GroupsPage() {
         )}
       </div>
 
-      {/* ── 報名學生 modal ── */}
-      {memberGroup && (
-        <div className="modal-overlay" onClick={() => !memberSaving && setMemberGroup(null)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{memberGroup.name}・報名學生</h3>
-              <button type="button" className="modal-close" onClick={() => !memberSaving && setMemberGroup(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              {memberLoading ? (
-                <div className="empty-hint">載入中…</div>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    placeholder="搜尋學生姓名"
-                    value={memberFilter}
-                    onChange={e => setMemberFilter(e.target.value)}
-                    className="roster-filter-input"
-                    autoFocus
-                  />
-                  <div className="roster-summary">
-                    已選 {memberDraft.size} 人 / 共 {studentsState.students.length} 人
-                  </div>
-                  <div className="roster-list">
-                    {(() => {
-                      const f = memberFilter.trim().toLowerCase()
-                      const list = f
-                        ? studentsState.students.filter(s => s.name.toLowerCase().includes(f))
-                        : studentsState.students
-                      if (list.length === 0) return <div className="empty-hint">沒有符合條件的學生</div>
-                      return list.map(s => (
-                        <label
-                          key={s.id}
-                          className={`attendance-item${memberDraft.has(s.id) ? ' attendance-item--checked' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={memberDraft.has(s.id)}
-                            onChange={() => toggleMemberDraft(s.id)}
-                          />
-                          <span className="attendance-name">{s.name}</span>
-                        </label>
-                      ))
-                    })()}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="modal-actions">
-              <button type="button" onClick={() => setMemberGroup(null)} disabled={memberSaving}>取消</button>
-              <button type="button" className="btn-primary" onClick={saveMembers} disabled={memberSaving || memberLoading}>
-                {memberSaving ? '儲存中…' : '儲存名單'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

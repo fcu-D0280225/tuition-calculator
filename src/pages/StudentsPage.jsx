@@ -200,6 +200,8 @@ export default function StudentsPage() {
     if (removingKey) return
     const current = enrollmentById[studentId]
     if (!current) return
+    const label = kind === 'course' ? '家教課' : '團課'
+    if (!window.confirm(`確定要移除此${label}選課？`)) return
     const courseIds = kind === 'course' ? current.course_ids.filter(x => x !== id) : current.course_ids
     const groupIds  = kind === 'group'  ? current.group_ids.filter(x => x !== id)  : current.group_ids
     setRemovingKey(key)

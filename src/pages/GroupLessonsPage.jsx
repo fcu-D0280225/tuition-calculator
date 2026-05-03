@@ -10,6 +10,31 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+const STATUS_OPTIONS = [
+  { value: 'attended',   label: '已點名' },
+  { value: 'pending',    label: '未點名' },
+  { value: 'pre_enroll', label: '尚未開始' },
+  { value: 'leave',      label: '請假' },
+]
+
+function getDisplayStatus(record) {
+  const status = record.status || 'attended'
+  if (status === 'leave' || (record.note || '').includes('請假')) return 'leave'
+  return status
+}
+
+function GroupRecordStatus({ record }) {
+  const s = getDisplayStatus(record)
+  const map = {
+    leave:     { label: '請假',     cls: 'status-leave' },
+    pre_enroll:{ label: '尚未開始', cls: 'status-pre' },
+    pending:   { label: '未點名',   cls: 'status-pending' },
+    attended:  { label: '已點名',   cls: 'status-attended' },
+  }
+  const { label, cls } = map[s] || map.attended
+  return <span className={`status-tag ${cls}`}>{label}</span>
+}
+
 const EMPTY_GROUP_RECORD = { group_id: '', teacher_id: '', student_ids: [], record_date: todayStr(), note: '' }
 
 export default function GroupLessonsPage() {
@@ -37,24 +62,33 @@ export default function GroupLessonsPage() {
   // 篩選
   const [filterFrom, setFilterFrom]       = useState('')
   const [filterTo, setFilterTo]           = useState('')
-  const [filterGroup, setFilterGroup]     = useState('')
-  const [filterStudent, setFilterStudent] = useState('')
-  const [filterTeacher, setFilterTeacher] = useState('')
+  const [filterGroups, setFilterGroups]     = useState([])  // 多選團課
+  const [filterStudents, setFilterStudents] = useState([])  // 多選學生
+  const [filterTeacher, setFilterTeacher]   = useState('')
 
   function handleFilter(e) {
     e.preventDefault()
+    // 多選的 group/student 走前端過濾，後端僅吃 from/to/teacher
     loadGroupRecords({
       from: filterFrom || undefined,
       to: filterTo || undefined,
-      group_id:   filterGroup || undefined,
-      student_id: filterStudent || undefined,
       teacher_id: filterTeacher || undefined,
     })
   }
   function resetFilter() {
-    setFilterFrom(''); setFilterTo(''); setFilterGroup(''); setFilterStudent(''); setFilterTeacher('')
+    setFilterFrom(''); setFilterTo(''); setFilterGroups([]); setFilterStudents([]); setFilterTeacher('')
     loadGroupRecords()
   }
+  function addFilterGroup(id) {
+    if (!id) return
+    setFilterGroups(prev => prev.includes(id) ? prev : [...prev, id])
+  }
+  function removeFilterGroup(id) { setFilterGroups(prev => prev.filter(x => x !== id)) }
+  function addFilterStudent(id) {
+    if (!id) return
+    setFilterStudents(prev => prev.includes(id) ? prev : [...prev, id])
+  }
+  function removeFilterStudent(id) { setFilterStudents(prev => prev.filter(x => x !== id)) }
 
   useEffect(() => {
     loadStudents(); loadTeachers(); loadGroups(); loadGroupRecords()
@@ -74,8 +108,8 @@ export default function GroupLessonsPage() {
 
   async function handleGroupSelectInForm(id) {
     const g = groupState.groups.find(x => x.id === id)
-    const firstTid = (g?.default_teacher_ids || [])[0] || ''
-    setGroupForm(f => ({ ...f, group_id: id, teacher_id: firstTid, student_ids: [] }))
+    const defaultTid = g?.default_teacher_id || ''
+    setGroupForm(f => ({ ...f, group_id: id, teacher_id: defaultTid, student_ids: [] }))
     if (id && !groupMemberMap[id]) {
       try {
         const rows = await apiListGroupMembers(id)
@@ -125,6 +159,7 @@ export default function GroupLessonsPage() {
       teacher_id: r.teacher_id || '',
       record_date: r.record_date,
       note: r.note || '',
+      status: getDisplayStatus(r),
     })
   }
 
@@ -229,8 +264,20 @@ export default function GroupLessonsPage() {
       )}
 
       <form className="filter-bar" onSubmit={handleFilter}>
-        <Combobox items={groups}   value={filterGroup}   onChange={setFilterGroup}   placeholder="全部團課" allLabel="全部團課" />
-        <Combobox items={students} value={filterStudent} onChange={setFilterStudent} placeholder="全部學生" allLabel="全部學生" />
+        <Combobox
+          key={`fg-${filterGroups.length}`}
+          items={groups.filter(g => !filterGroups.includes(g.id))}
+          value=""
+          onChange={addFilterGroup}
+          placeholder="加入團課（可複選）"
+        />
+        <Combobox
+          key={`fs-${filterStudents.length}`}
+          items={students.filter(s => !filterStudents.includes(s.id))}
+          value=""
+          onChange={addFilterStudent}
+          placeholder="加入學生（可複選）"
+        />
         <Combobox items={teachers} value={filterTeacher} onChange={setFilterTeacher} placeholder="全部老師" allLabel="全部老師" />
         <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} title="開始日期" />
         <span>—</span>
@@ -238,10 +285,38 @@ export default function GroupLessonsPage() {
         <button className="btn-sm btn-primary" type="submit">篩選</button>
         <button className="btn-sm" type="button" onClick={resetFilter}>重設</button>
       </form>
+      {(filterGroups.length > 0 || filterStudents.length > 0) && (
+        <div className="chip-list" style={{ margin: '4px 0 12px' }}>
+          {filterGroups.map(id => {
+            const g = groups.find(x => x.id === id)
+            return (
+              <span key={`fg-${id}`} className="chip">
+                團課：{g?.name || id}
+                <button type="button" className="chip-remove" onClick={() => removeFilterGroup(id)} aria-label="移除">×</button>
+              </span>
+            )
+          })}
+          {filterStudents.map(id => {
+            const s = students.find(x => x.id === id)
+            return (
+              <span key={`fs-${id}`} className="chip">
+                學生：{s?.name || id}
+                <button type="button" className="chip-remove" onClick={() => removeFilterStudent(id)} aria-label="移除">×</button>
+              </span>
+            )
+          })}
+        </div>
+      )}
 
-      {groupRecords.length === 0 ? (
-        <div className="empty-hint">目前沒有團課上課紀錄</div>
-      ) : (
+      {(() => {
+        const filtered = groupRecords.filter(r =>
+          (filterGroups.length === 0 || filterGroups.includes(r.group_id)) &&
+          (filterStudents.length === 0 || filterStudents.includes(r.student_id))
+        )
+        if (filtered.length === 0) {
+          return <div className="empty-hint">目前沒有團課上課紀錄</div>
+        }
+        return (
         <table className="lesson-table">
           <thead>
             <tr>
@@ -249,41 +324,56 @@ export default function GroupLessonsPage() {
               <th>團課</th>
               <th>學生</th>
               <th>老師</th>
+              <th>狀態</th>
               <th>備註</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {groupRecords.map(r => (
+            {filtered.map(r => (
               <tr key={r.id}>
                 {editGroupRecId === r.id ? (
                   <Fragment>
-                    <td><input type="date" value={editGroupRec.record_date} onChange={e => setEditGroupRec(f => ({ ...f, record_date: e.target.value }))} /></td>
+                    <td><input type="date" className="inline-edit-input" value={editGroupRec.record_date} onChange={e => setEditGroupRec(f => ({ ...f, record_date: e.target.value }))} /></td>
                     <td>
-                      <Combobox
-                        items={groups}
-                        value={editGroupRec.group_id}
-                        onChange={id => setEditGroupRec(f => ({ ...f, group_id: id }))}
-                        placeholder="搜尋團課…"
-                      />
+                      <div className="combobox-cell">
+                        <Combobox
+                          items={groups}
+                          value={editGroupRec.group_id}
+                          onChange={id => setEditGroupRec(f => ({ ...f, group_id: id }))}
+                          placeholder="搜尋團課…"
+                        />
+                      </div>
                     </td>
                     <td>
-                      <Combobox
-                        items={students}
-                        value={editGroupRec.student_id}
-                        onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
-                        placeholder="搜尋學生…"
-                      />
+                      <div className="combobox-cell">
+                        <Combobox
+                          items={students}
+                          value={editGroupRec.student_id}
+                          onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
+                          placeholder="搜尋學生…"
+                        />
+                      </div>
                     </td>
                     <td>
-                      <Combobox
-                        items={teachers}
-                        value={editGroupRec.teacher_id}
-                        onChange={id => setEditGroupRec(f => ({ ...f, teacher_id: id }))}
-                        placeholder="搜尋老師…"
-                      />
+                      <div className="combobox-cell">
+                        <Combobox
+                          items={teachers}
+                          value={editGroupRec.teacher_id}
+                          onChange={id => setEditGroupRec(f => ({ ...f, teacher_id: id }))}
+                          placeholder="搜尋老師…"
+                        />
+                      </div>
                     </td>
-                    <td><input type="text" value={editGroupRec.note} onChange={e => setEditGroupRec(f => ({ ...f, note: e.target.value }))} /></td>
+                    <td>
+                      <select className="inline-edit-input"
+                        value={editGroupRec.status || 'attended'}
+                        onChange={e => setEditGroupRec(f => ({ ...f, status: e.target.value }))}
+                      >
+                        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </td>
+                    <td><input type="text" className="inline-edit-input" value={editGroupRec.note} onChange={e => setEditGroupRec(f => ({ ...f, note: e.target.value }))} /></td>
                     <td className="row-actions">
                       <button className="btn-sm btn-primary" onClick={() => handleSaveEditGroupRec(r.id)} disabled={saving}>儲存</button>
                       <button className="btn-sm" onClick={() => { setEditGroupRecId(null); setEditGroupRec(null) }}>取消</button>
@@ -295,6 +385,7 @@ export default function GroupLessonsPage() {
                     <td>{r.group_name}</td>
                     <td>{r.student_name}</td>
                     <td>{r.teacher_name || <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+                    <td><GroupRecordStatus record={r} /></td>
                     <td className="note-cell">{r.note}</td>
                     <td className="row-actions">
                       <button className="btn-sm" onClick={() => startEditGroupRec(r)}>編輯</button>
@@ -306,7 +397,8 @@ export default function GroupLessonsPage() {
             ))}
           </tbody>
         </table>
-      )}
+        )
+      })()}
     </div>
   )
 }

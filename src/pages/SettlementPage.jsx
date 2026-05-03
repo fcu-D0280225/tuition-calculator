@@ -30,7 +30,7 @@ export default function SettlementPage() {
   const [payLoading, setPayLoading] = useState('')   // student_id 正在處理中
 
   function amt(value, suffix = '') {
-    return value.toLocaleString() + suffix
+    return Math.round(Number(value) || 0).toLocaleString() + suffix
   }
 
   async function handleGenerate(e) {
@@ -119,6 +119,7 @@ export default function SettlementPage() {
 
   async function handleTogglePaid(student) {
     const existing = paymentMap[student.student_id]
+    if (existing && !window.confirm(`確定要取消「${student.student_name}」的已繳狀態？`)) return
     setPayLoading(student.student_id)
     try {
       if (existing) {

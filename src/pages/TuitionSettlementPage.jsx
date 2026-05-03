@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react'
 import { apiSettlementTuition, apiCreateShareToken, apiListPaymentRecords, apiCreatePaymentRecord, apiDeletePaymentRecord } from '../data/api.js'
 import { generateTuitionPDF, generateStudentTuitionPDF } from '../utils/pdf.js'
 import { genId } from '../utils/ids.js'
+import PeriodLocksPanel from '../components/PeriodLocksPanel.jsx'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -26,7 +27,7 @@ export default function TuitionSettlementPage() {
   const [paymentMap, setPaymentMap] = useState({})
   const [payLoading, setPayLoading] = useState('')
 
-  function amt(value, suffix = '') { return value.toLocaleString() + suffix }
+  function amt(value, suffix = '') { return Math.round(Number(value) || 0).toLocaleString() + suffix }
 
   async function handleGenerate(e) {
     e.preventDefault()
@@ -90,6 +91,7 @@ export default function TuitionSettlementPage() {
 
   async function handleTogglePaid(student) {
     const existing = paymentMap[student.student_id]
+    if (existing && !window.confirm(`確定要取消「${student.student_name}」的已繳狀態？`)) return
     setPayLoading(student.student_id)
     try {
       if (existing) {
@@ -129,6 +131,8 @@ export default function TuitionSettlementPage() {
       </form>
 
       {error && <div className="error-msg">{error}</div>}
+
+      <PeriodLocksPanel from={from} to={to} />
 
       {shareUrl && (
         <div className="settlement-section">

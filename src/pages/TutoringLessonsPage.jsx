@@ -5,13 +5,38 @@ import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import Combobox from '../components/Combobox.jsx'
 import { useDirtyTracker } from '../contexts/UnsavedContext.jsx'
-import { apiListAllEnrollments } from '../data/api.js'
+import { apiListAllEnrollments, apiCreateLeaveRequest, apiDeleteLeaveRequest } from '../data/api.js'
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
-const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '1', lesson_date: todayStr(), start_time: '', note: '' }
+const STATUS_OPTIONS = [
+  { value: 'attended',   label: '已點名' },
+  { value: 'pending',    label: '未點名' },
+  { value: 'pre_enroll', label: '尚未開始' },
+  { value: 'leave',      label: '請假' },
+]
+
+function getDisplayStatus(record) {
+  const status = record.status || 'attended'
+  if (record.is_on_leave || status === 'leave') return 'leave'
+  return status
+}
+
+function LessonStatus({ record }) {
+  const s = getDisplayStatus(record)
+  const map = {
+    leave:     { label: '請假',     cls: 'status-leave' },
+    pre_enroll:{ label: '尚未開始', cls: 'status-pre' },
+    pending:   { label: '未點名',   cls: 'status-pending' },
+    attended:  { label: '已點名',   cls: 'status-attended' },
+  }
+  const { label, cls } = map[s] || map.attended
+  return <span className={`status-tag ${cls}`} title={record.leave_reason || ''}>{label}</span>
+}
+
+const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '1', lesson_dates: [todayStr()], start_time: '', note: '' }
 
 export default function TutoringLessonsPage() {
   const { state: lessonState, loadLessons, createLesson, updateLesson, removeLesson } = useLessons()
@@ -71,13 +96,41 @@ export default function TutoringLessonsPage() {
     const hours = parseFloat(form.hours)
     if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
-    if (!form.lesson_date) { setError('請選擇上課日期'); return }
+    const dates = (form.lesson_dates || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    if (dates.length === 0) { setError('請選擇至少一個上課日期'); return }
     setSaving(true); setError('')
+    const failures = []
     try {
-      await createLesson({ ...form, hours, start_time: form.start_time || null, unit_price: null, teacher_unit_price: null })
-      setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date, start_time: form.start_time })
-    } catch { setError('新增失敗') }
+      for (const d of dates) {
+        try {
+          await createLesson({
+            student_id: form.student_id,
+            course_id:  form.course_id,
+            teacher_id: form.teacher_id,
+            hours,
+            lesson_date: d,
+            start_time: form.start_time || null,
+            unit_price: null,
+            teacher_unit_price: null,
+            note: form.note || '',
+          })
+        } catch (e) {
+          failures.push(`${d}：${e?.message || e}`)
+        }
+      }
+      await loadLessons({})
+      setForm({ ...EMPTY_FORM, lesson_dates: form.lesson_dates, start_time: form.start_time })
+      if (failures.length) setError(`部分日期建立失敗：\n${failures.join('\n')}`)
+    } catch (e) { setError(`新增失敗：${e?.message || e}`) }
     finally { setSaving(false) }
+  }
+
+  function addDate(d) {
+    if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return
+    setForm(f => f.lesson_dates.includes(d) ? f : { ...f, lesson_dates: [...f.lesson_dates, d].sort() })
+  }
+  function removeDate(d) {
+    setForm(f => ({ ...f, lesson_dates: f.lesson_dates.filter(x => x !== d) }))
   }
 
   async function handleSaveEdit(id) {
@@ -85,9 +138,23 @@ export default function TutoringLessonsPage() {
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     setSaving(true); setError('')
     try {
-      await updateLesson(id, { ...editForm, hours })
+      const { _origStatus, _leaveRequestId, ...patch } = editForm
+      await updateLesson(id, { ...patch, hours })
+      // 同步請假：若狀態改成 leave 但沒既有請假，建立一筆；若從 leave 改成其他，刪除既有請假
+      if (editForm.status === 'leave' && !_leaveRequestId) {
+        await apiCreateLeaveRequest({
+          student_id: editForm.student_id,
+          course_id:  editForm.course_id,
+          leave_date: editForm.lesson_date,
+          reason:     '編輯標記為請假',
+          lesson_record_id: id,
+        })
+      } else if (_origStatus === 'leave' && editForm.status !== 'leave' && _leaveRequestId) {
+        try { await apiDeleteLeaveRequest(_leaveRequestId) } catch {}
+      }
+      await loadLessons({})
       setEditId(null); setEditForm(null)
-    } catch { setError('更新失敗') }
+    } catch (e) { setError(`更新失敗：${e?.message || e}`) }
     finally { setSaving(false) }
   }
 
@@ -181,10 +248,20 @@ export default function TutoringLessonsPage() {
                   className="hours-input"
                 />
               </label>
-              <label>日期
-                <input type="date" value={form.lesson_date}
-                  onChange={e => setForm(f => ({ ...f, lesson_date: e.target.value }))}
+              <label>日期（可複選，加入後 chip 顯示）
+                <input type="date"
+                  onChange={e => { addDate(e.target.value); e.target.value = '' }}
                 />
+                {form.lesson_dates.length > 0 && (
+                  <div className="chip-list" style={{ marginTop: 4 }}>
+                    {form.lesson_dates.map(d => (
+                      <span className="chip" key={d}>
+                        {d}
+                        <button type="button" className="chip-remove" onClick={() => removeDate(d)} aria-label="移除">×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </label>
               <label>開始時間
                 <input type="time" value={form.start_time}
@@ -229,6 +306,7 @@ export default function TutoringLessonsPage() {
               <th>課程</th>
               <th>老師</th>
               <th>時數</th>
+              <th>狀態</th>
               <th>備註</th>
               <th></th>
             </tr>
@@ -238,34 +316,48 @@ export default function TutoringLessonsPage() {
               <tr key={l.id}>
                 {editId === l.id ? (
                   <Fragment>
-                    <td><input type="date" value={editForm.lesson_date} onChange={e => setEditForm(f => ({ ...f, lesson_date: e.target.value }))} /></td>
+                    <td><input type="date" className="inline-edit-input" value={editForm.lesson_date} onChange={e => setEditForm(f => ({ ...f, lesson_date: e.target.value }))} /></td>
                     <td>
-                      <Combobox
-                        items={students}
-                        value={editForm.student_id}
-                        onChange={id => setEditForm(f => ({ ...f, student_id: id, course_id: '' }))}
-                        placeholder="搜尋學生…"
-                      />
+                      <div className="combobox-cell">
+                        <Combobox
+                          items={students}
+                          value={editForm.student_id}
+                          onChange={id => setEditForm(f => ({ ...f, student_id: id, course_id: '' }))}
+                          placeholder="搜尋學生…"
+                        />
+                      </div>
                     </td>
                     <td>
-                      <Combobox
-                        key={`edit-course-${editForm.student_id}`}
-                        items={coursesForStudent(editForm.student_id)}
-                        value={editForm.course_id}
-                        onChange={id => handleCourseChange(id, true)}
-                        placeholder={editForm.student_id ? '搜尋課程…' : '請先選學生'}
-                      />
+                      <div className="combobox-cell">
+                        <Combobox
+                          key={`edit-course-${editForm.student_id}`}
+                          items={coursesForStudent(editForm.student_id)}
+                          value={editForm.course_id}
+                          onChange={id => handleCourseChange(id, true)}
+                          placeholder={editForm.student_id ? '搜尋課程…' : '請先選學生'}
+                        />
+                      </div>
                     </td>
                     <td>
-                      <Combobox
-                        items={teachers}
-                        value={editForm.teacher_id}
-                        onChange={id => setEditForm(f => ({ ...f, teacher_id: id }))}
-                        placeholder="搜尋老師…"
-                      />
+                      <div className="combobox-cell">
+                        <Combobox
+                          items={teachers}
+                          value={editForm.teacher_id}
+                          onChange={id => setEditForm(f => ({ ...f, teacher_id: id }))}
+                          placeholder="搜尋老師…"
+                        />
+                      </div>
                     </td>
-                    <td><input type="number" min="0.5" step="0.5" value={editForm.hours} onChange={e => setEditForm(f => ({ ...f, hours: e.target.value }))} className="hours-input" /></td>
-                    <td><input type="text" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} /></td>
+                    <td><input type="number" min="0.5" step="0.5" className="inline-edit-input" value={editForm.hours} onChange={e => setEditForm(f => ({ ...f, hours: e.target.value }))} /></td>
+                    <td>
+                      <select className="inline-edit-input"
+                        value={editForm.status || 'attended'}
+                        onChange={e => setEditForm(f => ({ ...f, status: e.target.value }))}
+                      >
+                        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </td>
+                    <td><input type="text" className="inline-edit-input" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} /></td>
                     <td className="row-actions">
                       <button className="btn-sm btn-primary" onClick={() => handleSaveEdit(l.id)} disabled={saving}>儲存</button>
                       <button className="btn-sm" onClick={() => { setEditId(null); setEditForm(null) }}>取消</button>
@@ -278,6 +370,7 @@ export default function TutoringLessonsPage() {
                     <td>{l.course_name}</td>
                     <td>{l.teacher_name}</td>
                     <td>{l.hours}</td>
+                    <td><LessonStatus record={l} /></td>
                     <td className="note-cell">{l.note}</td>
                     <td className="row-actions">
                       <button className="btn-sm" onClick={() => {
@@ -290,6 +383,10 @@ export default function TutoringLessonsPage() {
                           lesson_date: l.lesson_date,
                           start_time: l.start_time ? String(l.start_time).slice(0, 5) : '',
                           note: l.note,
+                          status: getDisplayStatus(l),
+                          // 用於 save 時對照是否要同步 leave_request
+                          _origStatus: getDisplayStatus(l),
+                          _leaveRequestId: l.leave_request_id || null,
                         })
                       }}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(l.id)} disabled={saving}>刪除</button>

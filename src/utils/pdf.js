@@ -17,6 +17,8 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
 }
 
+function money(v) { return Math.round(Number(v) || 0).toLocaleString() }
+
 function todayStr() {
   const now = new Date()
   return `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`
@@ -61,7 +63,7 @@ function tuitionSummaryHtml(tuition, period, dateStr) {
   const rows = tuition.map((s, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600;">${escapeHtml(s.student_name)}</td>
-      <td style="padding:10px 12px; text-align:right; font-family:monospace;">NT$ ${s.total.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; font-family:monospace;">NT$ ${money(s.total)}</td>
     </tr>
   `).join('')
 
@@ -95,7 +97,7 @@ function tuitionSummaryHtml(tuition, period, dateStr) {
     </table>
     <div style="background:#14532d; color:white; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
       <div style="font-size:15px; font-weight:600;">合計</div>
-      <div style="font-size:24px; font-weight:700;">NT$ ${grandTotal.toLocaleString()}</div>
+      <div style="font-size:24px; font-weight:700;">NT$ ${money(grandTotal)}</div>
     </div>
     <div style="margin-top:28px; padding:14px; background:#f8fafc; border-radius:8px; color:#64748b; font-size:13px;">
       以下為各學生學費明細。
@@ -108,8 +110,8 @@ function singleTuitionHtml(student, period, dateStr) {
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600; color:#2563eb;">${escapeHtml(c.course_name)}</td>
       <td style="padding:10px 12px; text-align:right;">${c.total_hours} 時</td>
-      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${c.unit_price.toLocaleString()}</td>
-      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${c.amount.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(c.unit_price)}</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(c.amount)}</td>
     </tr>
   `).join('')
 
@@ -118,8 +120,8 @@ function singleTuitionHtml(student, period, dateStr) {
     <tr style="border-bottom:1px solid #f1f5f9; background:#ecfdf5;">
       <td style="padding:10px 12px; font-weight:600; color:#166534;">團課：${escapeHtml(g.group_name)}</td>
       <td style="padding:10px 12px; text-align:right;">${g.billable_months} 月</td>
-      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${g.monthly_fee.toLocaleString()}/月</td>
-      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${g.amount.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(g.monthly_fee)}/月</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(g.amount)}</td>
     </tr>
   `).join('')
 
@@ -128,8 +130,8 @@ function singleTuitionHtml(student, period, dateStr) {
     <tr style="border-bottom:1px solid #f1f5f9; background:#fefce8;">
       <td style="padding:10px 12px; font-weight:600; color:#a16207;">教材：${escapeHtml(m.material_name)}</td>
       <td style="padding:10px 12px; text-align:right;">${m.total_qty} 本</td>
-      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${m.unit_price.toLocaleString()}</td>
-      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${m.amount.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(m.unit_price)}</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(m.amount)}</td>
     </tr>
   `).join('')
 
@@ -170,7 +172,7 @@ function singleTuitionHtml(student, period, dateStr) {
     </table>
     <div style="background:#1e293b; color:white; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
       <div style="font-size:15px; font-weight:600;">應繳總金額</div>
-      <div style="font-size:24px; font-weight:700;">NT$ ${student.total.toLocaleString()}</div>
+      <div style="font-size:24px; font-weight:700;">NT$ ${money(student.total)}</div>
     </div>
     <div style="margin-top:32px; padding-top:24px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:12px; text-align:center;">
       此為電腦系統產出費單，如有疑問請聯繫補習班。
@@ -184,7 +186,7 @@ function salarySummaryHtml(salary, period, dateStr) {
   const rows = salary.map((t, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600;">${escapeHtml(t.teacher_name)}</td>
-      <td style="padding:10px 12px; text-align:right; font-family:monospace;">NT$ ${t.total.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; font-family:monospace;">NT$ ${money(t.total)}</td>
     </tr>
   `).join('')
 
@@ -218,7 +220,7 @@ function salarySummaryHtml(salary, period, dateStr) {
     </table>
     <div style="background:#4c1d95; color:white; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
       <div style="font-size:15px; font-weight:600;">合計</div>
-      <div style="font-size:24px; font-weight:700;">NT$ ${grandTotal.toLocaleString()}</div>
+      <div style="font-size:24px; font-weight:700;">NT$ ${money(grandTotal)}</div>
     </div>
     <div style="margin-top:28px; padding:14px; background:#f8fafc; border-radius:8px; color:#64748b; font-size:13px;">
       以下為各老師薪資明細。
@@ -231,8 +233,8 @@ function singleSalaryHtml(teacher, period, dateStr) {
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600; color:#7c3aed;">${escapeHtml(c.course_name)}</td>
       <td style="padding:10px 12px; text-align:right;">${c.total_hours}</td>
-      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${c.hourly_rate.toLocaleString()}</td>
-      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${c.amount.toLocaleString()}</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(c.hourly_rate)}</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(c.amount)}</td>
     </tr>
   `).join('')
 
@@ -271,7 +273,7 @@ function singleSalaryHtml(teacher, period, dateStr) {
     </table>
     <div style="background:#4c1d95; color:white; border-radius:8px; padding:16px 20px; display:flex; justify-content:space-between; align-items:center;">
       <div style="font-size:15px; font-weight:600;">應領薪資</div>
-      <div style="font-size:24px; font-weight:700;">NT$ ${teacher.total.toLocaleString()}</div>
+      <div style="font-size:24px; font-weight:700;">NT$ ${money(teacher.total)}</div>
     </div>
     <div style="margin-top:32px; padding-top:24px; border-top:1px solid #e2e8f0; color:#94a3b8; font-size:12px; text-align:center;">
       此為電腦系統產出薪資單，如有疑問請聯繫補習班。

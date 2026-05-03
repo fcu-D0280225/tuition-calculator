@@ -316,6 +316,15 @@ export async function initSchema() {
     await pool.query('UPDATE `groups` SET sort_order = (@rn := @rn + 10) ORDER BY monthly_fee DESC, id ASC')
   }
 
+  // Migration: 加 teachers.contact_phone
+  const [tPhoneCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'teachers' AND COLUMN_NAME = 'contact_phone'`
+  )
+  if (tPhoneCols.length === 0) {
+    await pool.query(`ALTER TABLE teachers ADD COLUMN contact_phone VARCHAR(64) NOT NULL DEFAULT '' AFTER name`)
+  }
+
   // Migration: 加 teachers.sort_order
   const [tSortCols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -326,6 +335,55 @@ export async function initSchema() {
     await pool.query(`SET @rn := 0`)
     await pool.query(`UPDATE teachers SET sort_order = (@rn := @rn + 10) ORDER BY created_at DESC, id DESC`)
   }
+
+  // Migration: 加 group_records.status / lesson_records.status
+  // pending = 待點名 / attended = 已點名 / pre_enroll = 報名前自動補的（紫）
+  for (const tbl of ['group_records', 'lesson_records']) {
+    const [cols] = await pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'status'`,
+      [tbl]
+    )
+    if (cols.length === 0) {
+      await pool.query(`ALTER TABLE \`${tbl}\` ADD COLUMN status VARCHAR(16) NOT NULL DEFAULT 'attended'`)
+    }
+  }
+  // 既有以 note='尚未開始開課' 標記的，回填到新欄位
+  await pool.query(`UPDATE group_records SET status = 'pre_enroll' WHERE note = '尚未開始開課'`)
+
+  // Migration: 加 group_records.teacher_id（記錄該次點名的老師）
+  const [grtCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'group_records' AND COLUMN_NAME = 'teacher_id'`
+  )
+  if (grtCols.length === 0) {
+    await pool.query(`ALTER TABLE group_records ADD COLUMN teacher_id VARCHAR(64) NULL DEFAULT NULL AFTER student_id`)
+    await pool.query(`ALTER TABLE group_records ADD CONSTRAINT fk_gr_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL`)
+    await pool.query(`ALTER TABLE group_records ADD INDEX idx_gr_teacher (teacher_id, record_date)`)
+  }
+
+  // Migration: 加 groups.default_teacher_id（點名時自動帶入的老師）
+  const [gDefTcols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'default_teacher_id'`
+  )
+  if (gDefTcols.length === 0) {
+    await pool.query('ALTER TABLE `groups` ADD COLUMN default_teacher_id VARCHAR(64) NULL DEFAULT NULL')
+    await pool.query('ALTER TABLE `groups` ADD CONSTRAINT fk_groups_default_teacher FOREIGN KEY (default_teacher_id) REFERENCES teachers(id) ON DELETE SET NULL')
+  }
+
+  // 雜項支出
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS misc_expenses (
+      id           VARCHAR(64)    NOT NULL PRIMARY KEY,
+      name         VARCHAR(128)   NOT NULL,
+      amount       DECIMAL(10,2)  NOT NULL DEFAULT 0,
+      expense_date DATE           NOT NULL,
+      note         VARCHAR(256)   NOT NULL DEFAULT '',
+      created_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_misc_date (expense_date)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
 
   // Migration: 加 students.sort_order
   const [sSortCols] = await pool.query(
@@ -388,6 +446,17 @@ export async function initSchema() {
   }
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS period_locks (
+      id          VARCHAR(64)  NOT NULL PRIMARY KEY,
+      period_from DATE         NOT NULL,
+      period_to   DATE         NOT NULL,
+      note        VARCHAR(256) NOT NULL DEFAULT '',
+      locked_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_lock_period (period_from, period_to)
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS share_tokens (
       id          VARCHAR(64)  NOT NULL PRIMARY KEY,
       token       VARCHAR(64)  NOT NULL UNIQUE,
@@ -431,14 +500,24 @@ export async function initSchema() {
       INDEX idx_leave_date    (leave_date)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+  // Migration: leave_requests 加 lesson_record_id（讓請假能精準綁到某一堂課，而非整天課程）
+  const [lvRecCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leave_requests' AND COLUMN_NAME = 'lesson_record_id'`
+  )
+  if (lvRecCols.length === 0) {
+    await pool.query(`ALTER TABLE leave_requests ADD COLUMN lesson_record_id VARCHAR(64) NULL`)
+    await pool.query(`ALTER TABLE leave_requests ADD CONSTRAINT fk_leave_lesson FOREIGN KEY (lesson_record_id) REFERENCES lesson_records(id) ON DELETE CASCADE`)
+    await pool.query(`ALTER TABLE leave_requests ADD INDEX idx_leave_lesson (lesson_record_id)`)
+  }
 }
 
 // ── Leave Requests ───────────────────────────────────────────────────────────
 
-export async function insertLeaveRequest({ id, studentId, courseId, leaveDate, reason }) {
+export async function insertLeaveRequest({ id, studentId, courseId, leaveDate, reason, lessonRecordId }) {
   await pool.query(
-    'INSERT INTO leave_requests (id, student_id, course_id, leave_date, reason) VALUES (?, ?, ?, ?, ?)',
-    [id, studentId, courseId, leaveDate, reason]
+    'INSERT INTO leave_requests (id, student_id, course_id, leave_date, reason, lesson_record_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, studentId, courseId, leaveDate, reason, lessonRecordId || null]
   )
 }
 
@@ -448,7 +527,7 @@ export async function listStudentLeaveRequests(studentId, { from, to } = {}) {
   if (from) { where.push('lr.leave_date >= ?'); params.push(from) }
   if (to)   { where.push('lr.leave_date <= ?'); params.push(to) }
   const [rows] = await pool.query(
-    `SELECT lr.id, lr.student_id, lr.course_id, lr.leave_date, lr.reason, lr.created_at,
+    `SELECT lr.id, lr.student_id, lr.course_id, lr.leave_date, lr.reason, lr.created_at, lr.lesson_record_id,
             c.name AS course_name
        FROM leave_requests lr
        JOIN courses c ON c.id = lr.course_id
@@ -532,6 +611,14 @@ export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
   }
   if (Array.isArray(groupIds)) {
     const cleaned = Array.from(new Set(groupIds.filter(Boolean)))
+    // 抓既有 group_ids，找出本次「新增」的，用來自動補上課紀錄
+    const [existRows] = await pool.query(
+      'SELECT group_id FROM group_members WHERE student_id = ?',
+      [studentId]
+    )
+    const existingSet = new Set(existRows.map(r => r.group_id))
+    const newlyAdded = cleaned.filter(gid => !existingSet.has(gid))
+
     await pool.query('DELETE FROM group_members WHERE student_id = ?', [studentId])
     if (cleaned.length) {
       await pool.query(
@@ -539,7 +626,167 @@ export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
         [cleaned.map(gid => [gid, studentId])]
       )
     }
+
+    for (const gid of newlyAdded) {
+      try { await backfillGroupRecordsForStudent(gid, studentId) }
+      catch (e) { console.error('[backfillGroupRecords] failed:', gid, studentId, e) }
+    }
   }
+}
+
+// ── Period Locks ─────────────────────────────────────────────────────────────
+
+export async function listPeriodLocks() {
+  const [rows] = await pool.query(
+    'SELECT id, period_from, period_to, note, locked_at FROM period_locks ORDER BY period_from DESC'
+  )
+  return rows
+}
+
+export async function insertPeriodLock({ id, periodFrom, periodTo, note }) {
+  await pool.query(
+    'INSERT INTO period_locks (id, period_from, period_to, note) VALUES (?, ?, ?, ?)',
+    [id, periodFrom, periodTo, note || '']
+  )
+}
+
+export async function deletePeriodLock(id) {
+  const [res] = await pool.query('DELETE FROM period_locks WHERE id = ?', [id])
+  return res.affectedRows > 0
+}
+
+// 檢查某日期是否落在任一鎖定區間中（含端點）
+export async function isDateLocked(dateStr) {
+  if (!dateStr) return false
+  const [rows] = await pool.query(
+    'SELECT 1 FROM period_locks WHERE ? BETWEEN period_from AND period_to LIMIT 1',
+    [dateStr]
+  )
+  return rows.length > 0
+}
+
+// 檢查紀錄 id 對應的日期是否被鎖
+export async function isLessonLocked(id) {
+  const [rows] = await pool.query('SELECT lesson_date FROM lesson_records WHERE id = ?', [id])
+  if (rows.length === 0) return false
+  return isDateLocked(String(rows[0].lesson_date).slice(0, 10))
+}
+
+export async function isGroupRecordLocked(id) {
+  const [rows] = await pool.query('SELECT record_date FROM group_records WHERE id = ?', [id])
+  if (rows.length === 0) return false
+  return isDateLocked(String(rows[0].record_date).slice(0, 10))
+}
+
+// ── Misc Expenses ────────────────────────────────────────────────────────────
+
+export async function listMiscExpenses({ from, to } = {}) {
+  const conds = []; const params = []
+  if (from) { conds.push('expense_date >= ?'); params.push(from) }
+  if (to)   { conds.push('expense_date <= ?'); params.push(to) }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
+  const [rows] = await pool.query(
+    `SELECT id, name, amount, expense_date, note FROM misc_expenses ${where} ORDER BY expense_date DESC, created_at DESC`,
+    params
+  )
+  return rows.map(r => ({ ...r, amount: parseFloat(r.amount) }))
+}
+
+export async function insertMiscExpense({ id, name, amount, expenseDate, note }) {
+  await pool.query(
+    'INSERT INTO misc_expenses (id, name, amount, expense_date, note) VALUES (?, ?, ?, ?, ?)',
+    [id, name, amount, expenseDate, note || '']
+  )
+}
+
+export async function deleteMiscExpense(id) {
+  const [res] = await pool.query('DELETE FROM misc_expenses WHERE id = ?', [id])
+  return res.affectedRows > 0
+}
+
+// 計算當日（伺服器當地時區）YYYY-MM-DD
+function todayLocalIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// 學生新加入某團課時，把整個 duration_months 區間內所有上課日補成 group_records
+// 若該團課已開過課（已有紀錄），起始日從該團課最早一筆紀錄開始；否則從當日開始
+// 早於當日的紀錄會標註 note='尚未開始開課'，方便結算與點名時辨別
+const PRE_ENROLL_NOTE = '尚未開始開課'
+
+async function backfillGroupRecordsForStudent(groupId, studentId) {
+  const [groupRows] = await pool.query(
+    'SELECT weekdays, duration_months, default_teacher_id FROM `groups` WHERE id = ? LIMIT 1',
+    [groupId]
+  )
+  const g = groupRows[0]
+  if (!g) return
+  const months = parseInt(g.duration_months, 10)
+  if (!months || months <= 0) return
+  const weekdaySet = new Set(
+    String(g.weekdays || '')
+      .split(',')
+      .map(s => parseInt(s, 10))
+      .filter(n => Number.isInteger(n) && n >= 0 && n <= 6)
+  )
+  if (weekdaySet.size === 0) return
+
+  const todayStr = todayLocalIso()
+  // 起始日候選 1：該團課最早一筆既有紀錄
+  const [earliestRows] = await pool.query(
+    'SELECT MIN(record_date) AS first_date FROM group_records WHERE group_id = ?',
+    [groupId]
+  )
+  const earliestExisting = earliestRows[0]?.first_date
+    ? String(earliestRows[0].first_date).slice(0, 10)
+    : null
+  // 起始日候選 2：本週的週日（涵蓋本週已上過的課）
+  const today = new Date(todayStr + 'T00:00:00')
+  const weekStart = new Date(today); weekStart.setDate(weekStart.getDate() - today.getDay())
+  const weekStartStr = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, '0')}-${String(weekStart.getDate()).padStart(2, '0')}`
+  // 取兩者最小，再保證 ≤ 今天
+  const candidates = [todayStr, weekStartStr]
+  if (earliestExisting) candidates.push(earliestExisting)
+  const startStr = candidates.sort()[0]
+
+  const start = new Date(startStr + 'T00:00:00')
+  const end = new Date(start)
+  end.setMonth(end.getMonth() + months)
+
+  const dates = []
+  const cur = new Date(start)
+  while (cur < end) {
+    if (weekdaySet.has(cur.getDay())) {
+      const y = cur.getFullYear()
+      const m = String(cur.getMonth() + 1).padStart(2, '0')
+      const d = String(cur.getDate()).padStart(2, '0')
+      dates.push(`${y}-${m}-${d}`)
+    }
+    cur.setDate(cur.getDate() + 1)
+  }
+  if (dates.length === 0) return
+
+  // 跳過該學生已有的紀錄日期
+  const [existing] = await pool.query(
+    'SELECT record_date FROM group_records WHERE group_id = ? AND student_id = ? AND record_date IN (?)',
+    [groupId, studentId, dates]
+  )
+  const existingSet = new Set(existing.map(r => String(r.record_date).slice(0, 10)))
+  const toInsert = dates.filter(d => !existingSet.has(d))
+  if (toInsert.length === 0) return
+
+  const teacherId = g.default_teacher_id || null
+  const ts = Date.now()
+  const rows = toInsert.map((d, i) => [
+    `grr_${ts}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+    groupId, studentId, teacherId, d, '',
+    d < todayStr ? 'pre_enroll' : 'pending',
+  ])
+  await pool.query(
+    'INSERT INTO group_records (id, group_id, student_id, teacher_id, record_date, note, status) VALUES ?',
+    [rows]
+  )
 }
 
 export async function listAllEnrollments() {
@@ -567,7 +814,7 @@ export async function listStudentCourses(studentId) {
 
 export async function listTeachers() {
   const [rows] = await pool.query(
-    'SELECT id, name, sort_order FROM teachers ORDER BY sort_order ASC, created_at DESC, id DESC'
+    'SELECT id, name, contact_phone, sort_order FROM teachers ORDER BY sort_order ASC, created_at DESC, id DESC'
   )
   return rows
 }
@@ -579,8 +826,18 @@ export async function reorderTeachers(orderedIds) {
   await pool.query(sql, [...orderedIds, orderedIds])
 }
 
-export async function insertTeacher({ id, name }) {
-  await pool.query('INSERT INTO teachers (id, name) VALUES (?, ?)', [id, name])
+export async function insertTeacher({ id, name, contactPhone }) {
+  await pool.query('INSERT INTO teachers (id, name, contact_phone) VALUES (?, ?, ?)', [id, name, contactPhone || ''])
+}
+
+export async function updateTeacher(id, { name, contactPhone }) {
+  const sets = []; const params = []
+  if (name         !== undefined) { sets.push('name = ?');          params.push(name) }
+  if (contactPhone !== undefined) { sets.push('contact_phone = ?'); params.push(contactPhone || '') }
+  if (!sets.length) return false
+  params.push(id)
+  const [res] = await pool.query(`UPDATE teachers SET ${sets.join(', ')} WHERE id = ?`, params)
+  return res.affectedRows > 0
 }
 
 export async function updateTeacherName(id, name) {
@@ -687,29 +944,38 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
     `SELECT lr.id, lr.student_id, s.name AS student_name,
             lr.course_id, c.name AS course_name,
             lr.teacher_id, t.name AS teacher_name,
-            lr.hours, lr.lesson_date, lr.start_time, lr.unit_price, lr.teacher_unit_price, lr.note,
+            lr.hours, lr.lesson_date, lr.start_time, lr.unit_price, lr.teacher_unit_price, lr.note, lr.status,
             c.hourly_rate         AS course_hourly_rate,
-            c.teacher_hourly_rate AS course_teacher_hourly_rate
+            c.teacher_hourly_rate AS course_teacher_hourly_rate,
+            lv.id IS NOT NULL     AS is_on_leave,
+            lv.id                 AS leave_request_id,
+            lv.reason             AS leave_reason
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
      JOIN teachers t ON t.id = lr.teacher_id
+     LEFT JOIN leave_requests lv
+       ON (lv.lesson_record_id = lr.id)
+       OR (lv.lesson_record_id IS NULL
+           AND lv.student_id = lr.student_id
+           AND lv.course_id  = lr.course_id
+           AND lv.leave_date = lr.lesson_date)
      ${where}
      ORDER BY lr.lesson_date DESC, lr.start_time ASC, lr.created_at DESC`,
     params
   )
-  return rows
+  return rows.map(r => ({ ...r, is_on_leave: !!r.is_on_leave }))
 }
 
-export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note }) {
+export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status }) {
   await pool.query(
-    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, courseId, teacherId, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '']
+    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, studentId, courseId, teacherId, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending']
   )
 }
 
-export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note }) {
+export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status }) {
   const sets = []
   const params = []
   if (studentId        !== undefined) { sets.push('student_id = ?');         params.push(studentId) }
@@ -721,6 +987,7 @@ export async function updateLesson(id, { studentId, courseId, teacherId, hours, 
   if (unitPrice        !== undefined) { sets.push('unit_price = ?');         params.push(unitPrice) }
   if (teacherUnitPrice !== undefined) { sets.push('teacher_unit_price = ?'); params.push(teacherUnitPrice) }
   if (note             !== undefined) { sets.push('note = ?');               params.push(note) }
+  if (status           !== undefined) { sets.push('status = ?');             params.push(status) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE lesson_records SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -964,7 +1231,7 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note, default_teacher_id, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
   )
   return rows.map(r => ({ ...r, duration_hours: parseFloat(r.duration_hours) }))
 }
@@ -976,22 +1243,23 @@ export async function reorderGroups(orderedIds) {
   await pool.query(sql, [...orderedIds, orderedIds])
 }
 
-export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note }) {
+export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note, defaultTeacherId }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, note || '']
+    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, note || '', defaultTeacherId || null]
   )
 }
 
-export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note }) {
+export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, note, defaultTeacherId }) {
   const sets = []; const params = []
-  if (name            !== undefined) { sets.push('name = ?');             params.push(name) }
-  if (weekdays        !== undefined) { sets.push('weekdays = ?');         params.push(weekdays || '') }
-  if (durationMonths  !== undefined) { sets.push('duration_months = ?');  params.push(durationMonths) }
-  if (monthlyFee      !== undefined) { sets.push('monthly_fee = ?');      params.push(monthlyFee) }
-  if (startTime       !== undefined) { sets.push('start_time = ?');       params.push(startTime || null) }
-  if (durationHours   !== undefined) { sets.push('duration_hours = ?');   params.push(durationHours) }
-  if (note            !== undefined) { sets.push('note = ?');             params.push(note || '') }
+  if (name             !== undefined) { sets.push('name = ?');               params.push(name) }
+  if (weekdays         !== undefined) { sets.push('weekdays = ?');           params.push(weekdays || '') }
+  if (durationMonths   !== undefined) { sets.push('duration_months = ?');    params.push(durationMonths) }
+  if (monthlyFee       !== undefined) { sets.push('monthly_fee = ?');        params.push(monthlyFee) }
+  if (startTime        !== undefined) { sets.push('start_time = ?');         params.push(startTime || null) }
+  if (durationHours    !== undefined) { sets.push('duration_hours = ?');     params.push(durationHours) }
+  if (note             !== undefined) { sets.push('note = ?');               params.push(note || '') }
+  if (defaultTeacherId !== undefined) { sets.push('default_teacher_id = ?'); params.push(defaultTeacherId || null) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -1005,22 +1273,25 @@ export async function deleteGroup(id) {
 
 // ── Group Records ────────────────────────────────────────────────────────────
 
-export async function listGroupRecords({ from, to, groupId, studentId } = {}) {
+export async function listGroupRecords({ from, to, groupId, studentId, teacherId } = {}) {
   const conditions = []; const params = []
   if (from)      { conditions.push('gr.record_date >= ?'); params.push(from) }
   if (to)        { conditions.push('gr.record_date <= ?'); params.push(to) }
   if (groupId)   { conditions.push('gr.group_id = ?');     params.push(groupId) }
   if (studentId) { conditions.push('gr.student_id = ?');   params.push(studentId) }
+  if (teacherId) { conditions.push('gr.teacher_id = ?');   params.push(teacherId) }
   const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
   const [rows] = await pool.query(
     `SELECT gr.id, gr.group_id, g.name AS group_name,
             gr.student_id, s.name AS student_name,
-            gr.record_date, gr.note,
+            gr.teacher_id, t.name AS teacher_name,
+            gr.record_date, gr.note, gr.status,
             g.start_time AS group_start_time,
             g.duration_hours AS group_duration_hours
      FROM group_records gr
      JOIN \`groups\`  g ON g.id = gr.group_id
      JOIN students   s ON s.id = gr.student_id
+     LEFT JOIN teachers t ON t.id = gr.teacher_id
      ${where}
      ORDER BY gr.record_date DESC, gr.created_at DESC`,
     params
@@ -1028,20 +1299,22 @@ export async function listGroupRecords({ from, to, groupId, studentId } = {}) {
   return rows
 }
 
-export async function insertGroupRecord({ id, groupId, studentId, recordDate, note }) {
+export async function insertGroupRecord({ id, groupId, studentId, teacherId, recordDate, note, status }) {
   await pool.query(
-    `INSERT INTO group_records (id, group_id, student_id, record_date, note)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, groupId, studentId, recordDate, note || '']
+    `INSERT INTO group_records (id, group_id, student_id, teacher_id, record_date, note, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, groupId, studentId, teacherId || null, recordDate, note || '', status || 'pending']
   )
 }
 
-export async function updateGroupRecord(id, { groupId, studentId, recordDate, note }) {
+export async function updateGroupRecord(id, { groupId, studentId, teacherId, recordDate, note, status }) {
   const sets = []; const params = []
   if (groupId    !== undefined) { sets.push('group_id = ?');    params.push(groupId) }
   if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
+  if (teacherId  !== undefined) { sets.push('teacher_id = ?');  params.push(teacherId || null) }
   if (recordDate !== undefined) { sets.push('record_date = ?'); params.push(recordDate) }
   if (note       !== undefined) { sets.push('note = ?');        params.push(note || '') }
+  if (status     !== undefined) { sets.push('status = ?');      params.push(status) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE group_records SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -1069,10 +1342,23 @@ export async function listGroupMembers(groupId) {
 
 export async function setGroupMembers(groupId, studentIds) {
   const cleaned = Array.from(new Set((studentIds || []).filter(Boolean)))
+  const [existRows] = await pool.query(
+    'SELECT student_id FROM group_members WHERE group_id = ?',
+    [groupId]
+  )
+  const existingSet = new Set(existRows.map(r => r.student_id))
+  const newlyAdded = cleaned.filter(sid => !existingSet.has(sid))
+
   await pool.query('DELETE FROM group_members WHERE group_id = ?', [groupId])
-  if (cleaned.length === 0) return
-  const values = cleaned.map(sid => [groupId, sid])
-  await pool.query('INSERT INTO group_members (group_id, student_id) VALUES ?', [values])
+  if (cleaned.length) {
+    const values = cleaned.map(sid => [groupId, sid])
+    await pool.query('INSERT INTO group_members (group_id, student_id) VALUES ?', [values])
+  }
+
+  for (const sid of newlyAdded) {
+    try { await backfillGroupRecordsForStudent(groupId, sid) }
+    catch (e) { console.error('[backfillGroupRecords] failed:', groupId, sid, e) }
+  }
 }
 
 // ── Share Tokens ──────────────────────────────────────────────────────────────

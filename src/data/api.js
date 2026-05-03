@@ -63,8 +63,9 @@ export const apiListAllEnrollments = ()        => request('/enrollments')
 // ── Teachers ──────────────────────────────────────────────────────────────────
 
 export const apiListTeachers    = ()           => request('/teachers')
-export const apiCreateTeacher   = (name)       => request('/teachers', { method: 'POST', body: JSON.stringify({ name }) })
+export const apiCreateTeacher   = (body)       => request('/teachers', { method: 'POST', body: JSON.stringify(typeof body === 'string' ? { name: body } : body) })
 export const apiRenameTeacher   = (id, name)   => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+export const apiUpdateTeacher   = (id, patch)  => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteTeacher   = (id)         => request(`/teachers/${encodeURIComponent(id)}`, { method: 'DELETE' })
 export const apiReorderTeachers = (ids)        => request('/teachers/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 
@@ -163,6 +164,24 @@ export const apiCreatePaymentRecord = (record) =>
   request('/payment-records', { method: 'POST', body: JSON.stringify(record) })
 export const apiDeletePaymentRecord = (id) =>
   request(`/payment-records/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+// ── Misc Expenses ─────────────────────────────────────────────────────────────
+
+export const apiListMiscExpenses = ({ from, to } = {}) => {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to)   params.set('to', to)
+  const qs = params.toString()
+  return request(`/misc-expenses${qs ? '?' + qs : ''}`)
+}
+export const apiCreateMiscExpense = (body) => request('/misc-expenses', { method: 'POST', body: JSON.stringify(body) })
+export const apiDeleteMiscExpense = (id)   => request(`/misc-expenses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+// ── Period Locks ──────────────────────────────────────────────────────────────
+
+export const apiListPeriodLocks   = ()      => request('/period-locks')
+export const apiCreatePeriodLock  = (body)  => request('/period-locks', { method: 'POST', body: JSON.stringify(body) })
+export const apiDeletePeriodLock  = (id)    => request(`/period-locks/${encodeURIComponent(id)}`, { method: 'DELETE' })
 
 // ── Settlement ────────────────────────────────────────────────────────────────
 

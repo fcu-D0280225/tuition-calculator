@@ -15,6 +15,7 @@ export const VALID_NAV_IDS = [
   'lessons_group',
   'attendance',
   'materials',
+  'misc',
   'settlement',
   'settlement_tuition',
   'settlement_salary',
@@ -90,6 +91,16 @@ export async function initAuthSchema() {
     await pool.query(`ALTER TABLE auth_users ADD CONSTRAINT fk_auth_users_group FOREIGN KEY (group_id) REFERENCES auth_groups(id) ON DELETE SET NULL`)
   }
 
+  // Migration: auth_users 加 teacher_id（若使用者是「老師」群組，連到 teachers 表的某一筆）
+  const [tidCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_users' AND COLUMN_NAME = 'teacher_id'`
+  )
+  if (tidCols.length === 0) {
+    await pool.query(`ALTER TABLE auth_users ADD COLUMN teacher_id VARCHAR(64) NULL`)
+    await pool.query(`ALTER TABLE auth_users ADD CONSTRAINT fk_auth_users_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL`)
+  }
+
   // 預設群組：管理員（全權限） / 一般使用者（無權限）
   const [adminGroupRows] = await pool.query("SELECT id FROM auth_groups WHERE name = '管理員' LIMIT 1")
   let adminGroupId = adminGroupRows[0]?.id
@@ -102,6 +113,21 @@ export async function initAuthSchema() {
   if (!defaultGroupId) {
     defaultGroupId = `ag_${Date.now()}_default`
     await pool.query('INSERT INTO auth_groups (id, name, is_admin) VALUES (?, ?, 0)', [defaultGroupId, '一般使用者'])
+  }
+
+  // 預設群組：老師（教學相關頁面，不含結算 / 使用者管理）
+  const [teacherGroupRows] = await pool.query("SELECT id FROM auth_groups WHERE name = '老師' LIMIT 1")
+  let teacherGroupId = teacherGroupRows[0]?.id
+  if (!teacherGroupId) {
+    teacherGroupId = `ag_${Date.now()}_teacher`
+    await pool.query('INSERT INTO auth_groups (id, name, is_admin) VALUES (?, ?, 0)', [teacherGroupId, '老師'])
+    const teacherPerms = [
+      'attendance',
+      'lessons', 'lessons_tutoring', 'lessons_group',
+      'schedule', 'students', 'materials', 'courses', 'groups',
+    ]
+    const values = teacherPerms.map(n => [teacherGroupId, n])
+    await pool.query('INSERT INTO auth_group_permissions (group_id, nav_id) VALUES ?', [values])
   }
 
   const [rows] = await pool.query('SELECT COUNT(*) AS n FROM auth_users')
@@ -168,7 +194,7 @@ function buildSessionCookie(token, maxAgeSec) {
 
 async function findUserByUsername(username) {
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.password_hash, u.group_id, g.name AS group_name, g.is_admin
+    `SELECT u.id, u.username, u.password_hash, u.group_id, u.teacher_id, g.name AS group_name, g.is_admin
        FROM auth_users u
        LEFT JOIN auth_groups g ON g.id = u.group_id
       WHERE u.username = ? LIMIT 1`,
@@ -179,7 +205,7 @@ async function findUserByUsername(username) {
 
 async function findUserById(id) {
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.group_id, g.name AS group_name, g.is_admin
+    `SELECT u.id, u.username, u.group_id, u.teacher_id, g.name AS group_name, g.is_admin
        FROM auth_users u
        LEFT JOIN auth_groups g ON g.id = u.group_id
       WHERE u.id = ? LIMIT 1`,
@@ -229,7 +255,7 @@ async function createSession(userId) {
 async function getSessionUser(token) {
   if (!token) return null
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.group_id, g.name AS group_name, g.is_admin, s.expires_at
+    `SELECT u.id, u.username, u.group_id, u.teacher_id, g.name AS group_name, g.is_admin, s.expires_at
        FROM auth_sessions s
        JOIN auth_users u ON u.id = s.user_id
        LEFT JOIN auth_groups g ON g.id = u.group_id
@@ -245,6 +271,7 @@ async function getSessionUser(token) {
   return {
     id: row.id, username: row.username,
     group_id: row.group_id, group_name: row.group_name,
+    teacher_id: row.teacher_id || null,
     is_admin: !!row.is_admin,
   }
 }
@@ -315,9 +342,11 @@ function getRequiredNavs(method, p) {
       : ['materials']
   }
   // settlement
-  if (/^\/api\/settlement\//.test(p)) return ['settlement', 'dashboard']
+  if (/^\/api\/settlement\//.test(p)) return ['settlement', 'dashboard', 'settlement_tuition', 'settlement_salary']
   // payment-records
-  if (/^\/api\/payment-records(\/[^/]+)?$/.test(p)) return ['settlement']
+  if (/^\/api\/payment-records(\/[^/]+)?$/.test(p)) return ['settlement', 'settlement_tuition']
+  // misc-expenses
+  if (/^\/api\/misc-expenses(\/[^/]+)?$/.test(p)) return method === 'GET' ? ['misc', 'dashboard'] : ['misc']
 
   return null
 }
@@ -372,6 +401,7 @@ export function registerAuthRoutes(app) {
         user: { id: user.id, username: user.username },
         group: user.group_id ? { id: user.group_id, name: user.group_name } : null,
         is_admin: !!user.is_admin,
+        teacher_id: user.teacher_id || null,
         permissions: perms,
       })
     } catch (e) {
@@ -402,6 +432,7 @@ export function registerAuthRoutes(app) {
         user: { id: user.id, username: user.username },
         group: user.group_id ? { id: user.group_id, name: user.group_name } : null,
         is_admin: !!user.is_admin,
+        teacher_id: user.teacher_id || null,
         permissions: perms,
       })
     } catch (e) {
@@ -556,16 +587,20 @@ export function registerAdminRoutes(app) {
   app.get('/api/admin/users', requireAdmin(), async (_req, res) => {
     try {
       const [users] = await pool.query(
-        `SELECT u.id, u.username, u.group_id, u.created_at,
-                g.name AS group_name, g.is_admin AS group_is_admin
+        `SELECT u.id, u.username, u.group_id, u.teacher_id, u.created_at,
+                g.name AS group_name, g.is_admin AS group_is_admin,
+                t.name AS teacher_name
            FROM auth_users u
            LEFT JOIN auth_groups g ON g.id = u.group_id
+           LEFT JOIN teachers   t ON t.id = u.teacher_id
           ORDER BY g.is_admin DESC, u.created_at ASC, u.id ASC`
       )
       res.json(users.map(u => ({
         id: u.id, username: u.username,
         group: u.group_id ? { id: u.group_id, name: u.group_name, is_admin: !!u.group_is_admin } : null,
         is_admin: !!u.group_is_admin,
+        teacher_id: u.teacher_id || null,
+        teacher_name: u.teacher_name || null,
         created_at: u.created_at,
       })))
     } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -575,6 +610,8 @@ export function registerAdminRoutes(app) {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim() : ''
     const password = typeof req.body?.password === 'string' ? req.body.password : ''
     const groupId  = typeof req.body?.group_id === 'string' ? req.body.group_id : null
+    const teacherId = req.body?.teacher_id !== undefined && req.body.teacher_id !== ''
+      ? String(req.body.teacher_id) : null
     if (!username || username.length > 64) return res.status(400).json({ error: 'invalid_username' })
     if (!password || password.length < 6) return res.status(400).json({ error: 'password_too_short' })
     if (!groupId) return res.status(400).json({ error: 'group_required' })
@@ -585,13 +622,14 @@ export function registerAdminRoutes(app) {
       if (exists) return res.status(409).json({ error: 'username_taken' })
       const id = `au_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
       await pool.query(
-        'INSERT INTO auth_users (id, username, password_hash, is_admin, group_id) VALUES (?, ?, ?, ?, ?)',
-        [id, username, hashPassword(password), group.is_admin ? 1 : 0, groupId]
+        'INSERT INTO auth_users (id, username, password_hash, is_admin, group_id, teacher_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [id, username, hashPassword(password), group.is_admin ? 1 : 0, groupId, teacherId]
       )
       res.status(201).json({
         id, username,
         group: { id: group.id, name: group.name, is_admin: !!group.is_admin },
         is_admin: !!group.is_admin,
+        teacher_id: teacherId,
       })
     } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
   })
@@ -616,11 +654,17 @@ export function registerAdminRoutes(app) {
           [newGroupId, newGroup.is_admin ? 1 : 0, id])
       }
 
+      if (req.body?.teacher_id !== undefined) {
+        const tid = req.body.teacher_id === '' || req.body.teacher_id === null ? null : String(req.body.teacher_id)
+        await pool.query('UPDATE auth_users SET teacher_id = ? WHERE id = ?', [tid, id])
+      }
+
       const updated = await findUserById(id)
       res.json({
         id: updated.id, username: updated.username,
         group: updated.group_id ? { id: updated.group_id, name: updated.group_name, is_admin: !!updated.is_admin } : null,
         is_admin: !!updated.is_admin,
+        teacher_id: updated.teacher_id || null,
       })
     } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
   })

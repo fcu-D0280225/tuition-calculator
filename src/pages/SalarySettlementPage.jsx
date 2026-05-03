@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react'
 import { apiSettlementSalary } from '../data/api.js'
 import { generateSalaryPDF, generateTeacherSalaryPDF } from '../utils/pdf.js'
+import PeriodLocksPanel from '../components/PeriodLocksPanel.jsx'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -20,7 +21,7 @@ export default function SalarySettlementPage() {
   const [error, setError]     = useState('')
   const [pdfLoading, setPdfLoading] = useState('')
 
-  function amt(value) { return value.toLocaleString() }
+  function amt(value) { return Math.round(Number(value) || 0).toLocaleString() }
 
   async function handleGenerate(e) {
     e.preventDefault()
@@ -68,6 +69,8 @@ export default function SalarySettlementPage() {
       </form>
 
       {error && <div className="error-msg">{error}</div>}
+
+      <PeriodLocksPanel from={from} to={to} />
 
       {salary && (
         <div className="settlement-section">

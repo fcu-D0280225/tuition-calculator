@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import { apiListTeachers, apiCreateTeacher, apiRenameTeacher, apiDeleteTeacher } from '../data/api.js'
+import { apiListTeachers, apiCreateTeacher, apiRenameTeacher, apiUpdateTeacher, apiDeleteTeacher } from '../data/api.js'
 
 const TeachersContext = createContext(null)
 
@@ -29,8 +29,8 @@ export function TeachersProvider({ children }) {
     dispatch({ type: 'SET_TEACHERS', teachers })
   }, [])
 
-  const createTeacher = useCallback(async (name) => {
-    const teacher = await apiCreateTeacher(name)
+  const createTeacher = useCallback(async (body) => {
+    const teacher = await apiCreateTeacher(body)
     dispatch({ type: 'ADD_TEACHER', teacher })
     return teacher
   }, [])
@@ -40,13 +40,18 @@ export function TeachersProvider({ children }) {
     dispatch({ type: 'UPDATE_TEACHER', teacher })
   }, [])
 
+  const updateTeacher = useCallback(async (id, patch) => {
+    const teacher = await apiUpdateTeacher(id, patch)
+    dispatch({ type: 'UPDATE_TEACHER', teacher: { id, ...patch, ...teacher } })
+  }, [])
+
   const removeTeacher = useCallback(async (id) => {
     await apiDeleteTeacher(id)
     dispatch({ type: 'REMOVE_TEACHER', id })
   }, [])
 
   return (
-    <TeachersContext.Provider value={{ state, loadTeachers, createTeacher, renameTeacher, removeTeacher }}>
+    <TeachersContext.Provider value={{ state, loadTeachers, createTeacher, renameTeacher, updateTeacher, removeTeacher }}>
       {children}
     </TeachersContext.Provider>
   )

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   apiAdminListUsers, apiAdminCreateUser, apiAdminUpdateUser, apiAdminDeleteUser,
   apiAdminListGroups, apiAdminCreateGroup, apiAdminUpdateGroup, apiAdminDeleteGroup,
-  apiAuthChangePassword,
+  apiAuthChangePassword, apiListTeachers,
 } from '../data/api.js'
 
 const NAV_OPTIONS = [
@@ -18,12 +18,13 @@ const NAV_OPTIONS = [
   { id: 'teachers',   label: '老師' },
 ]
 
-const EMPTY_NEW_USER  = { username: '', password: '', group_id: '' }
+const EMPTY_NEW_USER  = { username: '', password: '', group_id: '', teacher_id: '' }
 const EMPTY_NEW_GROUP = { name: '', is_admin: false, permissions: [] }
 
 export default function UsersPage({ currentUser }) {
   const [users, setUsers]   = useState([])
   const [groups, setGroups] = useState([])
+  const [teachers, setTeachers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy]   = useState(false)
@@ -54,8 +55,8 @@ export default function UsersPage({ currentUser }) {
   async function reload() {
     setLoading(true); setError('')
     try {
-      const [u, g] = await Promise.all([apiAdminListUsers(), apiAdminListGroups()])
-      setUsers(u); setGroups(g)
+      const [u, g, t] = await Promise.all([apiAdminListUsers(), apiAdminListGroups(), apiListTeachers().catch(() => [])])
+      setUsers(u); setGroups(g); setTeachers(t)
     } catch {
       setError('讀取資料失敗')
     } finally {
@@ -83,6 +84,7 @@ export default function UsersPage({ currentUser }) {
         username: uname,
         password: newUser.password,
         group_id: newUser.group_id,
+        teacher_id: newUser.teacher_id || null,
       })
       setNewUser(EMPTY_NEW_USER)
       setShowAddUser(false)
@@ -364,6 +366,14 @@ export default function UsersPage({ currentUser }) {
                       ))}
                     </select>
                   </label>
+                  <label>對應老師（選填，老師帳號才需要）
+                    <select value={newUser.teacher_id} onChange={e => setNewUser(u => ({ ...u, teacher_id: e.target.value }))}>
+                      <option value="">（無）</option>
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 <div className="users-form-actions">
                   <button type="submit" disabled={busy}>{busy ? '建立中…' : '建立'}</button>
@@ -375,7 +385,7 @@ export default function UsersPage({ currentUser }) {
               <div className="users-table-wrap">
                 <table className="users-table">
                   <thead>
-                    <tr><th>帳號</th><th>群組</th><th></th></tr>
+                    <tr><th>帳號</th><th>群組</th><th>對應老師</th><th></th></tr>
                   </thead>
                   <tbody>
                     {users.map(u => (
@@ -390,6 +400,29 @@ export default function UsersPage({ currentUser }) {
                           >
                             {groups.map(g => (
                               <option key={g.id} value={g.id}>{g.name}{g.is_admin ? '（管理員）' : ''}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <select
+                            value={u.teacher_id || ''}
+                            onChange={async e => {
+                              if (busy) return
+                              setBusy(true); setError('')
+                              try {
+                                await apiAdminUpdateUser(u.id, { teacher_id: e.target.value || null })
+                                await reload()
+                              } catch (err) {
+                                setError(`更新對應老師失敗：${err?.message || err}`)
+                              } finally {
+                                setBusy(false)
+                              }
+                            }}
+                            disabled={busy}
+                          >
+                            <option value="">（無）</option>
+                            {teachers.map(t => (
+                              <option key={t.id} value={t.id}>{t.name}</option>
                             ))}
                           </select>
                         </td>
