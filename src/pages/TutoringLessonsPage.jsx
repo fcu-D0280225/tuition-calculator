@@ -7,10 +7,6 @@ import Combobox from '../components/Combobox.jsx'
 import { useDirtyTracker } from '../contexts/UnsavedContext.jsx'
 import { apiListAllEnrollments, apiCreateLeaveRequest, apiDeleteLeaveRequest } from '../data/api.js'
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
-}
-
 const STATUS_OPTIONS = [
   { value: 'attended',   label: '已點名' },
   { value: 'pending',    label: '未點名' },
@@ -36,7 +32,7 @@ function LessonStatus({ record }) {
   return <span className={`status-tag ${cls}`} title={record.leave_reason || ''}>{label}</span>
 }
 
-const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '1', lesson_dates: [todayStr()], start_time: '', note: '' }
+const EMPTY_FORM = { student_id: '', course_id: '', teacher_id: '', hours: '1', lesson_dates: [], start_time: '', note: '' }
 
 export default function TutoringLessonsPage() {
   const { state: lessonState, loadLessons, createLesson, updateLesson, removeLesson } = useLessons()
