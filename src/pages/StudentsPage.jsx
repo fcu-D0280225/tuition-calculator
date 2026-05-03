@@ -145,8 +145,20 @@ export default function StudentsPage({ onEnroll }) {
     if (removingKey) return
     const current = enrollmentById[studentId]
     if (!current) return
-    const label = kind === 'course' ? '家教課' : '團課'
-    if (!window.confirm(`確定要移除此${label}選課？`)) return
+    const targetName =
+      kind === 'course' ? (courseById(id)?.name || '此家教課')
+                        : (groupById(id)?.name  || '此團課')
+    const msg = kind === 'course'
+      ? `確定要把「${targetName}」從「已選課程」中移除？\n\n` +
+        `⚠️ 注意：\n` +
+        `• 已建立的上課紀錄不會被刪除，仍會列入學費計算\n` +
+        `• 不需要的紀錄請操作人員手動到「上課紀錄」頁刪除\n` +
+        `• 若再次選回此課程並建立日期，可能與既有紀錄重複`
+      : `確定要把學生從團課「${targetName}」移除？\n\n` +
+        `⚠️ 注意：\n` +
+        `• 該團課既有的點名紀錄不會被刪除，仍會列入學費計算\n` +
+        `• 不需要的紀錄請操作人員手動到「團課」頁刪除`
+    if (!window.confirm(msg)) return
     const courseIds = kind === 'course' ? current.course_ids.filter(x => x !== id) : current.course_ids
     const groupIds  = kind === 'group'  ? current.group_ids.filter(x => x !== id)  : current.group_ids
     setRemovingKey(key)
@@ -395,9 +407,9 @@ export default function StudentsPage({ onEnroll }) {
                           ) : (
                             <ul style={{ margin: 0, paddingLeft: '1.2em', lineHeight: 1.8 }}>
                               {historyInfo.items.map(it => (
-                                <li key={`${it.course_id}::${it.teacher_id}`}>
+                                <li key={`${it.course_id}::${it.teacher_id || 'none'}`}>
                                   {it.course_name}
-                                  <span style={{ color: 'var(--muted)' }}>（{it.teacher_name}）</span>
+                                  <span style={{ color: 'var(--muted)' }}>（{it.teacher_name || '未指派'}）</span>
                                 </li>
                               ))}
                             </ul>
