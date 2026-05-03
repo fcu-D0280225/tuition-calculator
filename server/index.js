@@ -245,7 +245,7 @@ app.post('/api/courses', async (req, res) => {
   if (isNaN(teacherHourlyRate) || teacherHourlyRate < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
   const discountPerStudent = req.body?.discount_per_student !== undefined ? parseFloat(req.body.discount_per_student) : 0
   if (isNaN(discountPerStudent) || discountPerStudent < 0 || discountPerStudent > 100000) return res.status(400).json({ error: 'invalid_discount_per_student' })
-  const defaultTeacherId = req.body?.default_teacher_id !== undefined && req.body.default_teacher_id !== ''
+  const defaultTeacherId = req.body?.default_teacher_id != null && req.body.default_teacher_id !== ''
     ? String(req.body.default_teacher_id) : null
   const durationHoursRaw = req.body?.duration_hours
   const durationHours = durationHoursRaw === undefined || durationHoursRaw === '' || durationHoursRaw === null
@@ -571,7 +571,7 @@ app.post('/api/groups', async (req, res) => {
   const durationHours = req.body?.duration_hours !== undefined ? parseFloat(req.body.duration_hours) : 0
   if (isNaN(durationHours) || durationHours < 0 || durationHours > 24) return res.status(400).json({ error: 'invalid_duration_hours' })
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
-  const defaultTeacherId = req.body?.default_teacher_id !== undefined && req.body.default_teacher_id !== ''
+  const defaultTeacherId = req.body?.default_teacher_id != null && req.body.default_teacher_id !== ''
     ? String(req.body.default_teacher_id) : null
   const id = genId('gr')
   try {
