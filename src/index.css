@@ -2867,6 +2867,32 @@ select.catalog-input.catalog-select {
 .hours-input { width: 80px; }
 .note-input  { width: 180px; }
 
+@media (max-width: 768px) {
+  .lesson-form label {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 560px) {
+  .lesson-form-row {
+    flex-direction: column;
+  }
+  .lesson-form label {
+    width: 100%;
+    min-width: unset;
+  }
+  .lesson-form select,
+  .lesson-form input[type="date"],
+  .lesson-form input[type="time"],
+  .lesson-form input[type="text"],
+  .lesson-form input[type="number"] {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .hours-input { width: 100%; }
+  .note-input  { width: 100%; }
+}
+
 /* 篩選 bar */
 .filter-bar {
   display: flex;

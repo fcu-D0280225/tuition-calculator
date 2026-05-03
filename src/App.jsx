@@ -113,6 +113,11 @@ export default function App() {
     try { localStorage.setItem('app_theme', theme) } catch {}
   }, [theme])
 
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [sidebarOpen])
+
   function toggleTheme() {
     setTheme(t => t === 'dark' ? 'light' : 'dark')
   }
