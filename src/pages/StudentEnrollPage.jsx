@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
+import Combobox from '../components/Combobox.jsx'
 import { apiCreateLesson, apiGetStudentEnrollment, apiSetStudentEnrollment } from '../data/api.js'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
@@ -31,6 +32,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const [enrolledGroupIds, setEnrolledGroupIds] = useState(null)
   const [groupBusy, setGroupBusy] = useState(null) // group_id 正在處理
   const [groupMsg, setGroupMsg] = useState('')
+  const [overrideTeacherId, setOverrideTeacherId] = useState('')
 
   useEffect(() => { loadCourses(); loadTeachers(); loadGroups() }, [loadCourses, loadTeachers, loadGroups])
 
@@ -76,11 +78,6 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     () => coursesState.courses.find(c => c.id === courseId),
     [coursesState.courses, courseId]
   )
-  const defaultTeacher = useMemo(() => {
-    if (!course?.default_teacher_id) return null
-    return teachersState.teachers.find(t => t.id === course.default_teacher_id) || null
-  }, [course, teachersState.teachers])
-
   function teacherName(id) {
     return teachersState.teachers.find(t => t.id === id)?.name || ''
   }
@@ -90,7 +87,9 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   }
 
   function pickCourse(cid) {
+    const c = coursesState.courses.find(x => x.id === cid)
     setCourseId(cid)
+    setOverrideTeacherId(c?.default_teacher_id || '')
     setSelectedDates(new Set())
     setDone(null)
     setError('')
@@ -100,10 +99,14 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   function backToCourseList() {
     setStep('pick-course')
     setCourseId(null)
+    setOverrideTeacherId('')
     setSelectedDates(new Set())
     setDone(null)
     setError('')
   }
+
+  const effectiveTeacherId = overrideTeacherId || course?.default_teacher_id || ''
+  const activeTeachers = teachersState.teachers.filter(t => t.active !== 0)
 
   function toggleDate(dateStr) {
     setSelectedDates(prev => {
@@ -136,8 +139,8 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
 
   async function handleSubmit() {
     if (!course) return
-    if (!course.default_teacher_id) {
-      setError('該課程未設定預設老師，請先到「家教課」頁設定後再回來')
+    if (!effectiveTeacherId) {
+      setError('請選擇老師')
       return
     }
     if (selectedDates.size === 0) {
@@ -152,7 +155,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
         await apiCreateLesson({
           student_id: studentId,
           course_id: course.id,
-          teacher_id: course.default_teacher_id,
+          teacher_id: effectiveTeacherId,
           hours: 1,
           lesson_date: d,
           start_time: null,
@@ -268,12 +271,20 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
           </div>
 
           <div className="enroll-summary">
-            <div><strong>課程：</strong>{courseLabel(course)}</div>
-            <div>
+            <div><strong>課程：</strong>{course.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <strong>老師：</strong>
-              {defaultTeacher
-                ? defaultTeacher.name
-                : <span style={{ color: 'var(--danger, #c00)' }}>未設定（請先到家教課頁補上預設老師）</span>}
+              <div style={{ minWidth: 180 }}>
+                <Combobox
+                  items={activeTeachers}
+                  value={effectiveTeacherId}
+                  onChange={setOverrideTeacherId}
+                  placeholder="搜尋老師…"
+                />
+              </div>
+              {!course.default_teacher_id && (
+                <span style={{ color: 'var(--muted)', fontSize: 12 }}>（此課程未設預設老師，請手動選擇）</span>
+              )}
             </div>
             <div><strong>每筆時數：</strong>1 小時</div>
           </div>
@@ -340,7 +351,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
               type="button"
               className="btn-primary"
               onClick={handleSubmit}
-              disabled={saving || selectedDates.size === 0 || !course.default_teacher_id}
+              disabled={saving || selectedDates.size === 0 || !effectiveTeacherId}
             >
               {saving ? '建立中⋯' : `建立 ${selectedDates.size} 筆上課紀錄`}
             </button>
