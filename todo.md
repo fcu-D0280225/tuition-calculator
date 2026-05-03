@@ -74,6 +74,15 @@
 
 ### 中優先（行政效率）
 
+- [ ] **接 React Router**（修瀏覽器上一頁／重新整理／分享連結）
+  - 現況：`App.jsx` 用 `tab` state 切頁面，網址永遠是 `/`，瀏覽器上一頁會直接離開 app；重新整理永遠回預設頁
+  - 加 `react-router-dom`，把 `tab` 改成 route：`/students`、`/students/:id/enroll`、`/courses`、`/courses/:id/edit`、`/attendance`、`/dashboard` 等
+  - 權限檢查（`firstAllowedTab` / `allowedTabIds`）改寫成 route guard
+  - 把 `student_enroll`、`course_edit` 這類「特殊 tab」改成真的 route，URL 會帶 `studentId` / `courseId`
+  - 老師帳號預設導向也改用 `<Navigate to="/attendance" />`，重新整理仍停在點名頁
+  - 影響：14 個頁面 + 2 個內部跳轉，預估 30~60 分鐘；多 1 個依賴 (~5KB gz)
+
+
 - [ ] **線上繳費（第三方支付）**：先做 LINE Pay / 街口介接 PoC（手續費高但快）
   - 後續視量再評估銀行 API 直連
   - 繳費成功 webhook 自動寫 `payment_records`
