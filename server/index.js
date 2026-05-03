@@ -7,7 +7,7 @@ import {
   listStudents, insertStudent, updateStudent, setStudentActive, listStudentCourses,
   getStudentEnrollment, setStudentEnrollment, listAllEnrollments, reorderStudents,
   // teachers
-  listTeachers, insertTeacher, updateTeacherName, updateTeacher, setTeacherActive, reorderTeachers,
+  listTeachers, insertTeacher, updateTeacherName, updateTeacher, setTeacherActive, reorderTeachers, listTeacherCourses,
   // courses
   listCourses, insertCourse, updateCourse, deleteCourse, reorderCourses,
   // lessons
@@ -203,6 +203,11 @@ app.patch('/api/teachers/:id', async (req, res) => {
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...update })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.get('/api/teachers/:id/courses', async (req, res) => {
+  try { res.json(await listTeacherCourses(req.params.id)) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/teachers/:id/active', async (req, res) => {

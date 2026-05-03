@@ -67,6 +67,7 @@ export const apiCreateTeacher   = (body)       => request('/teachers', { method:
 export const apiRenameTeacher   = (id, name)   => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 export const apiUpdateTeacher   = (id, patch)  => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiSetTeacherActive = (id, active) => request(`/teachers/${encodeURIComponent(id)}/active`, { method: 'PUT', body: JSON.stringify({ active: !!active }) })
+export const apiListTeacherCourses = (id) => request(`/teachers/${encodeURIComponent(id)}/courses`)
 export const apiReorderTeachers = (ids)        => request('/teachers/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 
 // ── Courses ───────────────────────────────────────────────────────────────────

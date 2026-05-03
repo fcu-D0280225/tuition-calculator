@@ -826,6 +826,34 @@ export async function listStudentCourses(studentId) {
   return rows
 }
 
+export async function listTeacherCourses(teacherId) {
+  // 家教課（distinct course）
+  const [courseRows] = await pool.query(
+    `SELECT lr.course_id, c.name AS course_name,
+            COUNT(*) AS lesson_count,
+            MAX(lr.lesson_date) AS last_lesson_date
+       FROM lesson_records lr
+       JOIN courses c ON c.id = lr.course_id
+      WHERE lr.teacher_id = ?
+      GROUP BY lr.course_id, c.name
+      ORDER BY last_lesson_date DESC, c.name ASC`,
+    [teacherId]
+  )
+  // 團課（distinct group）
+  const [groupRows] = await pool.query(
+    `SELECT gr.group_id, g.name AS group_name,
+            COUNT(*) AS record_count,
+            MAX(gr.record_date) AS last_record_date
+       FROM group_records gr
+       JOIN \`groups\` g ON g.id = gr.group_id
+      WHERE gr.teacher_id = ?
+      GROUP BY gr.group_id, g.name
+      ORDER BY last_record_date DESC, g.name ASC`,
+    [teacherId]
+  )
+  return { courses: courseRows, groups: groupRows }
+}
+
 // ── Teachers ──────────────────────────────────────────────────────────────────
 
 export async function listTeachers() {
