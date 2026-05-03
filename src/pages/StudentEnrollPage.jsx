@@ -9,9 +9,6 @@ const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
 function pad(n) { return String(n).padStart(2, '0') }
 function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
-function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-}
 
 export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const { state: coursesState, loadCourses } = useCourses()
@@ -20,12 +17,9 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
 
   const [step, setStep] = useState('pick-course') // 'pick-course' | 'pick-dates'
   const [courseId, setCourseId] = useState(null)
-  const [selectedDates, setSelectedDates] = useState(new Map()) // Map<dateStr, timeStr>
-  const [pendingDate, setPendingDate] = useState(null) // 剛點選、等使用者輸入時間
-  const [viewMonth, setViewMonth] = useState(() => {
-    const d = new Date()
-    return new Date(d.getFullYear(), d.getMonth(), 1)
-  })
+  // 第 2 步改為：選週幾 + 設定每個週幾的時間，自動建立本月剩餘的對應日期
+  const [weekdayTimes, setWeekdayTimes] = useState(new Map()) // Map<0..6, timeStr>
+  const [pendingWeekday, setPendingWeekday] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(null)
@@ -121,8 +115,8 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     const c = coursesState.courses.find(x => x.id === cid)
     setCourseId(cid)
     setOverrideTeacherId(c?.default_teacher_id || '')
-    setSelectedDates(new Map())
-    setPendingDate(null)
+    setWeekdayTimes(new Map())
+    setPendingWeekday(null)
     setDone(null)
     setError('')
     setStep('pick-dates')
@@ -132,8 +126,8 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     setStep('pick-course')
     setCourseId(null)
     setOverrideTeacherId('')
-    setSelectedDates(new Map())
-    setPendingDate(null)
+    setWeekdayTimes(new Map())
+    setPendingWeekday(null)
     setDone(null)
     setError('')
   }
@@ -142,66 +136,67 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const activeTeachers = teachersState.teachers.filter(t => t.active !== 0)
   const lessonHours = course ? parseFloat(course.duration_hours ?? 1) || 1 : 1
 
-  const submitDisableReason = saving
-    ? '建立中，請稍候'
-    : selectedDates.size === 0
-      ? '請至少勾選一個日期'
-      : ''
-
-  function toggleDate(dateStr) {
-    setSelectedDates(prev => {
+  function toggleWeekday(w) {
+    setWeekdayTimes(prev => {
       const next = new Map(prev)
-      if (next.has(dateStr)) {
-        next.delete(dateStr)
-        if (pendingDate === dateStr) setPendingDate(null)
+      if (next.has(w)) {
+        next.delete(w)
+        if (pendingWeekday === w) setPendingWeekday(null)
       } else {
-        next.set(dateStr, '')
-        setPendingDate(dateStr)
+        next.set(w, '')
+        setPendingWeekday(w)
       }
       return next
     })
   }
 
-  function setDateTime(dateStr, time) {
-    setSelectedDates(prev => {
+  function setWeekdayTime(w, time) {
+    setWeekdayTimes(prev => {
       const next = new Map(prev)
-      if (next.has(dateStr)) next.set(dateStr, time)
+      if (next.has(w)) next.set(w, time)
       return next
     })
   }
 
-  function shiftMonth(delta) {
-    setViewMonth(d => new Date(d.getFullYear(), d.getMonth() + delta, 1))
-  }
-
-  // 6×7 月曆網格，週日起算
-  const calendarDays = useMemo(() => {
-    const first = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1)
-    const startWeekday = first.getDay() // 0=Sun
-    const start = new Date(first)
-    start.setDate(first.getDate() - startWeekday)
-    const days = []
-    for (let i = 0; i < 42; i++) {
-      const d = new Date(start)
-      d.setDate(start.getDate() + i)
-      days.push(d)
-    }
-    return days
-  }, [viewMonth])
-
   const today = new Date()
+
+  // 依選定的週幾，列出本月（從今天起）剩餘符合的日期
+  const entriesToCreate = useMemo(() => {
+    if (weekdayTimes.size === 0) return []
+    const y = today.getFullYear()
+    const m = today.getMonth()
+    const startDay = today.getDate()
+    const lastDay = new Date(y, m + 1, 0).getDate()
+    const out = []
+    for (let day = startDay; day <= lastDay; day++) {
+      const d = new Date(y, m, day)
+      const w = d.getDay()
+      if (weekdayTimes.has(w)) {
+        out.push({ date: fmtDate(d), time: weekdayTimes.get(w) || '', weekday: w })
+      }
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekdayTimes])
+
+  const submitDisableReason = saving
+    ? '建立中，請稍候'
+    : weekdayTimes.size === 0
+      ? '請至少選擇一個週幾'
+      : entriesToCreate.length === 0
+        ? '本月剩餘日期沒有符合的週幾'
+        : ''
 
   async function handleSubmit() {
     if (!course) return
-    if (selectedDates.size === 0) {
-      setError('請至少選一個日期')
+    if (entriesToCreate.length === 0) {
+      setError('本月剩餘日期沒有符合的週幾，請至少選一個週幾')
       return
     }
     setSaving(true); setError(''); setDone(null)
-    const entries = Array.from(selectedDates.entries()).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
     const failures = []
     let skipped = 0
-    for (const [d, t] of entries) {
+    for (const { date: d, time: t } of entriesToCreate) {
       try {
         await apiCreateLessonWithDupCheck({
           student_id: studentId,
@@ -228,7 +223,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
         else failures.push(`${d}：${e?.message || '建立失敗'}`)
       }
     }
-    const successCount = entries.length - failures.length - skipped
+    const successCount = entriesToCreate.length - failures.length - skipped
     if (successCount > 0 && enrolledCourseIds && !enrolledCourseIds.has(course.id)) {
       const nextCourseIds = new Set(enrolledCourseIds)
       nextCourseIds.add(course.id)
@@ -243,10 +238,10 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
       }
     }
     setSaving(false)
-    setDone({ total: entries.length, failed: failures.length, skipped, failures })
+    setDone({ total: entriesToCreate.length, failed: failures.length, skipped, failures })
     if (failures.length === 0 && skipped === 0) {
-      setSelectedDates(new Map())
-      setPendingDate(null)
+      setWeekdayTimes(new Map())
+      setPendingWeekday(null)
     }
   }
 
@@ -372,7 +367,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
         <div className="enroll-step">
           <div className="form-section-title" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button type="button" className="btn-sm" onClick={backToCourseList}>← 重新選課程</button>
-            <span>第 2 步：在月曆上勾選上課日期</span>
+            <span>第 2 步：選擇週幾與每個週幾的開始時間（自動建立本月剩餘對應日期）</span>
           </div>
 
           <div className="enroll-summary">
@@ -397,92 +392,95 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
             <div className="enroll-summary-row">
               <strong className="enroll-summary-label">每筆時數：</strong>
               <span>{lessonHours} 小時</span>
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>（點選日期後可逐日設定開始時間）</span>
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>
+                （建立範圍：{fmtDate(today)} ~ {fmtDate(new Date(today.getFullYear(), today.getMonth() + 1, 0))}）
+              </span>
             </div>
           </div>
 
-          <div className="calendar-toolbar">
-            <button type="button" className="btn-sm" onClick={() => shiftMonth(-1)} disabled={saving}>‹ 上個月</button>
-            <span className="calendar-month-label">
-              {viewMonth.getFullYear()} 年 {viewMonth.getMonth() + 1} 月
-            </span>
-            <button type="button" className="btn-sm" onClick={() => shiftMonth(1)} disabled={saving}>下個月 ›</button>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ marginBottom: 8, fontWeight: 600 }}>選擇上課週幾</div>
+            <div className="weekday-picker">
+              {WEEKDAYS.map((label, w) => {
+                const active = weekdayTimes.has(w)
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    className={`weekday-chip${active ? ' active' : ''}`}
+                    onClick={() => toggleWeekday(w)}
+                    disabled={saving}
+                    aria-pressed={active}
+                  >{label}</button>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="calendar-grid">
-            {WEEKDAYS.map(w => (
-              <div className="calendar-head" key={w}>{w}</div>
-            ))}
-            {calendarDays.map((d, idx) => {
-              const dateStr = fmtDate(d)
-              const inMonth = d.getMonth() === viewMonth.getMonth()
-              const isToday = isSameDay(d, today)
-              const picked  = selectedDates.has(dateStr)
-              const pickedTime = picked ? selectedDates.get(dateStr) : ''
-              return (
-                <button
-                  type="button"
-                  key={idx}
-                  className={`calendar-cell${inMonth ? '' : ' calendar-cell--out'}${picked ? ' calendar-cell--picked' : ''}${isToday ? ' calendar-cell--today' : ''}`}
-                  onClick={() => toggleDate(dateStr)}
-                  disabled={saving}
-                  title={dateStr}
-                >
-                  <span className="calendar-day-num">{d.getDate()}</span>
-                  {picked && pickedTime && (
-                    <span className="calendar-day-time" style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>{pickedTime}</span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          {selectedDates.size > 0 && (
-            <div className="enroll-selected">
-              已選 {selectedDates.size} 個日期（可逐日設定開始時間，留空表示未排定）：
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {Array.from(selectedDates.entries())
-                  .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
-                  .map(([d, t]) => (
+          {weekdayTimes.size > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ marginBottom: 8, fontWeight: 600 }}>每個週幾的開始時間（留空表示未排定）</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {Array.from(weekdayTimes.entries())
+                  .sort(([a], [b]) => a - b)
+                  .map(([w, t]) => (
                     <div
-                      key={d}
+                      key={w}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: 8,
                         padding: '4px 8px',
-                        border: pendingDate === d ? '1px solid var(--primary, #3b82f6)' : '1px solid var(--border, #ddd)',
+                        border: pendingWeekday === w ? '1px solid var(--primary, #3b82f6)' : '1px solid var(--border, #ddd)',
                         borderRadius: 6,
                       }}
                     >
-                      <span style={{ minWidth: 110 }}>{d}</span>
+                      <span style={{ minWidth: 60 }}>週{WEEKDAYS[w]}</span>
                       <input
                         type="time"
                         value={t}
                         step="60"
-                        autoFocus={pendingDate === d}
-                        onFocus={() => setPendingDate(d)}
-                        onBlur={() => { if (pendingDate === d) setPendingDate(null) }}
-                        onChange={e => setDateTime(d, e.target.value)}
+                        autoFocus={pendingWeekday === w}
+                        onFocus={() => setPendingWeekday(w)}
+                        onBlur={() => { if (pendingWeekday === w) setPendingWeekday(null) }}
+                        onChange={e => setWeekdayTime(w, e.target.value)}
                       />
                       {t && (
                         <button
                           type="button"
                           className="btn-sm"
-                          onClick={() => setDateTime(d, '')}
+                          onClick={() => setWeekdayTime(w, '')}
                           aria-label="清除時間"
                         >清除時間</button>
                       )}
                       <button
                         type="button"
                         className="chip-remove"
-                        onClick={() => toggleDate(d)}
-                        aria-label="移除日期"
+                        onClick={() => toggleWeekday(w)}
+                        aria-label="移除此週幾"
                         style={{ marginLeft: 'auto' }}
                       >×</button>
                     </div>
                   ))}
               </div>
+            </div>
+          )}
+
+          {weekdayTimes.size > 0 && (
+            <div className="enroll-selected" style={{ marginTop: 12 }}>
+              {entriesToCreate.length === 0
+                ? <span style={{ color: 'var(--muted)' }}>本月剩餘日期沒有符合所選週幾的日子</span>
+                : <>
+                    將建立 {entriesToCreate.length} 筆上課紀錄：
+                    <div className="chip-list" style={{ marginTop: 6 }}>
+                      {entriesToCreate.map(e => (
+                        <span className="chip" key={e.date}>
+                          {e.date}（週{WEEKDAYS[e.weekday]}）{e.time && `・${e.time}`}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+              }
             </div>
           )}
 
@@ -515,7 +513,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
                 disabled={!!submitDisableReason}
                 title={submitDisableReason}
               >
-                {saving ? '建立中⋯' : `建立 ${selectedDates.size} 筆上課紀錄`}
+                {saving ? '建立中⋯' : `建立 ${entriesToCreate.length} 筆上課紀錄`}
               </button>
             </span>
             {submitDisableReason && !saving && (
