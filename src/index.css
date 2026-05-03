@@ -4363,6 +4363,22 @@ select.catalog-input.catalog-select {
   font-size: 12px;
   color: var(--muted);
 }
+.course-pick-card--picked {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+.course-pick-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  vertical-align: middle;
+  font-weight: 500;
+}
 
 .enroll-summary {
   display: flex;

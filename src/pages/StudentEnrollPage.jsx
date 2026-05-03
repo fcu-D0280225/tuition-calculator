@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
-import { apiCreateLesson } from '../data/api.js'
+import { apiCreateLesson, apiGetStudentEnrollment } from '../data/api.js'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -25,8 +25,17 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState(null)
+  const [enrolledCourseIds, setEnrolledCourseIds] = useState(null) // null=載入中, Set=已載入
 
   useEffect(() => { loadCourses(); loadTeachers() }, [loadCourses, loadTeachers])
+
+  useEffect(() => {
+    let cancelled = false
+    apiGetStudentEnrollment(studentId)
+      .then(data => { if (!cancelled) setEnrolledCourseIds(new Set(data.course_ids || [])) })
+      .catch(() => { if (!cancelled) setEnrolledCourseIds(new Set()) })
+    return () => { cancelled = true }
+  }, [studentId])
 
   const course = useMemo(
     () => coursesState.courses.find(c => c.id === courseId),
@@ -141,21 +150,27 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
             <div className="empty-hint">尚無家教課可選，請先到「家教課」頁新增</div>
           ) : (
             <div className="course-pick-grid">
-              {coursesState.courses.map(c => (
-                <button
-                  type="button"
-                  key={c.id}
-                  className="course-pick-card"
-                  onClick={() => pickCourse(c.id)}
-                >
-                  <div className="course-pick-name">{c.name}</div>
-                  <div className="course-pick-meta">
-                    {c.default_teacher_id
-                      ? <>預設老師：{teacherName(c.default_teacher_id) || '—'}</>
-                      : <span style={{ color: 'var(--danger, #c00)' }}>尚未設定預設老師</span>}
-                  </div>
-                </button>
-              ))}
+              {coursesState.courses.map(c => {
+                const alreadyPicked = enrolledCourseIds?.has(c.id)
+                return (
+                  <button
+                    type="button"
+                    key={c.id}
+                    className={`course-pick-card${alreadyPicked ? ' course-pick-card--picked' : ''}`}
+                    onClick={() => pickCourse(c.id)}
+                  >
+                    <div className="course-pick-name">
+                      {c.name}
+                      {alreadyPicked && <span className="course-pick-badge">已選過</span>}
+                    </div>
+                    <div className="course-pick-meta">
+                      {c.default_teacher_id
+                        ? <>預設老師：{teacherName(c.default_teacher_id) || '—'}</>
+                        : <span style={{ color: 'var(--danger, #c00)' }}>尚未設定預設老師</span>}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
