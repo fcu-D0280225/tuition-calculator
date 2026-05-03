@@ -434,6 +434,16 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
                       disabled={!active || saving}
                       onChange={e => setWeekdayTime(w, e.target.value)}
                       onClick={e => e.stopPropagation()}
+                      style={{
+                        padding: '7px 10px',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        color: 'var(--text)',
+                        background: active ? 'var(--surface)' : 'var(--bg)',
+                        opacity: active ? 1 : 0.5,
+                      }}
                     />
                     {active && t && (
                       <button
