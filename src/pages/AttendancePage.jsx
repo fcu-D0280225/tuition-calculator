@@ -740,7 +740,11 @@ export default function AttendancePage() {
               onSaved={() => setReloadTick(t => t + 1)}
               headerLabel={headerLabel}
               selectedDate={selectedDate}
-              defaultTeacherId={(!isAdmin && ownTeacherId) ? ownTeacherId : ''}
+              defaultTeacherId={
+                (!isAdmin && ownTeacherId)
+                  ? ownTeacherId
+                  : (coursesState.courses.find(c => c.id === selectedCourse)?.default_teacher_id || '')
+              }
             />
           ))
         )
