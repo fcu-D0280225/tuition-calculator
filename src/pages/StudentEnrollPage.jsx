@@ -399,72 +399,55 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
           </div>
 
           <div style={{ marginTop: 12 }}>
-            <div style={{ marginBottom: 8, fontWeight: 600 }}>選擇上課週幾</div>
-            <div className="weekday-picker">
+            <div style={{ marginBottom: 8, fontWeight: 600 }}>
+              勾選上課的週幾，並設定每個週幾的開始時間（可複選；時間留空表示未排定）
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {WEEKDAYS.map((label, w) => {
                 const active = weekdayTimes.has(w)
+                const t = active ? weekdayTimes.get(w) : ''
                 return (
-                  <button
+                  <label
                     key={w}
-                    type="button"
-                    className={`weekday-chip${active ? ' active' : ''}`}
-                    onClick={() => toggleWeekday(w)}
-                    disabled={saving}
-                    aria-pressed={active}
-                  >{label}</button>
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '8px 12px',
+                      border: '1px solid var(--border, #ddd)',
+                      borderRadius: 6,
+                      background: active ? 'var(--accent-light)' : 'var(--surface)',
+                      cursor: saving ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={active}
+                      disabled={saving}
+                      onChange={() => toggleWeekday(w)}
+                    />
+                    <span style={{ minWidth: 60, fontWeight: 600 }}>週{label}</span>
+                    <input
+                      type="time"
+                      value={t}
+                      step="60"
+                      disabled={!active || saving}
+                      onChange={e => setWeekdayTime(w, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    {active && t && (
+                      <button
+                        type="button"
+                        className="btn-sm"
+                        onClick={e => { e.preventDefault(); setWeekdayTime(w, '') }}
+                        aria-label="清除時間"
+                      >清除時間</button>
+                    )}
+                  </label>
                 )
               })}
             </div>
           </div>
-
-          {weekdayTimes.size > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ marginBottom: 8, fontWeight: 600 }}>每個週幾的開始時間（留空表示未排定）</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {Array.from(weekdayTimes.entries())
-                  .sort(([a], [b]) => a - b)
-                  .map(([w, t]) => (
-                    <div
-                      key={w}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '4px 8px',
-                        border: pendingWeekday === w ? '1px solid var(--primary, #3b82f6)' : '1px solid var(--border, #ddd)',
-                        borderRadius: 6,
-                      }}
-                    >
-                      <span style={{ minWidth: 60 }}>週{WEEKDAYS[w]}</span>
-                      <input
-                        type="time"
-                        value={t}
-                        step="60"
-                        autoFocus={pendingWeekday === w}
-                        onFocus={() => setPendingWeekday(w)}
-                        onBlur={() => { if (pendingWeekday === w) setPendingWeekday(null) }}
-                        onChange={e => setWeekdayTime(w, e.target.value)}
-                      />
-                      {t && (
-                        <button
-                          type="button"
-                          className="btn-sm"
-                          onClick={() => setWeekdayTime(w, '')}
-                          aria-label="清除時間"
-                        >清除時間</button>
-                      )}
-                      <button
-                        type="button"
-                        className="chip-remove"
-                        onClick={() => toggleWeekday(w)}
-                        aria-label="移除此週幾"
-                        style={{ marginLeft: 'auto' }}
-                      >×</button>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
 
           {weekdayTimes.size > 0 && (
             <div className="enroll-selected" style={{ marginTop: 12 }}>
