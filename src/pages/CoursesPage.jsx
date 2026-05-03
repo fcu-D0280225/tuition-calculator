@@ -5,29 +5,19 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import Combobox from '../components/Combobox.jsx'
 import { apiReorderCourses } from '../data/api.js'
 
-export default function CoursesPage() {
-  const { state, loadCourses, createCourse, updateCourse, removeCourse } = useCourses()
+export default function CoursesPage({ onEditCourse }) {
+  const { state, loadCourses, createCourse, removeCourse } = useCourses()
   const { state: teachersState, loadTeachers } = useTeachers()
-  const { canViewRates } = useAuth()
+  const { canViewRates, canManageCourses } = useAuth()
   const { courses, loading } = state
   const { teachers } = teachersState
   const activeTeachers = teachers.filter(t => t.active !== 0)
 
   const [newName, setNewName]                   = useState('')
   const [newRate, setNewRate]                   = useState('')
-  const [newTeacherRate, setNewTeacherRate]     = useState('')
-  const [newDiscountAmt, setNewDiscountAmt]     = useState('0')
   const [newDefaultTeacher, setNewDefaultTeacher] = useState('')
   const [newDurationHours, setNewDurationHours] = useState('1')
-  const [newNote, setNewNote]                   = useState('')
-  const [editId, setEditId]                     = useState(null)
-  const [editName, setEditName]                 = useState('')
-  const [editRate, setEditRate]                 = useState('')
-  const [editTeacherRate, setEditTeacherRate]   = useState('')
-  const [editDiscountAmt, setEditDiscountAmt]   = useState('0')
-  const [editDefaultTeacher, setEditDefaultTeacher] = useState('')
-  const [editNote, setEditNote]                 = useState('')
-  const [editDurationHours, setEditDurationHours] = useState('1')
+  // 列表只顯示至關欄位；其他欄位（學費／老師時薪／每多一人折扣／備註）改在獨立的編輯頁修改
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
 
@@ -74,37 +64,17 @@ export default function CoursesPage() {
     e.preventDefault()
     const name = newName.trim()
     if (!name) { setError('請輸入家教課名稱'); return }
-    const hourlyRate = parseFloat(newRate)
-    if (isNaN(hourlyRate) || hourlyRate <= 0) { setError('請輸入學費'); return }
-    const teacherHourlyRate = parseFloat(newTeacherRate)
-    if (isNaN(teacherHourlyRate) || teacherHourlyRate <= 0) { setError('請輸入老師時薪'); return }
-    const discAmt = parseFloat(newDiscountAmt || '0')
-    if (isNaN(discAmt) || discAmt < 0 || discAmt > 100000) { setError('每多一人折扣金額格式不正確'); return }
+    const hourlyRate = canViewRates ? parseFloat(newRate) : 0
+    if (canViewRates && (isNaN(hourlyRate) || hourlyRate <= 0)) { setError('請輸入學費'); return }
     const durationHours = parseFloat(newDurationHours || '1')
     if (isNaN(durationHours) || durationHours <= 0 || durationHours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError('')
     try {
-      await createCourse(name, hourlyRate, teacherHourlyRate, discAmt, newDefaultTeacher || null, durationHours, newNote.trim())
-      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountAmt('0'); setNewDefaultTeacher(''); setNewDurationHours('1'); setNewNote('')
+      // 老師時薪 / 每多一人折扣 / 備註 改在獨立的編輯頁設定
+      await createCourse(name, hourlyRate, 0, 0, newDefaultTeacher || null, durationHours, '')
+      setNewName(''); setNewRate(''); setNewDefaultTeacher(''); setNewDurationHours('1')
     }
     catch { setError('新增失敗') }
-    finally { setSaving(false) }
-  }
-
-  async function handleUpdate(id) {
-    const name = editName.trim()
-    if (!name) return
-    const hourly_rate = parseFloat(editRate)
-    if (isNaN(hourly_rate) || hourly_rate < 0) { setError('學費格式不正確'); return }
-    const teacher_hourly_rate = parseFloat(editTeacherRate)
-    if (isNaN(teacher_hourly_rate) || teacher_hourly_rate < 0) { setError('老師時薪格式不正確'); return }
-    const discAmt = parseFloat(editDiscountAmt || '0')
-    if (isNaN(discAmt) || discAmt < 0 || discAmt > 100000) { setError('每多一人折扣金額格式不正確'); return }
-    const duration_hours = parseFloat(editDurationHours || '1')
-    if (isNaN(duration_hours) || duration_hours <= 0 || duration_hours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
-    setSaving(true); setError('')
-    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_per_student: discAmt, default_teacher_id: editDefaultTeacher || null, duration_hours, note: editNote }); setEditId(null) }
-    catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
 
@@ -122,6 +92,7 @@ export default function CoursesPage() {
         <h1>家教課目錄</h1>
       </div>
 
+      {canManageCourses && (
       <div className="lesson-form-card">
         <div className="form-section-title">家教課目錄</div>
         <form className="lesson-form" onSubmit={handleAdd} style={{ marginBottom: '16px' }}>
@@ -146,26 +117,6 @@ export default function CoursesPage() {
                     onChange={e => setNewRate(e.target.value)}
                   />
                 </label>
-                <label>老師時薪（元/小時）
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="例如 400"
-                    value={newTeacherRate}
-                    onChange={e => setNewTeacherRate(e.target.value)}
-                  />
-                </label>
-                <label title="N 人時學費 = 學費 − 此金額 × (N-1)。0 = 不打折">每多一人 −（元）
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="例如 100"
-                    value={newDiscountAmt}
-                    onChange={e => setNewDiscountAmt(e.target.value)}
-                  />
-                </label>
               </>
             )}
             <label title="每堂課的預設時數，學生選課建立上課紀錄時會帶入">每堂時數
@@ -187,15 +138,6 @@ export default function CoursesPage() {
                 allLabel="（無預設）"
               />
             </label>
-            <label>備註
-              <input
-                type="text"
-                placeholder="（選填）"
-                value={newNote}
-                onChange={e => setNewNote(e.target.value)}
-                className="note-input"
-              />
-            </label>
           </div>
           <button
             className="btn-primary"
@@ -204,11 +146,11 @@ export default function CoursesPage() {
               saving
               || !newName.trim()
               || (canViewRates && (!newRate.trim() || parseFloat(newRate) <= 0))
-              || (canViewRates && (!newTeacherRate.trim() || parseFloat(newTeacherRate) <= 0))
             }
           >新增家教課</button>
         </form>
       </div>
+      )}
 
       {error && <div className="error-msg">{error}</div>}
 
@@ -220,13 +162,10 @@ export default function CoursesPage() {
         <table className="entity-table courses-table">
           <colgroup>
             <col style={{ width: 36 }} />
-            <col style={{ width: 160 }} />
-            {canViewRates && <col style={{ width: 90 }} />}
-            {canViewRates && <col style={{ width: 100 }} />}
-            {canViewRates && <col style={{ width: 100 }} />}
-            <col style={{ width: 90 }} />
-            <col style={{ width: 140 }} />
             <col />
+            {canViewRates && <col style={{ width: 100 }} />}
+            <col style={{ width: 100 }} />
+            <col style={{ width: 160 }} />
             <col style={{ width: 130 }} />
           </colgroup>
           <thead>
@@ -234,11 +173,8 @@ export default function CoursesPage() {
               <th aria-label="拖曳排序"></th>
               <th>家教課名稱</th>
               {canViewRates && <th>學費</th>}
-              {canViewRates && <th>老師時薪</th>}
-              {canViewRates && <th>每多一人 −</th>}
               <th>每堂時數</th>
               <th>預設老師</th>
-              <th>備註</th>
               <th></th>
             </tr>
           </thead>
@@ -247,144 +183,36 @@ export default function CoursesPage() {
               <tr
                 key={c.id}
                 className={`${dragId === c.id ? 'row-dragging' : ''} ${overId === c.id ? 'row-drop-target' : ''}`}
-                onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(c.id) } }}
+                onDragOver={e => { if (dragId) { e.preventDefault(); setOverId(c.id) } }}
                 onDragLeave={() => { if (overId === c.id) setOverId(null) }}
                 onDrop={e => { e.preventDefault(); handleDrop(c.id) }}
               >
                 <td
                   className="drag-handle"
-                  draggable={editId === null}
+                  draggable
                   onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(c.id) }}
                   onDragEnd={endDrag}
                   title="拖曳調整順序"
                 >⋮⋮</td>
-                <td>
-                  {editId === c.id ? (
-                    <input
-                      autoFocus
-                      className="inline-edit-input"
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (
-                    c.name
-                  )}
-                </td>
-                {canViewRates && (
-                  <td>
-                    {editId === c.id ? (
-                      <input
-                        className="inline-edit-input"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={editRate}
-                        onChange={e => setEditRate(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                      />
-                    ) : (
-                      amt(c.hourly_rate)
-                    )}
-                  </td>
-                )}
-                {canViewRates && (
-                  <td>
-                    {editId === c.id ? (
-                      <input
-                        className="inline-edit-input"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={editTeacherRate}
-                        onChange={e => setEditTeacherRate(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                      />
-                    ) : (
-                      amt(c.teacher_hourly_rate ?? 0)
-                    )}
-                  </td>
-                )}
-                {canViewRates && (
-                  <td>
-                    {editId === c.id ? (
-                      <input
-                        className="inline-edit-input"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={editDiscountAmt}
-                        onChange={e => setEditDiscountAmt(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                      />
-                    ) : (
-                      c.discount_per_student && parseFloat(c.discount_per_student) > 0
-                        ? `−${parseFloat(c.discount_per_student).toLocaleString()}`
-                        : '—'
-                    )}
-                  </td>
-                )}
-                <td>
-                  {editId === c.id ? (
-                    <input
-                      className="inline-edit-input"
-                      type="number"
-                      min="0.5"
-                      step="0.5"
-                      value={editDurationHours}
-                      onChange={e => setEditDurationHours(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (
-                    `${parseFloat(c.duration_hours ?? 1)} 小時`
-                  )}
-                </td>
-                <td>
-                  {editId === c.id ? (
-                    <div className="combobox-cell">
-                      <Combobox
-                        items={activeTeachers}
-                        value={editDefaultTeacher}
-                        onChange={setEditDefaultTeacher}
-                        placeholder="（無）"
-                        allLabel="（無）"
-                      />
-                    </div>
-                  ) : (
-                    teachers.find(t => t.id === c.default_teacher_id)?.name || '—'
-                  )}
-                </td>
-                <td className="note-cell">
-                  {editId === c.id ? (
-                    <input
-                      className="inline-edit-input"
-                      type="text"
-                      value={editNote}
-                      onChange={e => setEditNote(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (c.note || '')}
-                </td>
+                <td>{c.name}</td>
+                {canViewRates && <td>{amt(c.hourly_rate)}</td>}
+                <td>{`${parseFloat(c.duration_hours ?? 1)} 小時`}</td>
+                <td>{teachers.find(t => t.id === c.default_teacher_id)?.name || '—'}</td>
                 <td className="row-actions">
-                  {editId === c.id ? (
+                  {canManageCourses ? (
                     <>
-                      <button className="btn-sm btn-primary" onClick={() => handleUpdate(c.id)} disabled={saving}>儲存</button>
-                      <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
+                      <button
+                        className="btn-sm"
+                        onClick={() => onEditCourse?.(c)}
+                      >編輯</button>
+                      <button
+                        className="btn-sm btn-danger"
+                        onClick={() => handleDelete(c.id)}
+                        disabled={saving}
+                      >刪除</button>
                     </>
                   ) : (
-                    <>
-                      <button className="btn-sm" onClick={() => {
-                        setEditId(c.id)
-                        setEditName(c.name)
-                        setEditRate(String(c.hourly_rate))
-                        setEditTeacherRate(String(c.teacher_hourly_rate ?? 0))
-                        setEditDiscountAmt(c.discount_per_student != null ? String(parseFloat(c.discount_per_student)) : '0')
-                        setEditDefaultTeacher(c.default_teacher_id || '')
-                        setEditDurationHours(c.duration_hours != null ? String(parseFloat(c.duration_hours)) : '1')
-                        setEditNote(c.note || '')
-                      }}>編輯</button>
-                      <button className="btn-sm btn-danger" onClick={() => handleDelete(c.id)} disabled={saving}>刪除</button>
-                    </>
+                    <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
                   )}
                 </td>
               </tr>

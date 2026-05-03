@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
 import CoursesPage       from './pages/CoursesPage.jsx'
+import CourseDetailPage  from './pages/CourseDetailPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
 import StudentEnrollPage from './pages/StudentEnrollPage.jsx'
 import TeachersPage      from './pages/TeachersPage.jsx'
@@ -92,6 +93,7 @@ function firstAllowedTab(visibleNav, preferId = null) {
 export default function App() {
   const [tab, setTab] = useState(null)
   const [enrollContext, setEnrollContext] = useState(null) // { studentId, studentName }
+  const [courseEditId, setCourseEditId] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [], teacher_id: null })
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
@@ -167,6 +169,7 @@ export default function App() {
   useEffect(() => {
     if (authState.status !== 'authed') return
     if (tab === 'student_enroll') return // 內部跳轉用，不在 NAV 中
+    if (tab === 'course_edit') return // 內部跳轉用，不在 NAV 中
     if (!tab || !allowedTabIds.has(tab)) {
       // 老師帳號（綁定 teacher_id 且非管理員）優先導向點名
       const prefer = (!authState.is_admin && authState.teacher_id) ? 'attendance' : null
@@ -196,6 +199,17 @@ export default function App() {
   function closeStudentEnroll() {
     setEnrollContext(null)
     setTab('students')
+  }
+
+  function openCourseEdit(course) {
+    setCourseEditId(course.id)
+    setTab('course_edit')
+    setSidebarOpen(false)
+  }
+
+  function closeCourseEdit() {
+    setCourseEditId(null)
+    setTab('courses')
   }
 
   if (authState.status === 'loading') {
@@ -331,7 +345,10 @@ export default function App() {
               />
             )}
             {tab === 'teachers'   && <TeachersPage />}
-            {tab === 'courses'    && <CoursesPage />}
+            {tab === 'courses'    && <CoursesPage onEditCourse={openCourseEdit} />}
+            {tab === 'course_edit' && courseEditId && (
+              <CourseDetailPage courseId={courseEditId} onBack={closeCourseEdit} />
+            )}
             {tab === 'materials'  && <MaterialsPage />}
             {tab === 'groups'     && <GroupsPage />}
             {tab === 'attendance' && <AttendancePage />}

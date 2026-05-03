@@ -18,6 +18,7 @@ export function AuthProvider({ value, children }) {
       permissions: perms,
       teacher_id: value?.teacher_id || null,
       canViewRates: isAdmin || perms.includes('view_rates'),
+      canManageCourses: isAdmin || perms.includes('manage_courses'),
     }
   }, [value])
   return <AuthContext.Provider value={merged}>{children}</AuthContext.Provider>

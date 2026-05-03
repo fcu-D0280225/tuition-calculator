@@ -23,6 +23,7 @@ const NAV_OPTIONS = [
   { id: 'misc',              label: '雜項支出' },
   { id: 'profit_loss',       label: '損益報表' },
   { id: 'view_rates',        label: '【功能】顯示時薪／金額' },
+  { id: 'manage_courses',    label: '【功能】編輯／刪除家教課' },
 ]
 
 const EMPTY_NEW_USER  = { username: '', password: '', group_id: '', teacher_id: '' }

@@ -22,6 +22,8 @@ export const VALID_NAV_IDS = [
   'profit_loss',
   // 功能權限（非實際 nav）：是否可看時薪/金額欄位
   'view_rates',
+  // 功能權限：可進入家教課編輯頁修改名稱／時薪／折扣／備註等
+  'manage_courses',
   'students',
   'teachers',
   'schedule',
@@ -144,6 +146,23 @@ export async function initAuthSchema() {
          AND NOT EXISTS (
            SELECT 1 FROM auth_group_permissions p
             WHERE p.group_id = g.id AND p.nav_id = 'view_rates'
+         )`
+  )
+
+  // Migration: 既有的非「老師」群組若已有 courses 權限，補上 manage_courses；
+  // 老師群組預設沒有 → 老師可看課程列表但不能進編輯頁
+  await pool.query(
+    `INSERT IGNORE INTO auth_group_permissions (group_id, nav_id)
+     SELECT g.id, 'manage_courses'
+       FROM auth_groups g
+       WHERE g.name <> '老師'
+         AND EXISTS (
+           SELECT 1 FROM auth_group_permissions p
+            WHERE p.group_id = g.id AND p.nav_id = 'courses'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM auth_group_permissions p
+            WHERE p.group_id = g.id AND p.nav_id = 'manage_courses'
          )`
   )
 
