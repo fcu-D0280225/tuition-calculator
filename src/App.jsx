@@ -91,6 +91,22 @@ export default function App() {
       return new Set(raw ? JSON.parse(raw) : [])
     } catch { return new Set() }
   })
+  const [theme, setTheme] = useState(() => {
+    try {
+      const saved = localStorage.getItem('app_theme')
+      if (saved === 'light' || saved === 'dark') return saved
+      return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    } catch { return 'light' }
+  })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    try { localStorage.setItem('app_theme', theme) } catch {}
+  }, [theme])
+
+  function toggleTheme() {
+    setTheme(t => t === 'dark' ? 'light' : 'dark')
+  }
 
   function toggleGroup(key) {
     setCollapsedGroups(prev => {
@@ -243,7 +259,7 @@ export default function App() {
         </aside>
 
         <div className="app-content">
-          <header className="mobile-topbar">
+          <header className="app-topbar">
             <button
               type="button"
               className="sidebar-toggle-btn"
@@ -255,6 +271,24 @@ export default function App() {
               <span />
             </button>
             <span className="mobile-topbar-title">補習班管理系統</span>
+            <button
+              type="button"
+              className="theme-toggle-btn"
+              onClick={toggleTheme}
+              aria-label={theme === 'dark' ? '切換到日間模式' : '切換到夜間模式'}
+              title={theme === 'dark' ? '切換到日間模式' : '切換到夜間模式'}
+            >
+              {theme === 'dark' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+            </button>
           </header>
 
           <main className="app-main">
