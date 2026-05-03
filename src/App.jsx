@@ -74,7 +74,13 @@ function filterNav(perms, isAdmin) {
     .filter(Boolean)
 }
 
-function firstAllowedTab(visibleNav) {
+function firstAllowedTab(visibleNav, preferId = null) {
+  if (preferId) {
+    for (const item of visibleNav) {
+      if (item.type === 'tab' && item.id === preferId) return item.id
+      if (item.children?.some(c => c.id === preferId)) return preferId
+    }
+  }
   for (const item of visibleNav) {
     if (item.type === 'tab') return item.id
     if (item.children?.length) return item.children[0].id
@@ -86,7 +92,7 @@ export default function App() {
   const [tab, setTab] = useState(null)
   const [enrollContext, setEnrollContext] = useState(null) // { studentId, studentName }
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [] })
+  const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [], teacher_id: null })
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try {
       const raw = localStorage.getItem('nav_collapsed_groups')
@@ -122,16 +128,16 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     apiAuthMe()
-      .then(({ user, is_admin, permissions }) => {
-        if (!cancelled) setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [] })
+      .then(({ user, is_admin, permissions, teacher_id }) => {
+        if (!cancelled) setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null })
       })
-      .catch(() => { if (!cancelled) setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [] }) })
+      .catch(() => { if (!cancelled) setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], teacher_id: null }) })
     return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     function onUnauthorized() {
-      setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [] })
+      setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], teacher_id: null })
       setTab(null)
     }
     window.addEventListener('auth:unauthorized', onUnauthorized)
@@ -156,9 +162,11 @@ export default function App() {
     if (authState.status !== 'authed') return
     if (tab === 'student_enroll') return // 內部跳轉用，不在 NAV 中
     if (!tab || !allowedTabIds.has(tab)) {
-      setTab(firstAllowedTab(visibleNav))
+      // 老師帳號（綁定 teacher_id 且非管理員）優先導向點名
+      const prefer = (!authState.is_admin && authState.teacher_id) ? 'attendance' : null
+      setTab(firstAllowedTab(visibleNav, prefer))
     }
-  }, [authState.status, allowedTabIds, visibleNav, tab])
+  }, [authState.status, authState.is_admin, authState.teacher_id, allowedTabIds, visibleNav, tab])
 
   async function handleLogout() {
     try { await apiAuthLogout() } catch { /* ignore */ }
@@ -188,7 +196,7 @@ export default function App() {
     return <div className="login-shell"><div className="login-loading">載入中…</div></div>
   }
   if (authState.status !== 'authed') {
-    return <LoginPage onLoggedIn={({ user, is_admin, permissions }) => setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [] })} />
+    return <LoginPage onLoggedIn={({ user, is_admin, permissions, teacher_id }) => setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null })} />
   }
 
   return (
