@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
-import { apiCreateLesson, apiGetStudentEnrollment } from '../data/api.js'
+import { useGroups } from '../contexts/GroupsContext.jsx'
+import { apiCreateLesson, apiGetStudentEnrollment, apiSetStudentEnrollment } from '../data/api.js'
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -14,6 +15,7 @@ function isSameDay(a, b) {
 export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const { state: coursesState, loadCourses } = useCourses()
   const { state: teachersState, loadTeachers } = useTeachers()
+  const { state: groupsState, loadGroups } = useGroups()
 
   const [step, setStep] = useState('pick-course') // 'pick-course' | 'pick-dates'
   const [courseId, setCourseId] = useState(null)
@@ -26,16 +28,49 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const [error, setError] = useState('')
   const [done, setDone] = useState(null)
   const [enrolledCourseIds, setEnrolledCourseIds] = useState(null) // null=載入中, Set=已載入
+  const [enrolledGroupIds, setEnrolledGroupIds] = useState(null)
+  const [groupBusy, setGroupBusy] = useState(null) // group_id 正在處理
+  const [groupMsg, setGroupMsg] = useState('')
 
-  useEffect(() => { loadCourses(); loadTeachers() }, [loadCourses, loadTeachers])
+  useEffect(() => { loadCourses(); loadTeachers(); loadGroups() }, [loadCourses, loadTeachers, loadGroups])
 
   useEffect(() => {
     let cancelled = false
     apiGetStudentEnrollment(studentId)
-      .then(data => { if (!cancelled) setEnrolledCourseIds(new Set(data.course_ids || [])) })
-      .catch(() => { if (!cancelled) setEnrolledCourseIds(new Set()) })
+      .then(data => {
+        if (cancelled) return
+        setEnrolledCourseIds(new Set(data.course_ids || []))
+        setEnrolledGroupIds(new Set(data.group_ids || []))
+      })
+      .catch(() => {
+        if (cancelled) return
+        setEnrolledCourseIds(new Set())
+        setEnrolledGroupIds(new Set())
+      })
     return () => { cancelled = true }
   }, [studentId])
+
+  async function toggleGroup(groupId, currentlyJoined) {
+    if (groupBusy) return
+    if (currentlyJoined) {
+      if (!window.confirm('確定要把學生從這堂團課移除？該團課既有的上課紀錄不會被刪除。')) return
+    }
+    setGroupBusy(groupId); setGroupMsg('')
+    const nextSet = new Set(enrolledGroupIds || [])
+    if (currentlyJoined) nextSet.delete(groupId); else nextSet.add(groupId)
+    try {
+      await apiSetStudentEnrollment(studentId, {
+        course_ids: Array.from(enrolledCourseIds || []),
+        group_ids:  Array.from(nextSet),
+      })
+      setEnrolledGroupIds(nextSet)
+      setGroupMsg(currentlyJoined ? '已從團課移除' : '已加入團課（過去尚未產生的紀錄會自動補上）')
+    } catch {
+      setGroupMsg(currentlyJoined ? '移除失敗' : '加入失敗')
+    } finally {
+      setGroupBusy(null)
+    }
+  }
 
   const course = useMemo(
     () => coursesState.courses.find(c => c.id === courseId),
@@ -142,38 +177,87 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
       </div>
 
       {step === 'pick-course' && (
-        <div className="enroll-step">
-          <div className="form-section-title">第 1 步：選擇要排課的家教課</div>
-          {coursesState.loading ? (
-            <div className="loading">載入中⋯</div>
-          ) : coursesState.courses.length === 0 ? (
-            <div className="empty-hint">尚無家教課可選，請先到「家教課」頁新增</div>
-          ) : (
-            <div className="course-pick-grid">
-              {coursesState.courses.map(c => {
-                const alreadyPicked = enrolledCourseIds?.has(c.id)
-                return (
-                  <button
-                    type="button"
-                    key={c.id}
-                    className={`course-pick-card${alreadyPicked ? ' course-pick-card--picked' : ''}`}
-                    onClick={() => pickCourse(c.id)}
-                  >
-                    <div className="course-pick-name">
-                      {c.name}
-                      {alreadyPicked && <span className="course-pick-badge">已選過</span>}
-                    </div>
-                    <div className="course-pick-meta">
-                      {c.default_teacher_id
-                        ? <>預設老師：{teacherName(c.default_teacher_id) || '—'}</>
-                        : <span style={{ color: 'var(--danger, #c00)' }}>尚未設定預設老師</span>}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        <>
+          <div className="enroll-step">
+            <div className="form-section-title">家教課（選擇後到月曆排上課日）</div>
+            {coursesState.loading ? (
+              <div className="loading">載入中⋯</div>
+            ) : coursesState.courses.length === 0 ? (
+              <div className="empty-hint">尚無家教課可選，請先到「家教課」頁新增</div>
+            ) : (
+              <div className="course-pick-grid">
+                {coursesState.courses.map(c => {
+                  const alreadyPicked = enrolledCourseIds?.has(c.id)
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      className={`course-pick-card${alreadyPicked ? ' course-pick-card--picked' : ''}`}
+                      onClick={() => pickCourse(c.id)}
+                    >
+                      <div className="course-pick-name">
+                        {c.name}
+                        {alreadyPicked && <span className="course-pick-badge">已選過</span>}
+                      </div>
+                      <div className="course-pick-meta">
+                        {c.default_teacher_id
+                          ? <>預設老師：{teacherName(c.default_teacher_id) || '—'}</>
+                          : <span style={{ color: 'var(--danger, #c00)' }}>尚未設定預設老師</span>}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="enroll-step">
+            <div className="form-section-title">團課（加入後依團課排程自動補上課紀錄）</div>
+            {groupMsg && (
+              <div
+                className={groupMsg.startsWith('已') ? 'success-msg' : 'error-msg'}
+                style={{ marginBottom: 8 }}
+              >{groupMsg}</div>
+            )}
+            {groupsState.loading ? (
+              <div className="loading">載入中⋯</div>
+            ) : groupsState.groups.length === 0 ? (
+              <div className="empty-hint">尚無團課可選，請先到「團課」頁新增</div>
+            ) : (
+              <div className="course-pick-grid">
+                {groupsState.groups.map(g => {
+                  const joined = enrolledGroupIds?.has(g.id)
+                  const busy = groupBusy === g.id
+                  return (
+                    <button
+                      type="button"
+                      key={g.id}
+                      className={`course-pick-card${joined ? ' course-pick-card--picked' : ''}`}
+                      onClick={() => toggleGroup(g.id, joined)}
+                      disabled={busy || enrolledGroupIds === null}
+                    >
+                      <div className="course-pick-name">
+                        {g.name}
+                        {joined && <span className="course-pick-badge">已加入</span>}
+                      </div>
+                      <div className="course-pick-meta">
+                        {g.default_teacher_id
+                          ? <>預設老師：{teacherName(g.default_teacher_id) || '—'}</>
+                          : <span style={{ color: 'var(--muted)' }}>尚未設定預設老師</span>}
+                        {busy && <span style={{ marginLeft: 8 }}>處理中⋯</span>}
+                      </div>
+                      {!busy && (
+                        <div className="course-pick-meta" style={{ marginTop: 4 }}>
+                          {joined ? '點此可移除' : '點此加入'}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {step === 'pick-dates' && course && (
