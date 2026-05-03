@@ -78,7 +78,7 @@ export const apiReorderTeachers = (ids)        => request('/teachers/reorder', {
 // ── Courses ───────────────────────────────────────────────────────────────────
 
 export const apiListCourses     = ()                        => request('/courses')
-export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0, discount_per_student = 0, default_teacher_id = null, duration_hours = 1) => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours }) })
+export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0, discount_per_student = 0, default_teacher_id = null, duration_hours = 1, note = '') => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note }) })
 export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 export const apiReorderCourses  = (ids)                    => request('/courses/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })

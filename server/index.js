@@ -253,10 +253,11 @@ app.post('/api/courses', async (req, res) => {
   const durationHours = durationHoursRaw === undefined || durationHoursRaw === '' || durationHoursRaw === null
     ? 1 : parseFloat(durationHoursRaw)
   if (isNaN(durationHours) || durationHours <= 0 || durationHours > 24) return res.status(400).json({ error: 'invalid_duration_hours' })
+  const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const id = genId('cr')
   try {
-    await insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours })
-    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate, discount_per_student: discountPerStudent, default_teacher_id: defaultTeacherId, duration_hours: durationHours })
+    await insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note })
+    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate, discount_per_student: discountPerStudent, default_teacher_id: defaultTeacherId, duration_hours: durationHours, note })
   }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
@@ -291,6 +292,9 @@ app.patch('/api/courses/:id', async (req, res) => {
     const dh = parseFloat(req.body.duration_hours)
     if (isNaN(dh) || dh <= 0 || dh > 24) return res.status(400).json({ error: 'invalid_duration_hours' })
     update.durationHours = dh
+  }
+  if (req.body?.note !== undefined) {
+    update.note = typeof req.body.note === 'string' ? req.body.note : ''
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {

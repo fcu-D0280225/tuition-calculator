@@ -303,6 +303,15 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE courses ADD COLUMN duration_hours DECIMAL(4,2) NOT NULL DEFAULT 1`)
   }
 
+  // Migration: 加 courses.note，家教課備註
+  const [cNoteCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'courses' AND COLUMN_NAME = 'note'`
+  )
+  if (cNoteCols.length === 0) {
+    await pool.query(`ALTER TABLE courses ADD COLUMN note VARCHAR(256) NOT NULL DEFAULT ''`)
+  }
+
   // Migration: 加 courses.sort_order，可手動拖曳排序
   const [cSortCols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -987,7 +996,7 @@ export async function setTeacherActive(id, active) {
 
 export async function listCourses() {
   const [rows] = await pool.query(
-    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, sort_order FROM courses ORDER BY sort_order ASC, name ASC, id DESC'
+    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note, sort_order FROM courses ORDER BY sort_order ASC, name ASC, id DESC'
   )
   return rows.map(r => ({
     ...r,
@@ -1004,14 +1013,14 @@ export async function reorderCourses(orderedIds) {
   await pool.query(sql, [...orderedIds, orderedIds])
 }
 
-export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours }) {
+export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note }) {
   await pool.query(
-    'INSERT INTO courses (id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, name, hourlyRate ?? 0, teacherHourlyRate ?? 0, discountPerStudent ?? 0, defaultTeacherId || null, durationHours ?? 1]
+    'INSERT INTO courses (id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, hourlyRate ?? 0, teacherHourlyRate ?? 0, discountPerStudent ?? 0, defaultTeacherId || null, durationHours ?? 1, note || '']
   )
 }
 
-export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours }) {
+export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note }) {
   const sets = []
   const params = []
   if (name               !== undefined) { sets.push('name = ?');                 params.push(name) }
@@ -1020,6 +1029,7 @@ export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, di
   if (discountPerStudent !== undefined) { sets.push('discount_per_student = ?'); params.push(discountPerStudent) }
   if (defaultTeacherId   !== undefined) { sets.push('default_teacher_id = ?');   params.push(defaultTeacherId || null) }
   if (durationHours      !== undefined) { sets.push('duration_hours = ?');       params.push(durationHours) }
+  if (note               !== undefined) { sets.push('note = ?');                 params.push(note || '') }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE courses SET ${sets.join(', ')} WHERE id = ?`, params)

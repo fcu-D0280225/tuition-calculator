@@ -19,12 +19,14 @@ export default function CoursesPage() {
   const [newDiscountAmt, setNewDiscountAmt]     = useState('0')
   const [newDefaultTeacher, setNewDefaultTeacher] = useState('')
   const [newDurationHours, setNewDurationHours] = useState('1')
+  const [newNote, setNewNote]                   = useState('')
   const [editId, setEditId]                     = useState(null)
   const [editName, setEditName]                 = useState('')
   const [editRate, setEditRate]                 = useState('')
   const [editTeacherRate, setEditTeacherRate]   = useState('')
   const [editDiscountAmt, setEditDiscountAmt]   = useState('0')
   const [editDefaultTeacher, setEditDefaultTeacher] = useState('')
+  const [editNote, setEditNote]                 = useState('')
   const [editDurationHours, setEditDurationHours] = useState('1')
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
@@ -82,8 +84,8 @@ export default function CoursesPage() {
     if (isNaN(durationHours) || durationHours <= 0 || durationHours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError('')
     try {
-      await createCourse(name, hourlyRate, teacherHourlyRate, discAmt, newDefaultTeacher || null, durationHours)
-      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountAmt('0'); setNewDefaultTeacher(''); setNewDurationHours('1')
+      await createCourse(name, hourlyRate, teacherHourlyRate, discAmt, newDefaultTeacher || null, durationHours, newNote.trim())
+      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountAmt('0'); setNewDefaultTeacher(''); setNewDurationHours('1'); setNewNote('')
     }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -101,7 +103,7 @@ export default function CoursesPage() {
     const duration_hours = parseFloat(editDurationHours || '1')
     if (isNaN(duration_hours) || duration_hours <= 0 || duration_hours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError('')
-    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_per_student: discAmt, default_teacher_id: editDefaultTeacher || null, duration_hours }); setEditId(null) }
+    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_per_student: discAmt, default_teacher_id: editDefaultTeacher || null, duration_hours, note: editNote }); setEditId(null) }
     catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
@@ -185,6 +187,15 @@ export default function CoursesPage() {
                 allLabel="（無預設）"
               />
             </label>
+            <label>備註
+              <input
+                type="text"
+                placeholder="（選填）"
+                value={newNote}
+                onChange={e => setNewNote(e.target.value)}
+                className="note-input"
+              />
+            </label>
           </div>
           <button
             className="btn-primary"
@@ -209,13 +220,14 @@ export default function CoursesPage() {
         <table className="entity-table courses-table">
           <colgroup>
             <col style={{ width: 36 }} />
-            <col />
-            {canViewRates && <col style={{ width: 100 }} />}
-            {canViewRates && <col style={{ width: 110 }} />}
-            {canViewRates && <col style={{ width: 110 }} />}
-            <col style={{ width: 100 }} />
             <col style={{ width: 160 }} />
-            <col style={{ width: 150 }} />
+            {canViewRates && <col style={{ width: 90 }} />}
+            {canViewRates && <col style={{ width: 100 }} />}
+            {canViewRates && <col style={{ width: 100 }} />}
+            <col style={{ width: 90 }} />
+            <col style={{ width: 140 }} />
+            <col />
+            <col style={{ width: 130 }} />
           </colgroup>
           <thead>
             <tr>
@@ -226,6 +238,7 @@ export default function CoursesPage() {
               {canViewRates && <th>每多一人 −</th>}
               <th>每堂時數</th>
               <th>預設老師</th>
+              <th>備註</th>
               <th></th>
             </tr>
           </thead>
@@ -341,6 +354,17 @@ export default function CoursesPage() {
                     teachers.find(t => t.id === c.default_teacher_id)?.name || '—'
                   )}
                 </td>
+                <td className="note-cell">
+                  {editId === c.id ? (
+                    <input
+                      className="inline-edit-input"
+                      type="text"
+                      value={editNote}
+                      onChange={e => setEditNote(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                    />
+                  ) : (c.note || '')}
+                </td>
                 <td className="row-actions">
                   {editId === c.id ? (
                     <>
@@ -357,6 +381,7 @@ export default function CoursesPage() {
                         setEditDiscountAmt(c.discount_per_student != null ? String(parseFloat(c.discount_per_student)) : '0')
                         setEditDefaultTeacher(c.default_teacher_id || '')
                         setEditDurationHours(c.duration_hours != null ? String(parseFloat(c.duration_hours)) : '1')
+                        setEditNote(c.note || '')
                       }}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(c.id)} disabled={saving}>刪除</button>
                     </>
