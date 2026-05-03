@@ -16,12 +16,14 @@ export default function CoursesPage() {
   const [newTeacherRate, setNewTeacherRate]     = useState('')
   const [newDiscountAmt, setNewDiscountAmt]     = useState('0')
   const [newDefaultTeacher, setNewDefaultTeacher] = useState('')
+  const [newDurationHours, setNewDurationHours] = useState('1')
   const [editId, setEditId]                     = useState(null)
   const [editName, setEditName]                 = useState('')
   const [editRate, setEditRate]                 = useState('')
   const [editTeacherRate, setEditTeacherRate]   = useState('')
   const [editDiscountAmt, setEditDiscountAmt]   = useState('0')
   const [editDefaultTeacher, setEditDefaultTeacher] = useState('')
+  const [editDurationHours, setEditDurationHours] = useState('1')
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
 
@@ -74,10 +76,12 @@ export default function CoursesPage() {
     if (isNaN(teacherHourlyRate) || teacherHourlyRate <= 0) { setError('請輸入老師時薪'); return }
     const discAmt = parseFloat(newDiscountAmt || '0')
     if (isNaN(discAmt) || discAmt < 0 || discAmt > 100000) { setError('每多一人折扣金額格式不正確'); return }
+    const durationHours = parseFloat(newDurationHours || '1')
+    if (isNaN(durationHours) || durationHours <= 0 || durationHours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError('')
     try {
-      await createCourse(name, hourlyRate, teacherHourlyRate, discAmt, newDefaultTeacher || null)
-      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountAmt('0'); setNewDefaultTeacher('')
+      await createCourse(name, hourlyRate, teacherHourlyRate, discAmt, newDefaultTeacher || null, durationHours)
+      setNewName(''); setNewRate(''); setNewTeacherRate(''); setNewDiscountAmt('0'); setNewDefaultTeacher(''); setNewDurationHours('1')
     }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -92,8 +96,10 @@ export default function CoursesPage() {
     if (isNaN(teacher_hourly_rate) || teacher_hourly_rate < 0) { setError('老師時薪格式不正確'); return }
     const discAmt = parseFloat(editDiscountAmt || '0')
     if (isNaN(discAmt) || discAmt < 0 || discAmt > 100000) { setError('每多一人折扣金額格式不正確'); return }
+    const duration_hours = parseFloat(editDurationHours || '1')
+    if (isNaN(duration_hours) || duration_hours <= 0 || duration_hours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError('')
-    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_per_student: discAmt, default_teacher_id: editDefaultTeacher || null }); setEditId(null) }
+    try { await updateCourse(id, { name, hourly_rate, teacher_hourly_rate, discount_per_student: discAmt, default_teacher_id: editDefaultTeacher || null, duration_hours }); setEditId(null) }
     catch { setError('更新失敗') }
     finally { setSaving(false) }
   }
@@ -114,54 +120,65 @@ export default function CoursesPage() {
 
       <div className="lesson-form-card">
         <div className="form-section-title">家教課目錄</div>
-        <form className="add-form" onSubmit={handleAdd}>
-          <input
-            className="add-input"
-            placeholder="家教課名稱（如：國中英文）"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-          />
-          <input
-            className="add-input"
-            style={{ width: '120px' }}
-            placeholder="學費"
-            type="number"
-            min="0"
-            step="1"
-            value={newRate}
-            onChange={e => setNewRate(e.target.value)}
-          />
-          <input
-            className="add-input"
-            style={{ width: '120px' }}
-            placeholder="老師時薪"
-            type="number"
-            min="0"
-            step="1"
-            value={newTeacherRate}
-            onChange={e => setNewTeacherRate(e.target.value)}
-          />
-          <span className="input-with-suffix" title="N 人時學費 = 預設時薪 − 此金額 × (N-1)。0 = 不打折">
-            <input
-              className="add-input"
-              style={{ width: '200px' }}
-              placeholder="每多一人 −（例如 100）"
-              type="number"
-              min="0"
-              step="1"
-              value={newDiscountAmt}
-              onChange={e => setNewDiscountAmt(e.target.value)}
-            />
-            <span className="input-suffix">元</span>
-          </span>
-          <div className="combobox-cell" style={{ width: 180 }}>
-            <Combobox
-              items={activeTeachers}
-              value={newDefaultTeacher}
-              onChange={setNewDefaultTeacher}
-              placeholder="預設老師（選填）"
-              allLabel="（無預設）"
-            />
+        <form className="lesson-form" onSubmit={handleAdd} style={{ marginBottom: '16px' }}>
+          <div className="lesson-form-row">
+            <label>家教課名稱
+              <input
+                type="text"
+                placeholder="如：國中英文"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+              />
+            </label>
+            <label>學費（元/小時）
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="例如 600"
+                value={newRate}
+                onChange={e => setNewRate(e.target.value)}
+              />
+            </label>
+            <label>老師時薪（元/小時）
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="例如 400"
+                value={newTeacherRate}
+                onChange={e => setNewTeacherRate(e.target.value)}
+              />
+            </label>
+            <label title="N 人時學費 = 學費 − 此金額 × (N-1)。0 = 不打折">每多一人 −（元）
+              <input
+                type="number"
+                min="0"
+                step="1"
+                placeholder="例如 100"
+                value={newDiscountAmt}
+                onChange={e => setNewDiscountAmt(e.target.value)}
+              />
+            </label>
+            <label title="每堂課的預設時數，學生選課建立上課紀錄時會帶入">每堂時數
+              <input
+                type="number"
+                min="0.5"
+                step="0.5"
+                placeholder="例如 1"
+                value={newDurationHours}
+                onChange={e => setNewDurationHours(e.target.value)}
+              />
+            </label>
+            <label>預設老師
+              <Combobox
+                items={activeTeachers}
+                value={newDefaultTeacher}
+                onChange={setNewDefaultTeacher}
+                placeholder="（選填）"
+                allLabel="（無預設）"
+              />
+            </label>
           </div>
           <button
             className="btn-primary"
@@ -190,11 +207,12 @@ export default function CoursesPage() {
             <col style={{ width: 100 }} />
             <col style={{ width: 110 }} />
             <col style={{ width: 110 }} />
+            <col style={{ width: 100 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 150 }} />
           </colgroup>
           <thead>
-            <tr><th aria-label="拖曳排序"></th><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 −</th><th>預設老師</th><th></th></tr>
+            <tr><th aria-label="拖曳排序"></th><th>家教課名稱</th><th>學費</th><th>老師時薪</th><th>每多一人 −</th><th>每堂時數</th><th>預設老師</th><th></th></tr>
           </thead>
           <tbody>
             {displayCourses.map(c => (
@@ -274,6 +292,21 @@ export default function CoursesPage() {
                 </td>
                 <td>
                   {editId === c.id ? (
+                    <input
+                      className="inline-edit-input"
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={editDurationHours}
+                      onChange={e => setEditDurationHours(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleUpdate(c.id); if (e.key === 'Escape') setEditId(null) }}
+                    />
+                  ) : (
+                    `${parseFloat(c.duration_hours ?? 1)} 小時`
+                  )}
+                </td>
+                <td>
+                  {editId === c.id ? (
                     <div className="combobox-cell">
                       <Combobox
                         items={activeTeachers}
@@ -302,6 +335,7 @@ export default function CoursesPage() {
                         setEditTeacherRate(String(c.teacher_hourly_rate ?? 0))
                         setEditDiscountAmt(c.discount_per_student != null ? String(parseFloat(c.discount_per_student)) : '0')
                         setEditDefaultTeacher(c.default_teacher_id || '')
+                        setEditDurationHours(c.duration_hours != null ? String(parseFloat(c.duration_hours)) : '1')
                       }}>編輯</button>
                       <button className="btn-sm btn-danger" onClick={() => handleDelete(c.id)} disabled={saving}>刪除</button>
                     </>
