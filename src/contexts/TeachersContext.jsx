@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import { apiListTeachers, apiCreateTeacher, apiRenameTeacher, apiUpdateTeacher, apiDeleteTeacher } from '../data/api.js'
+import { apiListTeachers, apiCreateTeacher, apiRenameTeacher, apiUpdateTeacher, apiSetTeacherActive } from '../data/api.js'
 
 const TeachersContext = createContext(null)
 
@@ -11,8 +11,6 @@ function reducer(state, action) {
       return { ...state, teachers: [...state.teachers, action.teacher] }
     case 'UPDATE_TEACHER':
       return { ...state, teachers: state.teachers.map(t => t.id === action.teacher.id ? { ...t, ...action.teacher } : t) }
-    case 'REMOVE_TEACHER':
-      return { ...state, teachers: state.teachers.filter(t => t.id !== action.id) }
     case 'SET_LOADING':
       return { ...state, loading: action.loading }
     default:
@@ -45,13 +43,13 @@ export function TeachersProvider({ children }) {
     dispatch({ type: 'UPDATE_TEACHER', teacher: { id, ...patch, ...teacher } })
   }, [])
 
-  const removeTeacher = useCallback(async (id) => {
-    await apiDeleteTeacher(id)
-    dispatch({ type: 'REMOVE_TEACHER', id })
+  const setTeacherActive = useCallback(async (id, active) => {
+    await apiSetTeacherActive(id, active)
+    dispatch({ type: 'UPDATE_TEACHER', teacher: { id, active: active ? 1 : 0 } })
   }, [])
 
   return (
-    <TeachersContext.Provider value={{ state, loadTeachers, createTeacher, renameTeacher, updateTeacher, removeTeacher }}>
+    <TeachersContext.Provider value={{ state, loadTeachers, createTeacher, renameTeacher, updateTeacher, setTeacherActive }}>
       {children}
     </TeachersContext.Provider>
   )

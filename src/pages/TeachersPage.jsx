@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { apiReorderTeachers } from '../data/api.js'
 
+function isActive(t) { return t?.active === undefined ? true : !!t.active }
+
 export default function TeachersPage() {
-  const { state, loadTeachers, createTeacher, updateTeacher, removeTeacher } = useTeachers()
+  const { state, loadTeachers, createTeacher, updateTeacher, setTeacherActive } = useTeachers()
   const { teachers, loading } = state
 
   const [newName, setNewName]   = useState('')
@@ -45,7 +47,13 @@ export default function TeachersPage() {
     }
   }
 
-  const displayTeachers = orderOverride ?? teachers
+  // 啟用中在前、已停用置底
+  const displayTeachers = (() => {
+    const base = orderOverride ?? teachers
+    const actives = base.filter(isActive)
+    const inactives = base.filter(t => !isActive(t))
+    return [...actives, ...inactives]
+  })()
 
   useEffect(() => { loadTeachers() }, [loadTeachers])
 
@@ -79,11 +87,12 @@ export default function TeachersPage() {
     finally { setSaving(false) }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('確定要刪除此老師？（連帶刪除其所有上課紀錄）')) return
+  async function handleToggleActive(t) {
+    const turningOff = isActive(t)
+    if (turningOff && !window.confirm(`確定要停用「${t.name}」？停用後該老師不會出現在點名/上課紀錄等下拉選單中，但歷史紀錄保留。`)) return
     setSaving(true); setError('')
-    try { await removeTeacher(id) }
-    catch { setError('刪除失敗') }
+    try { await setTeacherActive(t.id, !turningOff) }
+    catch { setError(turningOff ? '停用失敗' : '啟用失敗') }
     finally { setSaving(false) }
   }
 
@@ -121,69 +130,79 @@ export default function TeachersPage() {
             <col style={{ width: 36 }} />
             <col />
             <col />
-            <col style={{ width: 150 }} />
+            <col style={{ width: 200 }} />
           </colgroup>
           <thead>
             <tr><th aria-label="拖曳排序"></th><th>老師姓名</th><th>聯絡電話</th><th></th></tr>
           </thead>
           <tbody>
-            {displayTeachers.map(t => (
-              <tr
-                key={t.id}
-                className={`${dragId === t.id ? 'row-dragging' : ''} ${overId === t.id ? 'row-drop-target' : ''}`}
-                onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(t.id) } }}
-                onDragLeave={() => { if (overId === t.id) setOverId(null) }}
-                onDrop={e => { e.preventDefault(); handleDrop(t.id) }}
-              >
-                <td
-                  className="drag-handle"
-                  draggable={editId === null}
-                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(t.id) }}
-                  onDragEnd={endDrag}
-                  title="拖曳調整順序"
-                >⋮⋮</td>
-                <td>
-                  {editId === t.id ? (
-                    <input
-                      autoFocus
-                      className="inline-edit-input"
-                      value={editName}
-                      onChange={e => setEditName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(t.id); if (e.key === 'Escape') setEditId(null) }}
-                    />
-                  ) : (
-                    t.name
-                  )}
-                </td>
-                <td>
-                  {editId === t.id ? (
-                    <input
-                      className="inline-edit-input"
-                      placeholder="聯絡電話"
-                      value={editPhone}
-                      onChange={e => setEditPhone(e.target.value)}
-                    />
-                  ) : (
-                    t.contact_phone
-                      ? <a href={`tel:${t.contact_phone}`}>{t.contact_phone}</a>
-                      : <span style={{ color: 'var(--muted)' }}>—</span>
-                  )}
-                </td>
-                <td className="row-actions">
-                  {editId === t.id ? (
-                    <>
-                      <button className="btn-sm btn-primary" onClick={() => handleSaveEdit(t.id)} disabled={saving}>儲存</button>
-                      <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="btn-sm" onClick={() => startEdit(t)}>編輯</button>
-                      <button className="btn-sm btn-danger" onClick={() => handleDelete(t.id)} disabled={saving}>刪除</button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {displayTeachers.map(t => {
+              const active = isActive(t)
+              return (
+                <tr
+                  key={t.id}
+                  className={`${dragId === t.id ? 'row-dragging' : ''} ${overId === t.id ? 'row-drop-target' : ''} ${active ? '' : 'row-inactive'}`}
+                  onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(t.id) } }}
+                  onDragLeave={() => { if (overId === t.id) setOverId(null) }}
+                  onDrop={e => { e.preventDefault(); handleDrop(t.id) }}
+                >
+                  <td
+                    className="drag-handle"
+                    draggable={editId === null}
+                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(t.id) }}
+                    onDragEnd={endDrag}
+                    title="拖曳調整順序"
+                  >⋮⋮</td>
+                  <td>
+                    {editId === t.id ? (
+                      <input
+                        autoFocus
+                        className="inline-edit-input"
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(t.id); if (e.key === 'Escape') setEditId(null) }}
+                      />
+                    ) : (
+                      <>
+                        {t.name}
+                        {!active && <span className="inactive-tag">已停用</span>}
+                      </>
+                    )}
+                  </td>
+                  <td>
+                    {editId === t.id ? (
+                      <input
+                        className="inline-edit-input"
+                        placeholder="聯絡電話"
+                        value={editPhone}
+                        onChange={e => setEditPhone(e.target.value)}
+                      />
+                    ) : (
+                      t.contact_phone
+                        ? <a href={`tel:${t.contact_phone}`}>{t.contact_phone}</a>
+                        : <span style={{ color: 'var(--muted)' }}>—</span>
+                    )}
+                  </td>
+                  <td className="row-actions">
+                    {editId === t.id ? (
+                      <>
+                        <button className="btn-sm btn-primary" onClick={() => handleSaveEdit(t.id)} disabled={saving}>儲存</button>
+                        <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="btn-sm" onClick={() => startEdit(t)}>編輯</button>
+                        {active ? (
+                          <button className="btn-sm btn-danger" onClick={() => handleToggleActive(t)} disabled={saving}>停用</button>
+                        ) : (
+                          <button className="btn-sm btn-primary" onClick={() => handleToggleActive(t)} disabled={saving}>重新啟用</button>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}

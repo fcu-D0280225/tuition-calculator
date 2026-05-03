@@ -253,7 +253,7 @@ export default function GroupsPage() {
             </label>
             <label>預設老師
               <Combobox
-                items={teachersState.teachers}
+                items={teachersState.teachers.filter(t => t.active !== 0)}
                 value={newGroup.default_teacher_id}
                 onChange={tid => setNewGroup(g => ({ ...g, default_teacher_id: tid }))}
                 placeholder="（選填）"
@@ -386,7 +386,7 @@ export default function GroupsPage() {
                     {editId === g.id ? (
                       <div className="combobox-cell">
                         <Combobox
-                          items={teachersState.teachers}
+                          items={teachersState.teachers.filter(t => t.active !== 0)}
                           value={editGroup.default_teacher_id}
                           onChange={tid => setEditGroup(eg => ({ ...eg, default_teacher_id: tid }))}
                           placeholder="（無）"

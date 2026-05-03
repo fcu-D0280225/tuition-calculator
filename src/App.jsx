@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
 import CoursesPage       from './pages/CoursesPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
+import StudentEnrollPage from './pages/StudentEnrollPage.jsx'
 import TeachersPage      from './pages/TeachersPage.jsx'
 import TutoringLessonsPage from './pages/TutoringLessonsPage.jsx'
 import GroupLessonsPage    from './pages/GroupLessonsPage.jsx'
@@ -81,6 +82,7 @@ function firstAllowedTab(visibleNav) {
 
 export default function App() {
   const [tab, setTab] = useState(null)
+  const [enrollContext, setEnrollContext] = useState(null) // { studentId, studentName }
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [] })
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
@@ -134,6 +136,7 @@ export default function App() {
   // 登入或權限變動時，重新對齊 active tab
   useEffect(() => {
     if (authState.status !== 'authed') return
+    if (tab === 'student_enroll') return // 內部跳轉用，不在 NAV 中
     if (!tab || !allowedTabIds.has(tab)) {
       setTab(firstAllowedTab(visibleNav))
     }
@@ -148,7 +151,19 @@ export default function App() {
 
   function navigate(id) {
     setTab(id)
+    setEnrollContext(null)
     setSidebarOpen(false)
+  }
+
+  function openStudentEnroll(student) {
+    setEnrollContext({ studentId: student.id, studentName: student.name })
+    setTab('student_enroll')
+    setSidebarOpen(false)
+  }
+
+  function closeStudentEnroll() {
+    setEnrollContext(null)
+    setTab('students')
   }
 
   if (authState.status === 'loading') {
@@ -250,7 +265,14 @@ export default function App() {
             {tab === 'settlement_tuition' && <TuitionSettlementPage />}
             {tab === 'settlement_salary'  && <SalarySettlementPage />}
             {tab === 'misc'               && <MiscPage />}
-            {tab === 'students'   && <StudentsPage />}
+            {tab === 'students'   && <StudentsPage onEnroll={openStudentEnroll} />}
+            {tab === 'student_enroll' && enrollContext && (
+              <StudentEnrollPage
+                studentId={enrollContext.studentId}
+                studentName={enrollContext.studentName}
+                onBack={closeStudentEnroll}
+              />
+            )}
             {tab === 'teachers'   && <TeachersPage />}
             {tab === 'courses'    && <CoursesPage />}
             {tab === 'materials'  && <MaterialsPage />}

@@ -515,6 +515,7 @@ export default function AttendancePage() {
   const { students } = studentsState
   const { courses }  = coursesState
   const { teachers } = teachersState
+  const activeTeachers = teachers.filter(t => t.active !== 0)
   const selectedGroupObj    = groups.find(g => g.id === selectedGroup) || null
   const selectedGroupName   = selectedGroupObj?.name || ''
   const selectedCourseName  = courses.find(c => c.id === selectedCourse)?.name || ''
@@ -633,7 +634,7 @@ export default function AttendancePage() {
           <div className="lesson-form">
             <div className="lesson-form-row">
               <label>老師
-                <Combobox items={teachers} value={groupTeacher} onChange={setGroupTeacher} placeholder="搜尋老師…" />
+                <Combobox items={activeTeachers} value={groupTeacher} onChange={setGroupTeacher} placeholder="搜尋老師…" />
               </label>
               <label>開始時間
                 <input type="time" step="900" value={groupStart} onChange={e => setGroupStart(e.target.value)} />
@@ -723,7 +724,7 @@ export default function AttendancePage() {
               key={s.key}
               session={s}
               allStudents={students}
-              teachers={teachers}
+              teachers={activeTeachers}
               leaveMap={leaveMap}
               leaveBusy={leaveBusy}
               onToggleLeave={toggleLeave}

@@ -8,8 +8,10 @@ import {
   apiListStudentCourses,
 } from '../data/api.js'
 
-export default function StudentsPage() {
-  const { state, loadStudents, createStudent, updateStudent, removeStudent } = useStudents()
+function isActive(s) { return s?.active === undefined ? true : !!s.active }
+
+export default function StudentsPage({ onEnroll }) {
+  const { state, loadStudents, createStudent, updateStudent, setStudentActive } = useStudents()
   const { state: coursesState, loadCourses } = useCourses()
   const { state: groupsState, loadGroups } = useGroups()
   const { state: teachersState, loadTeachers } = useTeachers()
@@ -28,16 +30,9 @@ export default function StudentsPage() {
   const [saving, setSaving]             = useState(false)
 
   const [expandedId, setExpandedId]         = useState(null)
-  const [enrollmentById, setEnrollmentById] = useState({}) // id → { loading, error, course_ids, group_ids }
-  const [historyById, setHistoryById]       = useState({}) // id → { loading, error, items }
+  const [enrollmentById, setEnrollmentById] = useState({})
+  const [historyById, setHistoryById]       = useState({})
   const [removingKey, setRemovingKey]       = useState(null)
-
-  // 選課 modal
-  const [enrollStudent, setEnrollStudent] = useState(null) // { id, name }
-  const [enrollDraftCourses, setEnrollDraftCourses] = useState(new Set())
-  const [enrollDraftGroups, setEnrollDraftGroups]   = useState(new Set())
-  const [enrollLoading, setEnrollLoading] = useState(false)
-  const [enrollSaving, setEnrollSaving]   = useState(false)
 
   // 拖曳排序
   const [dragId, setDragId] = useState(null)
@@ -73,7 +68,13 @@ export default function StudentsPage() {
     }
   }
 
-  const displayStudents = orderOverride ?? students
+  // 顯示順序：啟用中在前、已停用置底；組內維持後端/拖曳順序
+  const displayStudents = (() => {
+    const base = orderOverride ?? students
+    const actives = base.filter(isActive)
+    const inactives = base.filter(s => !isActive(s))
+    return [...actives, ...inactives]
+  })()
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -114,11 +115,12 @@ export default function StudentsPage() {
     finally { setSaving(false) }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('確定要刪除此學生？（連帶刪除其所有上課紀錄）')) return
+  async function handleToggleActive(s) {
+    const turningOff = isActive(s)
+    if (turningOff && !window.confirm(`確定要停用「${s.name}」？停用後該名學生不會出現在點名/上課紀錄等下拉選單中，但歷史紀錄保留。`)) return
     setSaving(true); setError('')
-    try { await removeStudent(id) }
-    catch { setError('刪除失敗') }
+    try { await setStudentActive(s.id, !turningOff) }
+    catch { setError(turningOff ? '停用失敗' : '啟用失敗') }
     finally { setSaving(false) }
   }
 
@@ -138,63 +140,6 @@ export default function StudentsPage() {
     }
   }
 
-  async function openEnrollEditor(s) {
-    setEnrollStudent({ id: s.id, name: s.name })
-    setEnrollDraftCourses(new Set())
-    setEnrollDraftGroups(new Set())
-    setEnrollLoading(true)
-    try {
-      const data = await apiGetStudentEnrollment(s.id)
-      setEnrollDraftCourses(new Set(data.course_ids || []))
-      setEnrollDraftGroups(new Set(data.group_ids || []))
-    } catch {
-      setError('讀取選課資料失敗')
-    } finally {
-      setEnrollLoading(false)
-    }
-  }
-
-  function toggleEnrollCourse(courseId) {
-    setEnrollDraftCourses(prev => {
-      const next = new Set(prev)
-      if (next.has(courseId)) next.delete(courseId); else next.add(courseId)
-      return next
-    })
-  }
-
-  function toggleEnrollGroup(groupId) {
-    setEnrollDraftGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(groupId)) next.delete(groupId); else next.add(groupId)
-      return next
-    })
-  }
-
-  async function handleSaveEnrollment() {
-    if (!enrollStudent || enrollSaving) return
-    setEnrollSaving(true)
-    try {
-      await apiSetStudentEnrollment(enrollStudent.id, {
-        course_ids: Array.from(enrollDraftCourses),
-        group_ids:  Array.from(enrollDraftGroups),
-      })
-      // 同步展開列的快取（如果剛好展開的就是這位學生）
-      setEnrollmentById(prev => ({
-        ...prev,
-        [enrollStudent.id]: {
-          loading: false,
-          course_ids: Array.from(enrollDraftCourses),
-          group_ids:  Array.from(enrollDraftGroups),
-        },
-      }))
-      setEnrollStudent(null)
-    } catch {
-      setError('儲存選課失敗')
-    } finally {
-      setEnrollSaving(false)
-    }
-  }
-
   async function removeEnrollment(studentId, kind, id) {
     const key = `${studentId}:${kind}:${id}`
     if (removingKey) return
@@ -205,7 +150,6 @@ export default function StudentsPage() {
     const courseIds = kind === 'course' ? current.course_ids.filter(x => x !== id) : current.course_ids
     const groupIds  = kind === 'group'  ? current.group_ids.filter(x => x !== id)  : current.group_ids
     setRemovingKey(key)
-    // 樂觀更新
     setEnrollmentById(prev => ({
       ...prev,
       [studentId]: { ...prev[studentId], course_ids: courseIds, group_ids: groupIds },
@@ -214,7 +158,6 @@ export default function StudentsPage() {
       await apiSetStudentEnrollment(studentId, { course_ids: courseIds, group_ids: groupIds })
     } catch {
       setError('移除失敗')
-      // 失敗就重新拉一次回來
       loadEnrollment(studentId)
     } finally {
       setRemovingKey(null)
@@ -232,7 +175,7 @@ export default function StudentsPage() {
   }
 
   const toggleExpand = useCallback(async (id) => {
-    if (editId === id) return // 編輯中不展開
+    if (editId === id) return
     if (expandedId === id) { setExpandedId(null); return }
     setExpandedId(id)
     if (!enrollmentById[id]?.course_ids) await loadEnrollment(id)
@@ -290,7 +233,7 @@ export default function StudentsPage() {
             <col />
             <col />
             <col />
-            <col style={{ width: 220 }} />
+            <col style={{ width: 260 }} />
           </colgroup>
           <thead>
             <tr>
@@ -307,10 +250,11 @@ export default function StudentsPage() {
               const isExpanded = expandedId === s.id
               const enrollInfo = enrollmentById[s.id]
               const historyInfo = historyById[s.id]
+              const active = isActive(s)
               return (
                 <Fragment key={s.id}>
                   <tr
-                    className={`${dragId === s.id ? 'row-dragging' : ''} ${overId === s.id ? 'row-drop-target' : ''}`}
+                    className={`${dragId === s.id ? 'row-dragging' : ''} ${overId === s.id ? 'row-drop-target' : ''} ${active ? '' : 'row-inactive'}`}
                     onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(s.id) } }}
                     onDragLeave={() => { if (overId === s.id) setOverId(null) }}
                     onDrop={e => { e.preventDefault(); handleDrop(s.id) }}
@@ -334,6 +278,7 @@ export default function StudentsPage() {
                       ) : (
                         <span className="expandable-name" onClick={() => toggleExpand(s.id)}>
                           {s.name}
+                          {!active && <span className="inactive-tag">已停用</span>}
                           <span className="expand-icon">{isExpanded ? '▼' : '▶'}</span>
                         </span>
                       )}
@@ -372,9 +317,15 @@ export default function StudentsPage() {
                         </>
                       ) : (
                         <>
-                          <button className="btn-sm" onClick={() => openEnrollEditor(s)}>選課</button>
+                          {active && (
+                            <button className="btn-sm" onClick={() => onEnroll && onEnroll(s)}>選課</button>
+                          )}
                           <button className="btn-sm" onClick={() => startEdit(s)}>編輯</button>
-                          <button className="btn-sm btn-danger" onClick={() => handleDelete(s.id)} disabled={saving}>刪除</button>
+                          {active ? (
+                            <button className="btn-sm btn-danger" onClick={() => handleToggleActive(s)} disabled={saving}>停用</button>
+                          ) : (
+                            <button className="btn-sm btn-primary" onClick={() => handleToggleActive(s)} disabled={saving}>重新啟用</button>
+                          )}
                         </>
                       )}
                     </td>
@@ -460,71 +411,6 @@ export default function StudentsPage() {
             })}
           </tbody>
         </table>
-      )}
-
-      {enrollStudent && (
-        <div className="modal-overlay" onClick={() => !enrollSaving && setEnrollStudent(null)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>{enrollStudent.name}・選課</h3>
-              <button type="button" className="modal-close" onClick={() => !enrollSaving && setEnrollStudent(null)}>✕</button>
-            </div>
-            <div className="modal-body">
-              {enrollLoading ? (
-                <div className="empty-hint">載入中⋯</div>
-              ) : (
-                <>
-                  <div className="expanded-label" style={{ marginTop: 0 }}>家教課</div>
-                  {coursesState.courses.length === 0 ? (
-                    <div className="empty-hint" style={{ textAlign: 'left', padding: 0 }}>尚無家教課可選</div>
-                  ) : (
-                    <div className="roster-list">
-                      {coursesState.courses.map(c => (
-                        <label
-                          key={c.id}
-                          className={`attendance-item${enrollDraftCourses.has(c.id) ? ' attendance-item--checked' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={enrollDraftCourses.has(c.id)}
-                            onChange={() => toggleEnrollCourse(c.id)}
-                          />
-                          <span className="attendance-name">{courseLabel(c)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                  <div className="expanded-label" style={{ marginTop: 16 }}>團課</div>
-                  {groupsState.groups.length === 0 ? (
-                    <div className="empty-hint" style={{ textAlign: 'left', padding: 0 }}>尚無團課可選</div>
-                  ) : (
-                    <div className="roster-list">
-                      {groupsState.groups.map(g => (
-                        <label
-                          key={g.id}
-                          className={`attendance-item${enrollDraftGroups.has(g.id) ? ' attendance-item--checked' : ''}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={enrollDraftGroups.has(g.id)}
-                            onChange={() => toggleEnrollGroup(g.id)}
-                          />
-                          <span className="attendance-name">{g.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="modal-actions">
-              <button type="button" onClick={() => setEnrollStudent(null)} disabled={enrollSaving}>取消</button>
-              <button type="button" className="btn-primary" onClick={handleSaveEnrollment} disabled={enrollSaving || enrollLoading}>
-                {enrollSaving ? '儲存中⋯' : '儲存選課'}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

@@ -4,10 +4,10 @@ import express from 'express'
 import {
   initSchema,
   // students
-  listStudents, insertStudent, updateStudent, deleteStudent, listStudentCourses,
+  listStudents, insertStudent, updateStudent, setStudentActive, listStudentCourses,
   getStudentEnrollment, setStudentEnrollment, listAllEnrollments, reorderStudents,
   // teachers
-  listTeachers, insertTeacher, updateTeacherName, updateTeacher, deleteTeacher, reorderTeachers,
+  listTeachers, insertTeacher, updateTeacherName, updateTeacher, setTeacherActive, reorderTeachers,
   // courses
   listCourses, insertCourse, updateCourse, deleteCourse, reorderCourses,
   // lessons
@@ -125,11 +125,12 @@ app.patch('/api/students/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
-app.delete('/api/students/:id', async (req, res) => {
+app.put('/api/students/:id/active', async (req, res) => {
+  if (typeof req.body?.active !== 'boolean') return res.status(400).json({ error: 'active_required' })
   try {
-    const ok = await deleteStudent(req.params.id)
+    const ok = await setStudentActive(req.params.id, req.body.active)
     if (!ok) return res.status(404).json({ error: 'not_found' })
-    res.status(204).end()
+    res.json({ id: req.params.id, active: req.body.active })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -204,11 +205,12 @@ app.patch('/api/teachers/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
-app.delete('/api/teachers/:id', async (req, res) => {
+app.put('/api/teachers/:id/active', async (req, res) => {
+  if (typeof req.body?.active !== 'boolean') return res.status(400).json({ error: 'active_required' })
   try {
-    const ok = await deleteTeacher(req.params.id)
+    const ok = await setTeacherActive(req.params.id, req.body.active)
     if (!ok) return res.status(404).json({ error: 'not_found' })
-    res.status(204).end()
+    res.json({ id: req.params.id, active: req.body.active })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

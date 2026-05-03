@@ -52,7 +52,7 @@ export const apiAdminDeleteGroup = (id)     =>
 export const apiListStudents    = ()           => request('/students')
 export const apiCreateStudent   = (body)       => request('/students', { method: 'POST', body: JSON.stringify(typeof body === 'string' ? { name: body } : body) })
 export const apiUpdateStudent   = (id, patch)  => request(`/students/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
-export const apiDeleteStudent   = (id)         => request(`/students/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiSetStudentActive = (id, active) => request(`/students/${encodeURIComponent(id)}/active`, { method: 'PUT', body: JSON.stringify({ active: !!active }) })
 export const apiReorderStudents = (ids)        => request('/students/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 export const apiListStudentCourses = (id)      => request(`/students/${encodeURIComponent(id)}/courses`)
 export const apiGetStudentEnrollment = (id)    => request(`/students/${encodeURIComponent(id)}/enrollment`)
@@ -66,7 +66,7 @@ export const apiListTeachers    = ()           => request('/teachers')
 export const apiCreateTeacher   = (body)       => request('/teachers', { method: 'POST', body: JSON.stringify(typeof body === 'string' ? { name: body } : body) })
 export const apiRenameTeacher   = (id, name)   => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ name }) })
 export const apiUpdateTeacher   = (id, patch)  => request(`/teachers/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
-export const apiDeleteTeacher   = (id)         => request(`/teachers/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const apiSetTeacherActive = (id, active) => request(`/teachers/${encodeURIComponent(id)}/active`, { method: 'PUT', body: JSON.stringify({ active: !!active }) })
 export const apiReorderTeachers = (ids)        => request('/teachers/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
 
 // ── Courses ───────────────────────────────────────────────────────────────────

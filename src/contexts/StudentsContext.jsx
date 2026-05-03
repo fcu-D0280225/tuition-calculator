@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import { apiListStudents, apiCreateStudent, apiUpdateStudent, apiDeleteStudent } from '../data/api.js'
+import { apiListStudents, apiCreateStudent, apiUpdateStudent, apiSetStudentActive } from '../data/api.js'
 
 const StudentsContext = createContext(null)
 
@@ -11,8 +11,6 @@ function reducer(state, action) {
       return { ...state, students: [...state.students, action.student] }
     case 'UPDATE_STUDENT':
       return { ...state, students: state.students.map(s => s.id === action.student.id ? { ...s, ...action.student } : s) }
-    case 'REMOVE_STUDENT':
-      return { ...state, students: state.students.filter(s => s.id !== action.id) }
     case 'SET_LOADING':
       return { ...state, loading: action.loading }
     default:
@@ -40,13 +38,13 @@ export function StudentsProvider({ children }) {
     dispatch({ type: 'UPDATE_STUDENT', student })
   }, [])
 
-  const removeStudent = useCallback(async (id) => {
-    await apiDeleteStudent(id)
-    dispatch({ type: 'REMOVE_STUDENT', id })
+  const setStudentActive = useCallback(async (id, active) => {
+    await apiSetStudentActive(id, active)
+    dispatch({ type: 'UPDATE_STUDENT', student: { id, active: active ? 1 : 0 } })
   }, [])
 
   return (
-    <StudentsContext.Provider value={{ state, loadStudents, createStudent, updateStudent, removeStudent }}>
+    <StudentsContext.Provider value={{ state, loadStudents, createStudent, updateStudent, setStudentActive }}>
       {children}
     </StudentsContext.Provider>
   )

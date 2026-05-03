@@ -148,7 +148,9 @@ export default function SchedulePage() {
     } catch { setError('取消請假失敗') }
   }
 
-  const personList = mode === 'student' ? studentsState.students : teachersState.teachers
+  const personList = mode === 'student'
+    ? studentsState.students.filter(s => s.active !== 0)
+    : teachersState.teachers.filter(t => t.active !== 0)
   const personLabel = mode === 'student' ? '學生' : '老師'
 
   // 把 lessons / group records 攤平成 calendar items

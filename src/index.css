@@ -4295,3 +4295,142 @@ select.catalog-input.catalog-select {
   width: 0;
   min-width: 0;
 }
+
+/* ── 停用標籤 / 已停用列 ───────────────────────────────────────── */
+.inactive-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  vertical-align: middle;
+}
+.entity-table tr.row-inactive td {
+  background: #fafbfc;
+  color: var(--muted);
+}
+.entity-table tr.row-inactive a { color: var(--muted); }
+
+.success-msg {
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+/* ── 學生選課新頁面 ──────────────────────────────────────── */
+.enroll-step {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.course-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.course-pick-card {
+  text-align: left;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+}
+.course-pick-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+}
+.course-pick-card:active { transform: translateY(1px); }
+.course-pick-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.course-pick-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enroll-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--accent-light);
+  border-radius: 8px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 16px 0 8px;
+}
+.calendar-month-label {
+  font-size: 16px;
+  font-weight: 600;
+  min-width: 140px;
+  text-align: center;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+.calendar-head {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 6px 0;
+  font-weight: 600;
+}
+.calendar-cell {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text);
+  padding: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+.calendar-cell:hover { background: #f1f5f9; }
+.calendar-cell:disabled { cursor: not-allowed; opacity: 0.6; }
+.calendar-cell--out { color: #cbd5e1; background: #fafbfc; }
+.calendar-cell--today { border-color: var(--accent); }
+.calendar-cell--picked {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.calendar-cell--picked:hover { background: var(--accent-dark); }
+
+.enroll-selected {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 14px;
+}

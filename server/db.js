@@ -510,6 +510,19 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE leave_requests ADD CONSTRAINT fk_leave_lesson FOREIGN KEY (lesson_record_id) REFERENCES lesson_records(id) ON DELETE CASCADE`)
     await pool.query(`ALTER TABLE leave_requests ADD INDEX idx_leave_lesson (lesson_record_id)`)
   }
+
+  // Migration: students/teachers 加 active 欄位（軟停用，取代真實刪除）
+  for (const tbl of ['students', 'teachers']) {
+    const [cols] = await pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'active'`,
+      [tbl]
+    )
+    if (cols.length === 0) {
+      await pool.query(`ALTER TABLE \`${tbl}\` ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1`)
+      await pool.query(`ALTER TABLE \`${tbl}\` ADD INDEX idx_${tbl}_active (active)`)
+    }
+  }
 }
 
 // ── Leave Requests ───────────────────────────────────────────────────────────
@@ -547,7 +560,7 @@ export async function deleteLeaveRequest(id) {
 
 export async function listStudents() {
   const [rows] = await pool.query(
-    'SELECT id, name, contact_name, contact_phone, sort_order FROM students ORDER BY sort_order ASC, created_at DESC, id DESC'
+    'SELECT id, name, contact_name, contact_phone, sort_order, active FROM students ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC'
   )
   return rows
 }
@@ -578,8 +591,11 @@ export async function updateStudent(id, { name, contactName, contactPhone }) {
   return res.affectedRows > 0
 }
 
-export async function deleteStudent(id) {
-  const [res] = await pool.query('DELETE FROM students WHERE id = ?', [id])
+export async function setStudentActive(id, active) {
+  const [res] = await pool.query(
+    'UPDATE students SET active = ? WHERE id = ?',
+    [active ? 1 : 0, id]
+  )
   return res.affectedRows > 0
 }
 
@@ -814,7 +830,7 @@ export async function listStudentCourses(studentId) {
 
 export async function listTeachers() {
   const [rows] = await pool.query(
-    'SELECT id, name, contact_phone, sort_order FROM teachers ORDER BY sort_order ASC, created_at DESC, id DESC'
+    'SELECT id, name, contact_phone, sort_order, active FROM teachers ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC'
   )
   return rows
 }
@@ -845,8 +861,11 @@ export async function updateTeacherName(id, name) {
   return res.affectedRows > 0
 }
 
-export async function deleteTeacher(id) {
-  const [res] = await pool.query('DELETE FROM teachers WHERE id = ?', [id])
+export async function setTeacherActive(id, active) {
+  const [res] = await pool.query(
+    'UPDATE teachers SET active = ? WHERE id = ?',
+    [active ? 1 : 0, id]
+  )
   return res.affectedRows > 0
 }
 

@@ -9,6 +9,7 @@ export default function CoursesPage() {
   const { state: teachersState, loadTeachers } = useTeachers()
   const { courses, loading } = state
   const { teachers } = teachersState
+  const activeTeachers = teachers.filter(t => t.active !== 0)
 
   const [newName, setNewName]                   = useState('')
   const [newRate, setNewRate]                   = useState('')
@@ -155,7 +156,7 @@ export default function CoursesPage() {
           </span>
           <div className="combobox-cell" style={{ width: 180 }}>
             <Combobox
-              items={teachers}
+              items={activeTeachers}
               value={newDefaultTeacher}
               onChange={setNewDefaultTeacher}
               placeholder="預設老師（選填）"
@@ -275,7 +276,7 @@ export default function CoursesPage() {
                   {editId === c.id ? (
                     <div className="combobox-cell">
                       <Combobox
-                        items={teachers}
+                        items={activeTeachers}
                         value={editDefaultTeacher}
                         onChange={setEditDefaultTeacher}
                         placeholder="（無）"

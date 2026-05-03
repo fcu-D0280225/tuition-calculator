@@ -191,6 +191,8 @@ export default function TutoringLessonsPage() {
   const { teachers } = teacherState
   const { courses }  = courseState
   const { lessons, loading } = lessonState
+  const activeStudents = students.filter(s => s.active !== 0)
+  const activeTeachers = teachers.filter(t => t.active !== 0)
 
   return (
     <div className="page">
@@ -216,7 +218,7 @@ export default function TutoringLessonsPage() {
             <div className="lesson-form-row">
               <label>學生
                 <Combobox
-                  items={students}
+                  items={activeStudents}
                   value={form.student_id}
                   onChange={id => setForm(f => ({ ...f, student_id: id, course_id: '' }))}
                   placeholder="搜尋學生…"
@@ -236,7 +238,7 @@ export default function TutoringLessonsPage() {
               </label>
               <label>老師
                 <Combobox
-                  items={teachers}
+                  items={activeTeachers}
                   value={form.teacher_id}
                   onChange={id => setForm(f => ({ ...f, teacher_id: id }))}
                   placeholder="搜尋老師…"
@@ -283,9 +285,9 @@ export default function TutoringLessonsPage() {
       )}
 
       <form className="filter-bar" onSubmit={handleFilter}>
-        <Combobox items={students} value={filterStudent} onChange={setFilterStudent} placeholder="全部學生" allLabel="全部學生" />
+        <Combobox items={activeStudents} value={filterStudent} onChange={setFilterStudent} placeholder="全部學生" allLabel="全部學生" />
         <Combobox items={courses}  value={filterCourse}  onChange={setFilterCourse}  placeholder="全部課程" allLabel="全部課程" />
-        <Combobox items={teachers} value={filterTeacher} onChange={setFilterTeacher} placeholder="全部老師" allLabel="全部老師" />
+        <Combobox items={activeTeachers} value={filterTeacher} onChange={setFilterTeacher} placeholder="全部老師" allLabel="全部老師" />
         <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} title="開始日期" />
         <span>—</span>
         <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} title="結束日期" />
@@ -320,7 +322,7 @@ export default function TutoringLessonsPage() {
                     <td>
                       <div className="combobox-cell">
                         <Combobox
-                          items={students}
+                          items={activeStudents}
                           value={editForm.student_id}
                           onChange={id => setEditForm(f => ({ ...f, student_id: id, course_id: '' }))}
                           placeholder="搜尋學生…"
@@ -341,7 +343,7 @@ export default function TutoringLessonsPage() {
                     <td>
                       <div className="combobox-cell">
                         <Combobox
-                          items={teachers}
+                          items={activeTeachers}
                           value={editForm.teacher_id}
                           onChange={id => setEditForm(f => ({ ...f, teacher_id: id }))}
                           placeholder="搜尋老師…"

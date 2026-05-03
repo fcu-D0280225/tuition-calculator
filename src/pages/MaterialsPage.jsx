@@ -96,6 +96,7 @@ export default function MaterialsPage() {
   const { materials, loading } = ms
   const { records } = ms
   const { students } = ss
+  const activeStudents = students.filter(s => s.active !== 0)
 
   return (
     <div className="page">
@@ -191,7 +192,7 @@ export default function MaterialsPage() {
           <div className="lesson-form-row">
             <label>學生
               <Combobox
-                items={students}
+                items={activeStudents}
                 value={form.student_id}
                 onChange={id => setForm(f => ({ ...f, student_id: id }))}
                 placeholder="搜尋學生…"

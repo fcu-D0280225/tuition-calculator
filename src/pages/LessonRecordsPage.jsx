@@ -173,6 +173,8 @@ export default function LessonRecordsPage() {
   const { courses }  = courseState
   const { lessons, loading } = lessonState
   const { groups, records: groupRecords } = groupState
+  const activeStudents = students.filter(s => s.active !== 0)
+  const activeTeachers = teachers.filter(t => t.active !== 0)
 
   function handleCourseChange(id, isEdit = false) {
     const course = courseState.courses.find(c => c.id === id)
@@ -254,7 +256,7 @@ export default function LessonRecordsPage() {
           <div className="lesson-form-row">
             <label>學生
               <Combobox
-                items={students}
+                items={activeStudents}
                 value={form.student_id}
                 onChange={id => setForm(f => ({ ...f, student_id: id, course_id: '' }))}
                 placeholder="搜尋學生…"
@@ -274,7 +276,7 @@ export default function LessonRecordsPage() {
             </label>
             <label>老師
               <Combobox
-                items={teachers}
+                items={activeTeachers}
                 value={form.teacher_id}
                 onChange={id => setForm(f => ({ ...f, teacher_id: id }))}
                 placeholder="搜尋老師…"
@@ -371,7 +373,7 @@ export default function LessonRecordsPage() {
       {/* 篩選 */}
       <form className="filter-bar" onSubmit={handleFilter}>
         <Combobox
-          items={students}
+          items={activeStudents}
           value={filterStudent}
           onChange={setFilterStudent}
           placeholder="全部學生"
@@ -385,7 +387,7 @@ export default function LessonRecordsPage() {
           allLabel="全部課程"
         />
         <Combobox
-          items={teachers}
+          items={activeTeachers}
           value={filterTeacher}
           onChange={setFilterTeacher}
           placeholder="全部老師"
@@ -424,7 +426,7 @@ export default function LessonRecordsPage() {
                     <td><input type="date" value={editForm.lesson_date} onChange={e => setEditForm(f => ({ ...f, lesson_date: e.target.value }))} /></td>
                     <td>
                       <Combobox
-                        items={students}
+                        items={activeStudents}
                         value={editForm.student_id}
                         onChange={id => setEditForm(f => ({ ...f, student_id: id, course_id: '' }))}
                         placeholder="搜尋學生…"
@@ -441,7 +443,7 @@ export default function LessonRecordsPage() {
                     </td>
                     <td>
                       <Combobox
-                        items={teachers}
+                        items={activeTeachers}
                         value={editForm.teacher_id}
                         onChange={id => setEditForm(f => ({ ...f, teacher_id: id }))}
                         placeholder="搜尋老師…"
@@ -519,7 +521,7 @@ export default function LessonRecordsPage() {
                       </td>
                       <td>
                         <Combobox
-                          items={students}
+                          items={activeStudents}
                           value={editGroupRec.student_id}
                           onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
                           placeholder="搜尋學生…"

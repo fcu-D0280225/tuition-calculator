@@ -100,10 +100,11 @@ export default function GroupLessonsPage() {
   )
 
   function studentsForGroup(groupId) {
-    if (!groupId) return studentState.students
+    const all = studentState.students.filter(s => s.active !== 0)
+    if (!groupId) return all
     const allowed = groupMemberMap[groupId]
     if (!allowed) return []
-    return studentState.students.filter(s => allowed.has(s.id))
+    return all.filter(s => allowed.has(s.id))
   }
 
   async function handleGroupSelectInForm(id) {
@@ -179,6 +180,8 @@ export default function GroupLessonsPage() {
   const { students } = studentState
   const { teachers } = teacherState
   const { groups, records: groupRecords } = groupState
+  const activeStudents = students.filter(s => s.active !== 0)
+  const activeTeachers = teachers.filter(t => t.active !== 0)
 
   return (
     <div className="page">
@@ -213,7 +216,7 @@ export default function GroupLessonsPage() {
               <label>老師
                 <Combobox
                   key={`grp-teacher-${groupForm.group_id}`}
-                  items={teachers}
+                  items={activeTeachers}
                   value={groupForm.teacher_id}
                   onChange={id => setGroupForm(f => ({ ...f, teacher_id: id }))}
                   placeholder="搜尋老師…"
@@ -273,12 +276,12 @@ export default function GroupLessonsPage() {
         />
         <Combobox
           key={`fs-${filterStudents.length}`}
-          items={students.filter(s => !filterStudents.includes(s.id))}
+          items={activeStudents.filter(s => !filterStudents.includes(s.id))}
           value=""
           onChange={addFilterStudent}
           placeholder="加入學生（可複選）"
         />
-        <Combobox items={teachers} value={filterTeacher} onChange={setFilterTeacher} placeholder="全部老師" allLabel="全部老師" />
+        <Combobox items={activeTeachers} value={filterTeacher} onChange={setFilterTeacher} placeholder="全部老師" allLabel="全部老師" />
         <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} title="開始日期" />
         <span>—</span>
         <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} title="結束日期" />
@@ -348,7 +351,7 @@ export default function GroupLessonsPage() {
                     <td>
                       <div className="combobox-cell">
                         <Combobox
-                          items={students}
+                          items={activeStudents}
                           value={editGroupRec.student_id}
                           onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
                           placeholder="搜尋學生…"
@@ -358,7 +361,7 @@ export default function GroupLessonsPage() {
                     <td>
                       <div className="combobox-cell">
                         <Combobox
-                          items={teachers}
+                          items={activeTeachers}
                           value={editGroupRec.teacher_id}
                           onChange={id => setEditGroupRec(f => ({ ...f, teacher_id: id }))}
                           placeholder="搜尋老師…"
