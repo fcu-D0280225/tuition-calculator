@@ -81,14 +81,16 @@ export default function LessonRecordsPage() {
   async function handleCreate(e) {
     e.preventDefault()
     const hours = parseFloat(form.hours)
-    if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
+    if (!form.student_id || !form.course_id) { setError('請選擇學生和課程'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     if (!form.lesson_date) { setError('請選擇上課日期'); return }
     setSaving(true); setError('')
     try {
       await createLesson({ ...form, hours, start_time: form.start_time || null, unit_price: null, teacher_unit_price: null })
       setForm({ ...EMPTY_FORM, lesson_date: form.lesson_date, start_time: form.start_time })
-    } catch { setError('新增失敗') }
+    } catch (e) {
+      if (!e?.skipped) setError('新增失敗')
+    }
     finally { setSaving(false) }
   }
 
@@ -461,7 +463,7 @@ export default function LessonRecordsPage() {
                     <td>{l.lesson_date}</td>
                     <td>{l.student_name}</td>
                     <td>{l.course_name}</td>
-                    <td>{l.teacher_name}</td>
+                    <td>{l.teacher_name || <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                     <td>{l.hours}</td>
                     <td className="note-cell">{l.note}</td>
                     <td className="row-actions">

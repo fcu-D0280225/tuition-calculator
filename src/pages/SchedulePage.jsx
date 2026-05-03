@@ -169,7 +169,7 @@ export default function SchedulePage() {
         startMin: t,
         durationMin: Math.max(15, Math.round(parseFloat(l.hours) * 60)),
         title: l.course_name,
-        sub: mode === 'student' ? l.teacher_name : l.student_name,
+        sub: mode === 'student' ? (l.teacher_name || '未指派老師') : l.student_name,
         note: l.note,
         lesson: l,
       })
@@ -201,7 +201,7 @@ export default function SchedulePage() {
         kind: 'lesson', id: l.id,
         date: String(l.lesson_date).slice(0, 10),
         title: l.course_name,
-        sub: mode === 'student' ? l.teacher_name : l.student_name,
+        sub: mode === 'student' ? (l.teacher_name || '未指派老師') : l.student_name,
         hours: l.hours,
         lesson: l,
       })),

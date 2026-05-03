@@ -1,7 +1,21 @@
 import { createContext, useContext, useReducer, useCallback } from 'react'
-import { apiListLessons, apiCreateLesson, apiUpdateLesson, apiDeleteLesson } from '../data/api.js'
+import { apiListLessons, apiCreateLesson, apiCreateLessonWithDupCheck, apiUpdateLesson, apiDeleteLesson } from '../data/api.js'
 
 const LessonsContext = createContext(null)
+
+function defaultDupConfirm(existing, lesson) {
+  const lines = (existing || []).map(r => {
+    const t = r.start_time ? String(r.start_time).slice(0, 5) : '未排定時間'
+    const teacher = r.teacher_name ? `・${r.teacher_name}` : ''
+    return `• ${t}　${r.hours} 小時${teacher}`
+  })
+  const msg =
+    `⚠️ 偵測到當天已有同一學生 + 同一課程的紀錄：\n\n` +
+    `日期：${lesson.lesson_date}\n` +
+    `${lines.join('\n')}\n\n` +
+    `仍要再新增一筆嗎？確定後會出現重複的紀錄。`
+  return window.confirm(msg)
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -30,7 +44,7 @@ export function LessonsProvider({ children }) {
   }, [])
 
   const createLesson = useCallback(async (lesson) => {
-    const created = await apiCreateLesson(lesson)
+    const created = await apiCreateLessonWithDupCheck(lesson, defaultDupConfirm)
     dispatch({ type: 'ADD_LESSON', lesson: created })
     return created
   }, [])

@@ -84,7 +84,7 @@ export async function initSchema() {
       id           VARCHAR(64)    NOT NULL PRIMARY KEY,
       student_id   VARCHAR(64)    NOT NULL,
       course_id    VARCHAR(64)    NOT NULL,
-      teacher_id   VARCHAR(64)    NOT NULL,
+      teacher_id   VARCHAR(64)    NULL DEFAULT NULL,
       hours        DECIMAL(5,2)   NOT NULL,
       lesson_date  DATE           NOT NULL,
       unit_price   DECIMAL(10,2)  NULL DEFAULT NULL,
@@ -93,7 +93,7 @@ export async function initSchema() {
       updated_at   DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
       FOREIGN KEY (course_id)  REFERENCES courses(id)  ON DELETE CASCADE,
-      FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+      FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL,
       INDEX idx_lesson_date    (lesson_date),
       INDEX idx_lesson_student (student_id, lesson_date),
       INDEX idx_lesson_teacher (teacher_id, lesson_date)
@@ -293,6 +293,15 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE courses DROP COLUMN discount_multiplier`)
   }
 
+  // Migration: 加 courses.duration_hours，每堂課預設時數
+  const [cDurationCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'courses' AND COLUMN_NAME = 'duration_hours'`
+  )
+  if (cDurationCols.length === 0) {
+    await pool.query(`ALTER TABLE courses ADD COLUMN duration_hours DECIMAL(4,2) NOT NULL DEFAULT 1`)
+  }
+
   // Migration: 加 courses.sort_order，可手動拖曳排序
   const [cSortCols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -384,6 +393,24 @@ export async function initSchema() {
       INDEX idx_misc_date (expense_date)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  // Migration: 把 lesson_records.teacher_id 改成 nullable（允許未指派老師的上課紀錄）
+  const [lrTeacherCol] = await pool.query(
+    `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_records' AND COLUMN_NAME = 'teacher_id'`
+  )
+  if (lrTeacherCol.length && lrTeacherCol[0].IS_NULLABLE === 'NO') {
+    const [fkRows] = await pool.query(
+      `SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_records'
+         AND COLUMN_NAME = 'teacher_id' AND REFERENCED_TABLE_NAME = 'teachers'`
+    )
+    for (const r of fkRows) {
+      await pool.query(`ALTER TABLE lesson_records DROP FOREIGN KEY \`${r.CONSTRAINT_NAME}\``)
+    }
+    await pool.query(`ALTER TABLE lesson_records MODIFY teacher_id VARCHAR(64) NULL DEFAULT NULL`)
+    await pool.query(`ALTER TABLE lesson_records ADD CONSTRAINT fk_lesson_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL`)
+  }
 
   // Migration: 加 students.sort_order
   const [sSortCols] = await pool.query(
@@ -817,7 +844,7 @@ export async function listStudentCourses(studentId) {
             MAX(lr.lesson_date) AS last_lesson_date
        FROM lesson_records lr
        JOIN courses  c ON c.id = lr.course_id
-       JOIN teachers t ON t.id = lr.teacher_id
+       LEFT JOIN teachers t ON t.id = lr.teacher_id
       WHERE lr.student_id = ?
       GROUP BY lr.course_id, c.name, lr.teacher_id, t.name
       ORDER BY last_lesson_date DESC, c.name ASC`,
@@ -901,9 +928,13 @@ export async function setTeacherActive(id, active) {
 
 export async function listCourses() {
   const [rows] = await pool.query(
-    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, sort_order FROM courses ORDER BY sort_order ASC, name ASC, id DESC'
+    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, sort_order FROM courses ORDER BY sort_order ASC, name ASC, id DESC'
   )
-  return rows.map(r => ({ ...r, discount_per_student: parseFloat(r.discount_per_student) }))
+  return rows.map(r => ({
+    ...r,
+    discount_per_student: parseFloat(r.discount_per_student),
+    duration_hours: parseFloat(r.duration_hours),
+  }))
 }
 
 export async function reorderCourses(orderedIds) {
@@ -914,14 +945,14 @@ export async function reorderCourses(orderedIds) {
   await pool.query(sql, [...orderedIds, orderedIds])
 }
 
-export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId }) {
+export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours }) {
   await pool.query(
-    'INSERT INTO courses (id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, name, hourlyRate ?? 0, teacherHourlyRate ?? 0, discountPerStudent ?? 0, defaultTeacherId || null]
+    'INSERT INTO courses (id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, name, hourlyRate ?? 0, teacherHourlyRate ?? 0, discountPerStudent ?? 0, defaultTeacherId || null, durationHours ?? 1]
   )
 }
 
-export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId }) {
+export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours }) {
   const sets = []
   const params = []
   if (name               !== undefined) { sets.push('name = ?');                 params.push(name) }
@@ -929,6 +960,7 @@ export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, di
   if (teacherHourlyRate  !== undefined) { sets.push('teacher_hourly_rate = ?');  params.push(teacherHourlyRate) }
   if (discountPerStudent !== undefined) { sets.push('discount_per_student = ?'); params.push(discountPerStudent) }
   if (defaultTeacherId   !== undefined) { sets.push('default_teacher_id = ?');   params.push(defaultTeacherId || null) }
+  if (durationHours      !== undefined) { sets.push('duration_hours = ?');       params.push(durationHours) }
   if (!sets.length) return false
   params.push(id)
   const [res] = await pool.query(`UPDATE courses SET ${sets.join(', ')} WHERE id = ?`, params)
@@ -1000,7 +1032,7 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
      FROM lesson_records lr
      JOIN students s ON s.id = lr.student_id
      JOIN courses  c ON c.id = lr.course_id
-     JOIN teachers t ON t.id = lr.teacher_id
+     LEFT JOIN teachers t ON t.id = lr.teacher_id
      LEFT JOIN leave_requests lv
        ON (lv.lesson_record_id = lr.id)
        OR (lv.lesson_record_id IS NULL
@@ -1014,11 +1046,23 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
   return rows.map(r => ({ ...r, is_on_leave: !!r.is_on_leave }))
 }
 
+export async function findDuplicateLesson({ studentId, courseId, lessonDate }) {
+  const [rows] = await pool.query(
+    `SELECT lr.id, lr.start_time, lr.hours, lr.teacher_id, t.name AS teacher_name
+       FROM lesson_records lr
+       LEFT JOIN teachers t ON t.id = lr.teacher_id
+      WHERE lr.student_id = ? AND lr.course_id = ? AND lr.lesson_date = ?
+      ORDER BY lr.start_time IS NULL, lr.start_time ASC`,
+    [studentId, courseId, lessonDate]
+  )
+  return rows
+}
+
 export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status }) {
   await pool.query(
     `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, courseId, teacherId, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending']
+    [id, studentId, courseId, teacherId || null, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending']
   )
 }
 
@@ -1438,7 +1482,7 @@ export async function getStudentBill(studentId, from, to) {
             t.name AS teacher_name
      FROM lesson_records lr
      JOIN courses  c ON c.id = lr.course_id
-     JOIN teachers t ON t.id = lr.teacher_id
+     LEFT JOIN teachers t ON t.id = lr.teacher_id
      WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
      ORDER BY lr.lesson_date ASC`,
     [from, to]

@@ -17,7 +17,12 @@ async function request(path, options = {}) {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`API ${options.method || 'GET'} ${path} failed: ${res.status} ${text}`)
+    let body = null
+    try { body = text ? JSON.parse(text) : null } catch { /* not json */ }
+    const err = new Error(`API ${options.method || 'GET'} ${path} failed: ${res.status} ${text}`)
+    err.status = res.status
+    err.body   = body
+    throw err
   }
   if (res.status === 204) return null
   return res.json()
@@ -73,7 +78,7 @@ export const apiReorderTeachers = (ids)        => request('/teachers/reorder', {
 // ── Courses ───────────────────────────────────────────────────────────────────
 
 export const apiListCourses     = ()                        => request('/courses')
-export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0, discount_per_student = 0, default_teacher_id = null) => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id }) })
+export const apiCreateCourse    = (name, hourly_rate = 0, teacher_hourly_rate = 0, discount_per_student = 0, default_teacher_id = null, duration_hours = 1) => request('/courses', { method: 'POST', body: JSON.stringify({ name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours }) })
 export const apiUpdateCourse    = (id, patch)              => request(`/courses/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
 export const apiDeleteCourse    = (id)                     => request(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
 export const apiReorderCourses  = (ids)                    => request('/courses/reorder', { method: 'PUT', body: JSON.stringify({ ids }) })
@@ -145,6 +150,24 @@ export const apiListLessons = ({ from, to, student_id, teacher_id, course_id } =
 
 export const apiCreateLesson = (lesson) =>
   request('/lessons', { method: 'POST', body: JSON.stringify(lesson) })
+
+// 嘗試建立上課紀錄；遇 409 重複則呼叫 confirmFn(existing, lesson) 由呼叫端決定要不要 force
+export async function apiCreateLessonWithDupCheck(lesson, confirmFn) {
+  try {
+    return await apiCreateLesson(lesson)
+  } catch (e) {
+    if (e?.status === 409 && e?.body?.error === 'duplicate_lesson') {
+      const ok = await confirmFn(e.body.existing || [], lesson)
+      if (!ok) {
+        const skipped = new Error('duplicate_skipped')
+        skipped.skipped = true
+        throw skipped
+      }
+      return await apiCreateLesson({ ...lesson, force: true })
+    }
+    throw e
+  }
+}
 
 export const apiUpdateLesson = (id, patch) =>
   request(`/lessons/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })

@@ -94,19 +94,20 @@ export default function TutoringLessonsPage() {
   async function handleCreate(e) {
     e.preventDefault()
     const hours = parseFloat(form.hours)
-    if (!form.student_id || !form.course_id || !form.teacher_id) { setError('請選擇學生、課程和老師'); return }
+    if (!form.student_id || !form.course_id) { setError('請選擇學生和課程'); return }
     if (isNaN(hours) || hours <= 0) { setError('請輸入有效時數'); return }
     const dates = (form.lesson_dates || []).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
     if (dates.length === 0) { setError('請選擇至少一個上課日期'); return }
     setSaving(true); setError('')
     const failures = []
+    let skipped = 0
     try {
       for (const d of dates) {
         try {
           await createLesson({
             student_id: form.student_id,
             course_id:  form.course_id,
-            teacher_id: form.teacher_id,
+            teacher_id: form.teacher_id || null,
             hours,
             lesson_date: d,
             start_time: form.start_time || null,
@@ -115,12 +116,16 @@ export default function TutoringLessonsPage() {
             note: form.note || '',
           })
         } catch (e) {
-          failures.push(`${d}：${e?.message || e}`)
+          if (e?.skipped) skipped++
+          else failures.push(`${d}：${e?.message || e}`)
         }
       }
       await loadLessons({})
       setForm({ ...EMPTY_FORM, lesson_dates: form.lesson_dates, start_time: form.start_time })
-      if (failures.length) setError(`部分日期建立失敗：\n${failures.join('\n')}`)
+      const parts = []
+      if (failures.length) parts.push(`部分日期建立失敗：\n${failures.join('\n')}`)
+      if (skipped) parts.push(`${skipped} 筆因重複略過`)
+      if (parts.length) setError(parts.join('\n'))
     } catch (e) { setError(`新增失敗：${e?.message || e}`) }
     finally { setSaving(false) }
   }
@@ -370,7 +375,7 @@ export default function TutoringLessonsPage() {
                     <td>{l.lesson_date}</td>
                     <td>{l.student_name}</td>
                     <td>{l.course_name}</td>
-                    <td>{l.teacher_name}</td>
+                    <td>{l.teacher_name || <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                     <td>{l.hours}</td>
                     <td><LessonStatus record={l} /></td>
                     <td className="note-cell">{l.note}</td>

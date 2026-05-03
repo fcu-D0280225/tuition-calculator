@@ -11,7 +11,7 @@ import {
   // courses
   listCourses, insertCourse, updateCourse, deleteCourse, reorderCourses,
   // lessons
-  listLessons, insertLesson, updateLesson, deleteLesson,
+  listLessons, insertLesson, updateLesson, deleteLesson, findDuplicateLesson,
   // materials
   listMaterials, insertMaterial, updateMaterial, deleteMaterial,
   listMaterialRecords, insertMaterialRecord, updateMaterialRecord, deleteMaterialRecord,
@@ -247,10 +247,14 @@ app.post('/api/courses', async (req, res) => {
   if (isNaN(discountPerStudent) || discountPerStudent < 0 || discountPerStudent > 100000) return res.status(400).json({ error: 'invalid_discount_per_student' })
   const defaultTeacherId = req.body?.default_teacher_id !== undefined && req.body.default_teacher_id !== ''
     ? String(req.body.default_teacher_id) : null
+  const durationHoursRaw = req.body?.duration_hours
+  const durationHours = durationHoursRaw === undefined || durationHoursRaw === '' || durationHoursRaw === null
+    ? 1 : parseFloat(durationHoursRaw)
+  if (isNaN(durationHours) || durationHours <= 0 || durationHours > 24) return res.status(400).json({ error: 'invalid_duration_hours' })
   const id = genId('cr')
   try {
-    await insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId })
-    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate, discount_per_student: discountPerStudent, default_teacher_id: defaultTeacherId })
+    await insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours })
+    res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate, discount_per_student: discountPerStudent, default_teacher_id: defaultTeacherId, duration_hours: durationHours })
   }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
@@ -280,6 +284,11 @@ app.patch('/api/courses/:id', async (req, res) => {
   if (req.body?.default_teacher_id !== undefined) {
     const v = req.body.default_teacher_id
     update.defaultTeacherId = (v === null || v === '') ? null : String(v)
+  }
+  if (req.body?.duration_hours !== undefined) {
+    const dh = parseFloat(req.body.duration_hours)
+    if (isNaN(dh) || dh <= 0 || dh > 24) return res.status(400).json({ error: 'invalid_duration_hours' })
+    update.durationHours = dh
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
@@ -380,7 +389,8 @@ app.get('/api/lessons', async (req, res) => {
 
 app.post('/api/lessons', async (req, res) => {
   const { student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status } = req.body || {}
-  if (!student_id || !course_id || !teacher_id) return res.status(400).json({ error: 'student_id_course_id_teacher_id_required' })
+  if (!student_id || !course_id) return res.status(400).json({ error: 'student_id_course_id_required' })
+  const teacherId = (teacher_id === undefined || teacher_id === null || teacher_id === '') ? null : String(teacher_id)
   const parsedHours = parseFloat(hours)
   if (isNaN(parsedHours) || parsedHours <= 0) return res.status(400).json({ error: 'invalid_hours' })
   if (!lesson_date || !/^\d{4}-\d{2}-\d{2}$/.test(lesson_date)) return res.status(400).json({ error: 'invalid_lesson_date' })
@@ -390,10 +400,16 @@ app.post('/api/lessons', async (req, res) => {
   if (parsedTeacherPrice !== null && (isNaN(parsedTeacherPrice) || parsedTeacherPrice < 0)) return res.status(400).json({ error: 'invalid_teacher_unit_price' })
   const cleanStart = start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(start_time) ? start_time : null
   if (await isDateLocked(lesson_date)) return res.status(423).json({ error: 'period_locked' })
+  if (!req.body?.force) {
+    const dups = await findDuplicateLesson({ studentId: student_id, courseId: course_id, lessonDate: lesson_date })
+    if (dups.length > 0) {
+      return res.status(409).json({ error: 'duplicate_lesson', existing: dups })
+    }
+  }
   const id = genId('lr')
   try {
-    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId: teacher_id, hours: parsedHours, lessonDate: lesson_date, startTime: cleanStart, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note, status })
-    res.status(201).json({ id, student_id, course_id, teacher_id, hours: parsedHours, lesson_date, start_time: cleanStart, unit_price: parsedPrice, teacher_unit_price: parsedTeacherPrice, note: note || '', status: status || 'pending' })
+    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId, hours: parsedHours, lessonDate: lesson_date, startTime: cleanStart, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note, status })
+    res.status(201).json({ id, student_id, course_id, teacher_id: teacherId, hours: parsedHours, lesson_date, start_time: cleanStart, unit_price: parsedPrice, teacher_unit_price: parsedTeacherPrice, note: note || '', status: status || 'pending' })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
