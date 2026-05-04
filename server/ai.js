@@ -1,6 +1,31 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { execSync } from 'node:child_process'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// ── OAuth token from Claude Code keychain (macOS) ──────────────────────────
+// Falls back to ANTHROPIC_API_KEY if keychain is unavailable.
+let _cachedToken = null
+let _tokenExpiry = 0
+
+function getClient() {
+  // If explicit API key is set, use it directly
+  if (process.env.ANTHROPIC_API_KEY) {
+    return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  }
+  // Re-use cached OAuth token until 5 min before expiry
+  if (_cachedToken && Date.now() < _tokenExpiry - 300_000) {
+    return new Anthropic({ authToken: _cachedToken })
+  }
+  try {
+    const raw = execSync('security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null', { timeout: 3000 }).toString().trim()
+    const creds = JSON.parse(raw)
+    const { accessToken, expiresAt } = creds.claudeAiOauth
+    _cachedToken = accessToken
+    _tokenExpiry = expiresAt
+    return new Anthropic({ authToken: accessToken })
+  } catch {
+    throw new Error('未設定 ANTHROPIC_API_KEY，且無法從 Claude Code keychain 取得 OAuth token。請在 .env 中設定 ANTHROPIC_API_KEY。')
+  }
+}
 
 const SYSTEM_PROMPT = `你是一位補習班經營助理，幫助經營者分析學費、薪資、上課紀錄、雜項支出等資料，並提供洞察與建議。
 
@@ -167,6 +192,7 @@ export async function runAiChat(messages, db) {
   // db: object with all DB functions
 
   const anthropicMessages = messages.map(m => ({ role: m.role, content: m.content }))
+  const client = getClient()
 
   let response = await client.messages.create({
     model:      'claude-sonnet-4-6',

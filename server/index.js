@@ -898,9 +898,6 @@ app.get('/api/share/:token', async (req, res) => {
 
 app.post('/api/ai/chat', requireAuth, async (req, res) => {
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(503).json({ error: '未設定 ANTHROPIC_API_KEY，請在 .env 中新增此環境變數' })
-    }
     const { messages } = req.body
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages 必須為非空陣列' })
