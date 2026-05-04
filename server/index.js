@@ -36,6 +36,7 @@ import {
   insertLeaveRequest, listStudentLeaveRequests, deleteLeaveRequest,
 } from './db.js'
 import { initAuthSchema, requireAuth, registerAuthRoutes, registerAdminRoutes } from './auth.js'
+import { runAiChat } from './ai.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
 
@@ -891,6 +892,29 @@ app.get('/api/share/:token', async (req, res) => {
       ...bill,
     })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── AI 助理 ───────────────────────────────────────────────────────────────────
+
+app.post('/api/ai/chat', requireAuth, async (req, res) => {
+  try {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(503).json({ error: '未設定 ANTHROPIC_API_KEY，請在 .env 中新增此環境變數' })
+    }
+    const { messages } = req.body
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'messages 必須為非空陣列' })
+    }
+    const db = {
+      settlementTuition, settlementSalary, sumMiscExpensesByCategory,
+      listLessons, listMiscExpenses, listStudents, listTeachers, listCourses,
+    }
+    const reply = await runAiChat(messages, db)
+    res.json({ reply })
+  } catch (e) {
+    console.error('[AI chat]', e)
+    res.status(500).json({ error: e.message || 'AI 呼叫失敗' })
+  }
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

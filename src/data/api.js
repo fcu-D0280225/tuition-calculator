@@ -251,3 +251,9 @@ export const apiCreateShareToken = (studentId, { from, to, expires_days } = {}) 
 
 export const apiGetShare = (token) =>
   request(`/share/${encodeURIComponent(token)}`)
+
+// ── AI 助理 ───────────────────────────────────────────────────────────────────
+
+export const apiAiChat = (messages) =>
+  request('/ai/chat', { method: 'POST', body: JSON.stringify({ messages }) })
+    .then(r => r.reply)

@@ -18,6 +18,7 @@ import DashboardPage     from './pages/DashboardPage.jsx'
 import AttendancePage    from './pages/AttendancePage.jsx'
 import SchedulePage      from './pages/SchedulePage.jsx'
 import UsersPage         from './pages/UsersPage.jsx'
+import AiAssistantPage   from './pages/AiAssistantPage.jsx'
 import LoginPage         from './pages/LoginPage.jsx'
 import { apiAuthMe, apiAuthLogout } from './data/api.js'
 
@@ -46,8 +47,9 @@ const NAV = [
     { id: 'settlement',         label: '結算總覽' },
   ]},
   { type: 'group', key: 'admin', label: '管理', children: [
-    { id: 'dashboard', label: '財務總覽' },
-    { id: 'users',     label: '使用者管理' },
+    { id: 'dashboard',     label: '財務總覽' },
+    { id: 'ai_assistant',  label: 'AI 助理' },
+    { id: 'users',         label: '使用者管理' },
   ]},
 ]
 
@@ -352,6 +354,7 @@ export default function App() {
             {tab === 'groups'     && <GroupsPage />}
             {tab === 'attendance' && <AttendancePage />}
             {tab === 'schedule'   && <SchedulePage />}
+            {tab === 'ai_assistant' && <AiAssistantPage />}
             {tab === 'users'      && <UsersPage currentUser={{ ...authState.user, is_admin: authState.is_admin }} />}
           </main>
         </div>
