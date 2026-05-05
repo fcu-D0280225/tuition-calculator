@@ -17,15 +17,15 @@ html {
 }
 
 :root {
-  --bg: #f3f3f6;
+  --bg: #f7f9fb;
   --surface: #ffffff;
-  --surface-soft: #f7f8fb;
-  --border: #e5e7eb;
-  --text: #1e293b;
+  --surface-soft: #f2f4f6;
+  --border: #e2e8f0;
+  --text: #191c1e;
   --muted: #64748b;
-  --accent: #0077CC;
-  --accent-dark: #005fa3;
-  --accent-light: #e0f2ff;
+  --accent: #2563EB;
+  --accent-dark: #1d4ed8;
+  --accent-light: #eff6ff;
   --brand-yellow: #FFD700;
   --brand-yellow-soft: #fff8d1;
   --brand-yellow-border: #f5d76e;
@@ -45,9 +45,9 @@ html {
   --success-gradient-to: #e0f2fe;
   --success-border: #a7f3d0;
   --sidebar-w: 300px;
-  --radius: 18px;
-  --radius-md: 14px;
-  --radius-sm: 10px;
+  --radius: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
   --shadow-soft: 0 4px 12px rgba(15, 23, 42, 0.06);
   --shadow-elev: 0 12px 28px rgba(15, 23, 42, 0.08);
   color-scheme: light;
@@ -73,9 +73,9 @@ html {
   --border:        #334155;
   --text:          #e2e8f0;
   --muted:         #94a3b8;
-  --accent:        #4aa6e8;
-  --accent-dark:   #2f8ed1;
-  --accent-light:  #0e3358;
+  --accent:        #60a5fa;
+  --accent-dark:   #3b82f6;
+  --accent-light:  #1e3a5f;
   --brand-yellow:        #FFD700;
   --brand-yellow-soft:   #3a330a;
   --brand-yellow-border: #806b1a;
@@ -103,7 +103,7 @@ html {
 }
 
 body {
-  font-family: 'Lexend', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft JhengHei', 'Noto Sans TC', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Inter', 'Noto Sans TC', 'PingFang TC', 'Hiragino Sans GB', 'Microsoft JhengHei', 'Segoe UI', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -115,7 +115,7 @@ body {
 
 /* 標題加粗（品牌規範：Lexend Bold） */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Lexend', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans TC', system-ui, sans-serif;
+  font-family: 'Inter', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', system-ui, sans-serif;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -2288,7 +2288,7 @@ select.catalog-input.catalog-select {
 /* sidebar：左側獨立頁籤選單 */
 .app-sidebar {
   flex-shrink: 0;
-  width: 240px;
+  width: 260px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -2406,7 +2406,7 @@ select.catalog-input.catalog-select {
 .nav-section-toggle {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 8px;
   width: 100%;
   background: transparent;
   border: none;
@@ -4408,10 +4408,10 @@ select.catalog-input.catalog-select {
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.status-tag.status-attended { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
-.status-tag.status-pending  { background: #eceff1; color: #546e7a; border-color: #b0bec5; }
-.status-tag.status-leave    { background: #fff3e0; color: #ef6c00; border-color: #ffcc80; }
-.status-tag.status-pre      { background: #f3e5f5; color: #6a1b9a; border-color: #ce93d8; }
+.status-tag.status-attended { background: #dcfce7; color: #15803d; border-color: transparent; }
+.status-tag.status-pending  { background: #f1f5f9; color: #64748b; border-color: transparent; }
+.status-tag.status-leave    { background: #ffedd5; color: #ea580c; border-color: transparent; }
+.status-tag.status-pre      { background: #ede9fe; color: #6d28d9; border-color: transparent; }
 
 /* ── Inline time + duration edit cell ──────────────────────────────────── */
 .time-duration-edit {
