@@ -1,14 +1,20 @@
 import { useRef, useState } from 'react'
 import { apiAiChat } from '../data/api.js'
 
-const WELCOME = `你好！我是補習班 AI 助理。你可以問我：
+const WELCOME = `你好！我是補習班 AI 助理，可以回答兩種問題：
 
+📊 經營分析
 - 「本月財務狀況如何？」
 - 「上個月哪位學生費用最高？」
 - 「最近有哪些課堂備註值得關注？」
-- 「老師薪資本月是多少？」
-- 「雜項支出本月花了多少？」
-- 「根據課堂備註，幫我總結各課程的教學狀況」`
+- 「根據課堂備註，幫我總結各課程的教學狀況」
+
+🛠️ 系統操作
+- 「我要新增學生，要去哪裡？」
+- 「點名怎麼操作？」
+- 「學費結算怎麼產 PDF？」
+- 「團課月費怎麼計算的？」
+- 「怎麼把這個系統裝到手機？」`
 
 export default function AiAssistantPage() {
   const [messages, setMessages] = useState([
@@ -68,7 +74,7 @@ export default function AiAssistantPage() {
           <p className="page-desc">與 AI 對話，快速查詢各項紀錄與統計</p>
         </div>
         <div className="page-header-actions">
-          <button type="button" className="btn-ghost" onClick={handleClear}>清除對話</button>
+          <button type="button" className="btn-secondary" onClick={handleClear}>清除對話</button>
         </div>
       </div>
 
