@@ -207,7 +207,10 @@ export default function StudentsPage({ onEnroll }) {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>學生名冊</h1>
+          <div className="page-header-body">
+            <h1>學生名冊</h1>
+            <p className="page-desc">管理所有學生資料、選課與學費設定</p>
+          </div>
       </div>
 
       <form className="add-form" onSubmit={handleAdd}>

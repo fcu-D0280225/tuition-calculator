@@ -191,7 +191,10 @@ export default function GroupsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>團課管理</h1>
+          <div className="page-header-body">
+            <h1>團課管理</h1>
+            <p className="page-desc">建立與管理團課課程與分組設定</p>
+          </div>
       </div>
 
       {error && <div className="error-msg">{error}</div>}

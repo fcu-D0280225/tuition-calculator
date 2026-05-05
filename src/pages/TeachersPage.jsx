@@ -137,7 +137,10 @@ export default function TeachersPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>老師名冊</h1>
+          <div className="page-header-body">
+            <h1>老師名冊</h1>
+            <p className="page-desc">管理所有老師資料與薪資設定</p>
+          </div>
       </div>
 
       <form className="add-form" onSubmit={handleAdd}>

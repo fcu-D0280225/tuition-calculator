@@ -53,7 +53,10 @@ export default function SalarySettlementPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>薪資結算</h1>
+          <div className="page-header-body">
+            <h1>薪資結算</h1>
+            <p className="page-desc">計算並匯出每位老師的薪資明細</p>
+          </div>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>

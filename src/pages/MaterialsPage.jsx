@@ -101,7 +101,10 @@ export default function MaterialsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>教材管理</h1>
+          <div className="page-header-body">
+            <h1>教材管理</h1>
+            <p className="page-desc">記錄與追蹤各課程的教材採購費用</p>
+          </div>
       </div>
 
       {error && <div className="error-msg">{error}</div>}

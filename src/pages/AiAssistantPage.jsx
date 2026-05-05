@@ -63,8 +63,13 @@ export default function AiAssistantPage() {
   return (
     <div className="page ai-page">
       <div className="page-header">
-        <h1>AI 助理</h1>
-        <button type="button" className="btn-ghost" onClick={handleClear}>清除對話</button>
+        <div className="page-header-body">
+          <h1>AI 助理</h1>
+          <p className="page-desc">與 AI 對話，快速查詢各項紀錄與統計</p>
+        </div>
+        <div className="page-header-actions">
+          <button type="button" className="btn-ghost" onClick={handleClear}>清除對話</button>
+        </div>
       </div>
 
       <div className="ai-chat-container">

@@ -186,7 +186,10 @@ export default function GroupLessonsPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>團課上課紀錄</h1>
+          <div className="page-header-body">
+            <h1>團課上課紀錄</h1>
+            <p className="page-desc">管理並追蹤所有學生的團課上課出席與進度</p>
+          </div>
       </div>
 
       <div className="add-mode-switcher">

@@ -115,7 +115,10 @@ export default function TuitionSettlementPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>學費結算</h1>
+          <div className="page-header-body">
+            <h1>學費結算</h1>
+            <p className="page-desc">計算並匯出每位學生的學費明細</p>
+          </div>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>

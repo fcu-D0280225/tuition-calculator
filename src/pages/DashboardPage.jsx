@@ -115,7 +115,10 @@ export default function DashboardPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>財務總覽（損益）</h1>
+          <div className="page-header-body">
+            <h1>財務總覽（損益）</h1>
+            <p className="page-desc">查看收入、支出與損益統計報表</p>
+          </div>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>

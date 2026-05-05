@@ -218,7 +218,10 @@ export default function SchedulePage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>課表</h1>
+          <div className="page-header-body">
+            <h1>課表</h1>
+            <p className="page-desc">查看所有課程的排課行事曆</p>
+          </div>
       </div>
 
       <div className="filter-bar">

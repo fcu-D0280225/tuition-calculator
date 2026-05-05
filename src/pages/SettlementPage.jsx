@@ -143,7 +143,10 @@ export default function SettlementPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>結算</h1>
+          <div className="page-header-body">
+            <h1>結算</h1>
+            <p className="page-desc">查看整體收支結算與損益彙總</p>
+          </div>
       </div>
 
       <form className="settlement-form" onSubmit={handleGenerate}>

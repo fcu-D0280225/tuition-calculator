@@ -133,7 +133,10 @@ export default function MiscPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>雜項支出</h1>
+          <div className="page-header-body">
+            <h1>雜項支出</h1>
+            <p className="page-desc">記錄非教材的其他相關費用</p>
+          </div>
       </div>
 
       <div className="lesson-form-card">

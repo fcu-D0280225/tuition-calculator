@@ -565,7 +565,10 @@ export default function AttendancePage() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>點名</h1>
+          <div className="page-header-body">
+            <h1>點名</h1>
+            <p className="page-desc">快速記錄每堂課的出席狀況</p>
+          </div>
       </div>
 
       {error      && <div className="error-msg" style={{ marginBottom: 12 }}>{error}</div>}

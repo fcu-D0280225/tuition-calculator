@@ -89,7 +89,10 @@ export default function CoursesPage({ onEditCourse }) {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>家教課目錄</h1>
+          <div className="page-header-body">
+            <h1>家教課目錄</h1>
+            <p className="page-desc">建立與管理家教課程，設定單價與授課老師</p>
+          </div>
       </div>
 
       {canManageCourses && (
