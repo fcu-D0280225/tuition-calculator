@@ -32,7 +32,7 @@ function openLineShare(msg) {
   window.location.href = `line://msg/text/?${encoded}`
   setTimeout(() => {
     if (!document.hidden) {
-      window.open(`https://line.me/R/msg/text/?${encoded}`, '_blank')
+      window.open(`https://line.me/R/msg/text/?${encoded}`, '_blank', 'noopener,noreferrer')
     }
   }, 1500)
 }

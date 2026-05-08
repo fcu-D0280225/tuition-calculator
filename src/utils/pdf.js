@@ -109,7 +109,7 @@ function singleTuitionHtml(student, period, dateStr) {
   const courseRows = student.courses.map((c, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600; color:#2563eb;">${escapeHtml(c.course_name)}</td>
-      <td style="padding:10px 12px; text-align:right;">${c.total_hours} 時</td>
+      <td style="padding:10px 12px; text-align:right;">${escapeHtml(c.total_hours)} 時</td>
       <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(c.unit_price)}</td>
       <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(c.amount)}</td>
     </tr>
@@ -119,7 +119,7 @@ function singleTuitionHtml(student, period, dateStr) {
   const groupRows = groups.map(g => `
     <tr style="border-bottom:1px solid #f1f5f9; background:#ecfdf5;">
       <td style="padding:10px 12px; font-weight:600; color:#166534;">團課：${escapeHtml(g.group_name)}</td>
-      <td style="padding:10px 12px; text-align:right;">${g.billable_months} 月</td>
+      <td style="padding:10px 12px; text-align:right;">${escapeHtml(g.billable_months)} 月</td>
       <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(g.monthly_fee)}/月</td>
       <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(g.amount)}</td>
     </tr>
@@ -129,7 +129,7 @@ function singleTuitionHtml(student, period, dateStr) {
   const matRows = materials.map((m, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; background:#fefce8;">
       <td style="padding:10px 12px; font-weight:600; color:#a16207;">教材：${escapeHtml(m.material_name)}</td>
-      <td style="padding:10px 12px; text-align:right;">${m.total_qty} 本</td>
+      <td style="padding:10px 12px; text-align:right;">${escapeHtml(m.total_qty)} 本</td>
       <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(m.unit_price)}</td>
       <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(m.amount)}</td>
     </tr>
@@ -232,7 +232,7 @@ function singleSalaryHtml(teacher, period, dateStr) {
   const rows = teacher.courses.map((c, i) => `
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
       <td style="padding:10px 12px; font-weight:600; color:#7c3aed;">${escapeHtml(c.course_name)}</td>
-      <td style="padding:10px 12px; text-align:right;">${c.total_hours}</td>
+      <td style="padding:10px 12px; text-align:right;">${escapeHtml(c.total_hours)}</td>
       <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(c.hourly_rate)}</td>
       <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(c.amount)}</td>
     </tr>

@@ -52,6 +52,9 @@ export default function LoginPage({ onLoggedIn }) {
         <button type="submit" className="login-submit" disabled={loading || !username || !password}>
           {loading ? '登入中…' : '登入'}
         </button>
+        <a href="/referral" className="login-referral-link">
+          了解更多功能介紹 →
+        </a>
       </form>
     </div>
   )

@@ -5027,3 +5027,212 @@ select:focus-visible {
 :root[data-theme='dark'] select:focus-visible {
   box-shadow: 0 0 0 3px rgba(74, 166, 232, 0.28);
 }
+
+/* ─────────────────────────────────────────────
+   ReferralPage 樣式
+   ───────────────────────────────────────────── */
+
+.referral-shell {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans, Inter, 'Noto Sans TC', sans-serif);
+}
+
+/* Hero */
+.referral-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 72px 24px 64px;
+  background: linear-gradient(160deg, var(--accent) 0%, #1e40af 100%);
+  color: #fff;
+}
+
+.referral-hero-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 20px;
+}
+
+.referral-hero-title {
+  font-size: clamp(28px, 6vw, 48px);
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+
+.referral-hero-sub {
+  font-size: clamp(15px, 2.5vw, 18px);
+  opacity: 0.88;
+  line-height: 1.7;
+  max-width: 520px;
+  margin: 0 0 36px;
+}
+
+/* CTA button */
+.referral-cta-btn {
+  display: inline-block;
+  padding: 14px 36px;
+  background: #fff;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 16px;
+  border-radius: var(--radius, 12px);
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.referral-cta-btn:hover {
+  opacity: 0.92;
+  transform: translateY(-2px);
+}
+
+/* Sections */
+.referral-section {
+  padding: 64px 24px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.referral-section--alt {
+  max-width: 100%;
+  background: var(--surface);
+  padding: 64px 24px;
+}
+
+.referral-section--alt > * {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.referral-section-title {
+  font-size: clamp(20px, 4vw, 28px);
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 40px;
+}
+
+/* Feature grid */
+.referral-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.referral-card {
+  background: var(--surface);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius, 12px);
+  padding: 28px 24px;
+  transition: box-shadow 0.15s;
+}
+
+.referral-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.referral-card-icon {
+  font-size: 28px;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.referral-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.referral-card-desc {
+  font-size: 14px;
+  color: var(--muted, #64748b);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* Steps */
+.referral-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.referral-step {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--bg);
+  border-radius: var(--radius, 12px);
+  padding: 20px 24px;
+}
+
+.referral-step-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  flex-shrink: 0;
+  width: 40px;
+}
+
+.referral-step-text {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* Bottom CTA */
+.referral-cta-section {
+  text-align: center;
+  padding: 72px 24px;
+  background: linear-gradient(160deg, var(--accent) 0%, #1e40af 100%);
+  max-width: 100%;
+  color: #fff;
+}
+
+.referral-cta-title {
+  font-size: clamp(22px, 5vw, 36px);
+  font-weight: 800;
+  margin: 0 0 12px;
+}
+
+.referral-cta-sub {
+  font-size: 16px;
+  opacity: 0.85;
+  margin: 0 0 32px;
+}
+
+/* Footer */
+.referral-footer {
+  text-align: center;
+  padding: 24px;
+  font-size: 13px;
+  color: var(--muted, #64748b);
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+/* Login page referral link */
+.login-referral-link {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.login-referral-link:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
