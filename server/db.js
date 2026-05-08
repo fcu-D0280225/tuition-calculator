@@ -459,6 +459,16 @@ export async function initSchema() {
     await pool.query(`ALTER TABLE lesson_records ADD CONSTRAINT fk_lesson_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL`)
   }
 
+  // Migration: 加 lesson_records.from_enroll_batch（標記是否為「學生選課」批次建立的紀錄；
+  // 取消選課時，僅這類紀錄會被自動刪除，手動建立的紀錄保留）
+  const [lrBatchCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lesson_records' AND COLUMN_NAME = 'from_enroll_batch'`
+  )
+  if (lrBatchCols.length === 0) {
+    await pool.query(`ALTER TABLE lesson_records ADD COLUMN from_enroll_batch TINYINT(1) NOT NULL DEFAULT 0`)
+  }
+
   // Migration: 加 students.sort_order
   const [sSortCols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -639,13 +649,6 @@ export async function listStudents() {
   return rows
 }
 
-export async function reorderStudents(orderedIds) {
-  if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
-  const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
-  const sql = `UPDATE students SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?)`
-  await pool.query(sql, [...orderedIds, orderedIds])
-}
-
 export async function insertStudent({ id, name, contactName, contactPhone }) {
   await pool.query(
     'INSERT INTO students (id, name, contact_name, contact_phone) VALUES (?, ?, ?, ?)',
@@ -666,6 +669,19 @@ export async function updateStudent(id, { name, contactName, contactPhone }) {
 }
 
 export async function setStudentActive(id, active) {
+  // 停用時清除「尚未點名」的家教課/團課紀錄（status NOT IN attended/leave，與 setStudentEnrollment 一致）
+  if (!active) {
+    await pool.query(
+      `DELETE FROM lesson_records
+       WHERE student_id = ? AND status NOT IN ('attended', 'leave')`,
+      [id]
+    )
+    await pool.query(
+      `DELETE FROM group_records
+       WHERE student_id = ? AND status NOT IN ('attended', 'leave')`,
+      [id]
+    )
+  }
   const [res] = await pool.query(
     'UPDATE students SET active = ? WHERE id = ?',
     [active ? 1 : 0, id]
@@ -691,6 +707,25 @@ export async function getStudentEnrollment(studentId) {
 export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
   if (Array.isArray(courseIds)) {
     const cleaned = Array.from(new Set(courseIds.filter(Boolean)))
+
+    // 找出本次被移除的家教課；只清除「由選課批次建立 + 未點名／尚未開始」的紀錄
+    // （已點名 'attended' / 請假 'leave' / 手動建立的紀錄都保留）
+    const [existRows] = await pool.query(
+      'SELECT course_id FROM student_courses WHERE student_id = ?',
+      [studentId]
+    )
+    const newSet = new Set(cleaned)
+    const removed = existRows.map(r => r.course_id).filter(cid => !newSet.has(cid))
+    if (removed.length) {
+      await pool.query(
+        `DELETE FROM lesson_records
+         WHERE student_id = ? AND course_id IN (?)
+           AND from_enroll_batch = 1
+           AND status NOT IN ('attended', 'leave')`,
+        [studentId, removed]
+      )
+    }
+
     await pool.query('DELETE FROM student_courses WHERE student_id = ?', [studentId])
     if (cleaned.length) {
       await pool.query(
@@ -1127,11 +1162,11 @@ export async function findDuplicateLesson({ studentId, courseId, lessonDate }) {
   return rows
 }
 
-export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status }) {
+export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status, fromEnrollBatch }) {
   await pool.query(
-    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, courseId, teacherId || null, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending']
+    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status, from_enroll_batch)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, studentId, courseId, teacherId || null, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending', fromEnrollBatch ? 1 : 0]
   )
 }
 

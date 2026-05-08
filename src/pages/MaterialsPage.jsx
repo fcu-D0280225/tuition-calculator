@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useMaterials } from '../contexts/MaterialsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import Combobox from '../components/Combobox.jsx'
@@ -27,6 +27,12 @@ export default function MaterialsPage() {
 
   const [error, setError]   = useState('')
   const [saving, setSaving] = useState(false)
+
+  // 名稱排序：null 維持後端順序，'asc' 升冪，'desc' 降冪
+  const [matNameSort, setMatNameSort] = useState(null)
+  function toggleMatNameSort() {
+    setMatNameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
+  }
 
   function amt(value) {
     return parseFloat(value).toLocaleString()
@@ -94,6 +100,11 @@ export default function MaterialsPage() {
   }
 
   const { materials, loading } = ms
+  const displayMaterials = useMemo(() => {
+    if (!matNameSort) return materials
+    const cmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
+    return [...materials].sort(matNameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+  }, [materials, matNameSort])
   const { records } = ms
   const { students } = ss
   const activeStudents = students.filter(s => s.active !== 0)
@@ -140,10 +151,27 @@ export default function MaterialsPage() {
         ) : (
           <table className="entity-table">
             <thead>
-              <tr><th>教材名稱</th><th>單價（元）</th><th></th></tr>
+              <tr>
+                <th>
+                  <button
+                    type="button"
+                    className="th-sort-btn"
+                    onClick={toggleMatNameSort}
+                    aria-label={`教材名稱（${matNameSort === 'asc' ? '升冪' : matNameSort === 'desc' ? '降冪' : '預設順序'}，點擊切換）`}
+                    title="點擊切換排序"
+                  >
+                    教材名稱
+                    <span className="th-sort-icon" aria-hidden="true">
+                      {matNameSort === 'asc' ? '▲' : matNameSort === 'desc' ? '▼' : '⇅'}
+                    </span>
+                  </button>
+                </th>
+                <th>單價（元）</th>
+                <th></th>
+              </tr>
             </thead>
             <tbody>
-              {materials.map(m => (
+              {displayMaterials.map(m => (
                 <tr key={m.id}>
                   <td>
                     {editMatId === m.id ? (

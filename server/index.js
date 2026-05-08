@@ -5,7 +5,7 @@ import {
   initSchema,
   // students
   listStudents, insertStudent, updateStudent, setStudentActive, listStudentCourses,
-  getStudentEnrollment, setStudentEnrollment, listAllEnrollments, reorderStudents,
+  getStudentEnrollment, setStudentEnrollment, listAllEnrollments,
   // teachers
   listTeachers, insertTeacher, updateTeacherName, updateTeacher, setTeacherActive, reorderTeachers, listTeacherCourses,
   // courses
@@ -154,15 +154,6 @@ app.put('/api/students/:id/enrollment', async (req, res) => {
   try {
     await setStudentEnrollment(req.params.id, { courseIds: course_ids, groupIds: group_ids })
     res.json(await getStudentEnrollment(req.params.id))
-  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
-})
-
-app.put('/api/students/reorder', async (req, res) => {
-  const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
-  if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
-  try {
-    await reorderStudents(ids)
-    res.json(await listStudents())
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -418,7 +409,7 @@ app.get('/api/lessons', async (req, res) => {
 })
 
 app.post('/api/lessons', async (req, res) => {
-  const { student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status } = req.body || {}
+  const { student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status, from_enroll_batch } = req.body || {}
   if (!student_id || !course_id) return res.status(400).json({ error: 'student_id_course_id_required' })
   const teacherId = (teacher_id === undefined || teacher_id === null || teacher_id === '') ? null : String(teacher_id)
   const parsedHours = parseFloat(hours)
@@ -438,8 +429,8 @@ app.post('/api/lessons', async (req, res) => {
   }
   const id = genId('lr')
   try {
-    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId, hours: parsedHours, lessonDate: lesson_date, startTime: cleanStart, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note, status })
-    res.status(201).json({ id, student_id, course_id, teacher_id: teacherId, hours: parsedHours, lesson_date, start_time: cleanStart, unit_price: parsedPrice, teacher_unit_price: parsedTeacherPrice, note: note || '', status: status || 'pending' })
+    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId, hours: parsedHours, lessonDate: lesson_date, startTime: cleanStart, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note, status, fromEnrollBatch: !!from_enroll_batch })
+    res.status(201).json({ id, student_id, course_id, teacher_id: teacherId, hours: parsedHours, lesson_date, start_time: cleanStart, unit_price: parsedPrice, teacher_unit_price: parsedTeacherPrice, note: note || '', status: status || 'pending', from_enroll_batch: !!from_enroll_batch })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 

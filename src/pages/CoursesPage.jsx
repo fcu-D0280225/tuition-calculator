@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import Combobox from '../components/Combobox.jsx'
-import { apiReorderCourses } from '../data/api.js'
 
 export default function CoursesPage({ onEditCourse }) {
   const { state, loadCourses, createCourse, removeCourse } = useCourses()
@@ -21,38 +20,16 @@ export default function CoursesPage({ onEditCourse }) {
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
 
-  // 拖曳排序
-  const [dragId, setDragId]   = useState(null)
-  const [overId, setOverId]   = useState(null)
-  const [orderOverride, setOrderOverride] = useState(null) // 樂觀更新後的順序
-
-  function startDrag(id) { setDragId(id) }
-  function endDrag() { setDragId(null); setOverId(null) }
-
-  async function handleDrop(targetId) {
-    if (!dragId || dragId === targetId) { endDrag(); return }
-    const list = (orderOverride ?? courses).map(c => c.id)
-    const fromIdx = list.indexOf(dragId)
-    const toIdx   = list.indexOf(targetId)
-    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
-    const next = list.slice()
-    next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, dragId)
-    // 樂觀更新顯示順序
-    const idMap = new Map(courses.map(c => [c.id, c]))
-    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
-    endDrag()
-    try {
-      await apiReorderCourses(next)
-      await loadCourses()
-      setOrderOverride(null)
-    } catch {
-      setError('排序儲存失敗')
-      setOrderOverride(null)
-    }
+  // 名稱排序：null 維持後端順序，'asc' 升冪，'desc' 降冪
+  const [nameSort, setNameSort] = useState(null)
+  function toggleNameSort() {
+    setNameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
   }
-
-  const displayCourses = orderOverride ?? courses
+  const displayCourses = useMemo(() => {
+    if (!nameSort) return courses
+    const cmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
+    return [...courses].sort(nameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+  }, [courses, nameSort])
 
   function amt(value) {
     return parseFloat(value).toLocaleString()
@@ -164,7 +141,6 @@ export default function CoursesPage({ onEditCourse }) {
       ) : (
         <table className="entity-table courses-table">
           <colgroup>
-            <col style={{ width: 36 }} />
             <col />
             {canViewRates && <col style={{ width: 100 }} />}
             <col style={{ width: 100 }} />
@@ -173,8 +149,20 @@ export default function CoursesPage({ onEditCourse }) {
           </colgroup>
           <thead>
             <tr>
-              <th aria-label="拖曳排序"></th>
-              <th>家教課名稱</th>
+              <th>
+                <button
+                  type="button"
+                  className="th-sort-btn"
+                  onClick={toggleNameSort}
+                  aria-label={`家教課名稱（${nameSort === 'asc' ? '升冪' : nameSort === 'desc' ? '降冪' : '預設順序'}，點擊切換）`}
+                  title="點擊切換排序"
+                >
+                  家教課名稱
+                  <span className="th-sort-icon" aria-hidden="true">
+                    {nameSort === 'asc' ? '▲' : nameSort === 'desc' ? '▼' : '⇅'}
+                  </span>
+                </button>
+              </th>
               {canViewRates && <th>學費</th>}
               <th>每堂時數</th>
               <th>預設老師</th>
@@ -183,20 +171,7 @@ export default function CoursesPage({ onEditCourse }) {
           </thead>
           <tbody>
             {displayCourses.map(c => (
-              <tr
-                key={c.id}
-                className={`${dragId === c.id ? 'row-dragging' : ''} ${overId === c.id ? 'row-drop-target' : ''}`}
-                onDragOver={e => { if (dragId) { e.preventDefault(); setOverId(c.id) } }}
-                onDragLeave={() => { if (overId === c.id) setOverId(null) }}
-                onDrop={e => { e.preventDefault(); handleDrop(c.id) }}
-              >
-                <td
-                  className="drag-handle"
-                  draggable
-                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(c.id) }}
-                  onDragEnd={endDrag}
-                  title="拖曳調整順序"
-                >⋮⋮</td>
+              <tr key={c.id}>
                 <td>{c.name}</td>
                 {canViewRates && <td>{amt(c.hourly_rate)}</td>}
                 <td>{`${parseFloat(c.duration_hours ?? 1)} 小時`}</td>

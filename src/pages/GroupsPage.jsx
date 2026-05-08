@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import Combobox from '../components/Combobox.jsx'
-import { apiListGroupMembers, apiReorderGroups } from '../data/api.js'
+import { apiListGroupMembers } from '../data/api.js'
 
 const WEEKDAYS = [
   { value: 0, label: '日' },
@@ -69,35 +69,10 @@ export default function GroupsPage() {
   // 各團課人數快取（id -> count）
   const [memberCounts, setMemberCounts] = useState({})
 
-  // 拖曳排序
-  const [dragId, setDragId]   = useState(null)
-  const [overId, setOverId]   = useState(null)
-  const [orderOverride, setOrderOverride] = useState(null)
-
-  function startDrag(id) { setDragId(id) }
-  function endDrag() { setDragId(null); setOverId(null) }
-
-  async function handleDrop(targetId) {
-    if (!dragId || dragId === targetId) { endDrag(); return }
-    const baseList = orderOverride ?? state.groups
-    const list = baseList.map(g => g.id)
-    const fromIdx = list.indexOf(dragId)
-    const toIdx   = list.indexOf(targetId)
-    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
-    const next = list.slice()
-    next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, dragId)
-    const idMap = new Map(state.groups.map(g => [g.id, g]))
-    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
-    endDrag()
-    try {
-      await apiReorderGroups(next)
-      await loadGroups()
-      setOrderOverride(null)
-    } catch {
-      setError('排序儲存失敗')
-      setOrderOverride(null)
-    }
+  // 名稱排序：null 維持後端順序，'asc' 升冪，'desc' 降冪
+  const [nameSort, setNameSort] = useState(null)
+  function toggleNameSort() {
+    setNameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
   }
 
   function amt(value) {
@@ -186,7 +161,11 @@ export default function GroupsPage() {
   }
 
   const { groups, loading } = state
-  const displayGroups = orderOverride ?? groups
+  const displayGroups = useMemo(() => {
+    if (!nameSort) return groups
+    const cmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
+    return [...groups].sort(nameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+  }, [groups, nameSort])
 
   return (
     <div className="page">
@@ -312,7 +291,6 @@ export default function GroupsPage() {
         ) : (
           <table className="entity-table groups-table">
             <colgroup>
-              <col style={{ width: 36 }} />
               <col style={{ width: 140 }} />
               <col style={{ width: 130 }} />
               <col style={{ width: 140 }} />
@@ -326,8 +304,20 @@ export default function GroupsPage() {
             </colgroup>
             <thead>
               <tr>
-                <th aria-label="拖曳排序"></th>
-                <th>團課名稱</th>
+                <th>
+                  <button
+                    type="button"
+                    className="th-sort-btn"
+                    onClick={toggleNameSort}
+                    aria-label={`團課名稱（${nameSort === 'asc' ? '升冪' : nameSort === 'desc' ? '降冪' : '預設順序'}，點擊切換）`}
+                    title="點擊切換排序"
+                  >
+                    團課名稱
+                    <span className="th-sort-icon" aria-hidden="true">
+                      {nameSort === 'asc' ? '▲' : nameSort === 'desc' ? '▼' : '⇅'}
+                    </span>
+                  </button>
+                </th>
                 <th>上課星期</th>
                 <th>上課時段</th>
                 <th>持續時間</th>
@@ -341,20 +331,7 @@ export default function GroupsPage() {
             </thead>
             <tbody>
               {displayGroups.map(g => (
-                <tr
-                  key={g.id}
-                  className={`${dragId === g.id ? 'row-dragging' : ''} ${overId === g.id ? 'row-drop-target' : ''}`}
-                  onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(g.id) } }}
-                  onDragLeave={() => { if (overId === g.id) setOverId(null) }}
-                  onDrop={e => { e.preventDefault(); handleDrop(g.id) }}
-                >
-                  <td
-                    className="drag-handle"
-                    draggable={editId === null}
-                    onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(g.id) }}
-                    onDragEnd={endDrag}
-                    title="拖曳調整順序"
-                  >⋮⋮</td>
+                <tr key={g.id}>
                   <td>
                     {editId === g.id ? (
                       <input

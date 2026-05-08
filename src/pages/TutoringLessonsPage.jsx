@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { useLessons } from '../contexts/LessonsContext.jsx'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
@@ -8,6 +8,7 @@ import { useDirtyTracker } from '../contexts/UnsavedContext.jsx'
 import { apiListAllEnrollments, apiCreateLeaveRequest, apiDeleteLeaveRequest } from '../data/api.js'
 
 const AVATAR_COLORS = ['', 'green', 'purple', 'orange', 'teal', 'pink']
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
 const STATUS_OPTIONS = [
   { value: 'attended',   label: '已點名' },
@@ -176,6 +177,44 @@ export default function TutoringLessonsPage() {
     return courseState.courses.filter(c => allowed.has(c.id))
   }
 
+  // 依 lesson_records 統整每門家教課對應的「週X HH:MM」常態時段（以未來紀錄為主）
+  const slotsByStudentCourse = useMemo(() => {
+    const todayStr = (() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    })()
+    const map = new Map() // student_id -> Map<course_id, Set<"w|HH:MM">>
+    for (const l of lessonState.lessons) {
+      if (!l.lesson_date || l.lesson_date < todayStr) continue
+      const w = new Date(l.lesson_date).getDay()
+      const t = l.start_time ? String(l.start_time).slice(0, 5) : ''
+      const key = `${w}|${t}`
+      if (!map.has(l.student_id)) map.set(l.student_id, new Map())
+      const inner = map.get(l.student_id)
+      if (!inner.has(l.course_id)) inner.set(l.course_id, new Set())
+      inner.get(l.course_id).add(key)
+    }
+    return map
+  }, [lessonState.lessons])
+
+  function buildSlotMeta(studentId, courseId) {
+    const set = slotsByStudentCourse.get(studentId)?.get(courseId)
+    if (!set || set.size === 0) return ''
+    return [...set]
+      .map(k => { const [w, t] = k.split('|'); return { w: Number(w), t } })
+      .sort((a, b) => a.w - b.w || a.t.localeCompare(b.t))
+      .map(s => `週${WEEKDAY_LABELS[s.w]} ${s.t || '未排定'}`)
+      .join(' / ')
+  }
+
+  function coursesWithSlotMeta(studentId) {
+    if (!studentId) return coursesForStudent(studentId)
+    return coursesForStudent(studentId).map(c => ({
+      ...c,
+      meta: buildSlotMeta(studentId, c.id),
+    }))
+  }
+
   function handleCourseChange(id, isEdit = false) {
     const course = courseState.courses.find(c => c.id === id)
     const defaultTid = course?.default_teacher_id || null
@@ -232,7 +271,7 @@ export default function TutoringLessonsPage() {
               <label>課程
                 <Combobox
                   key={`new-course-${form.student_id}`}
-                  items={coursesForStudent(form.student_id)}
+                  items={coursesWithSlotMeta(form.student_id)}
                   value={form.course_id}
                   onChange={id => handleCourseChange(id)}
                   placeholder={form.student_id ? '搜尋課程…' : '請先選學生'}
@@ -338,7 +377,7 @@ export default function TutoringLessonsPage() {
                       <div className="combobox-cell">
                         <Combobox
                           key={`edit-course-${editForm.student_id}`}
-                          items={coursesForStudent(editForm.student_id)}
+                          items={coursesWithSlotMeta(editForm.student_id)}
                           value={editForm.course_id}
                           onChange={id => handleCourseChange(id, true)}
                           placeholder={editForm.student_id ? '搜尋課程…' : '請先選學生'}

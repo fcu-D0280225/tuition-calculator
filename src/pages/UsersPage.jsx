@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   apiAdminListUsers, apiAdminCreateUser, apiAdminUpdateUser, apiAdminDeleteUser,
   apiAdminListGroups, apiAdminCreateGroup, apiAdminUpdateGroup, apiAdminDeleteGroup,
@@ -40,6 +40,17 @@ export default function UsersPage({ currentUser }) {
   // 新增使用者
   const [showAddUser, setShowAddUser] = useState(false)
   const [newUser, setNewUser]         = useState(EMPTY_NEW_USER)
+
+  // 帳號排序：null 維持原順序，'asc' 升冪，'desc' 降冪
+  const [usernameSort, setUsernameSort] = useState(null)
+  function toggleUsernameSort() {
+    setUsernameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
+  }
+  const displayUsers = useMemo(() => {
+    if (!usernameSort) return users
+    const cmp = (a, b) => String(a.username || '').localeCompare(String(b.username || ''), 'zh-Hant')
+    return [...users].sort(usernameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+  }, [users, usernameSort])
 
   // 新增群組
   const [showAddGroup, setShowAddGroup] = useState(false)
@@ -393,10 +404,28 @@ export default function UsersPage({ currentUser }) {
               <div className="users-table-wrap">
                 <table className="users-table">
                   <thead>
-                    <tr><th>帳號</th><th>群組</th><th>對應老師</th><th></th></tr>
+                    <tr>
+                      <th>
+                        <button
+                          type="button"
+                          className="th-sort-btn"
+                          onClick={toggleUsernameSort}
+                          aria-label={`帳號（${usernameSort === 'asc' ? '升冪' : usernameSort === 'desc' ? '降冪' : '預設順序'}，點擊切換）`}
+                          title="點擊切換排序"
+                        >
+                          帳號
+                          <span className="th-sort-icon" aria-hidden="true">
+                            {usernameSort === 'asc' ? '▲' : usernameSort === 'desc' ? '▼' : '⇅'}
+                          </span>
+                        </button>
+                      </th>
+                      <th>群組</th>
+                      <th>對應老師</th>
+                      <th></th>
+                    </tr>
                   </thead>
                   <tbody>
-                    {users.map(u => (
+                    {displayUsers.map(u => (
                       <tr key={u.id}>
                         <td>{u.username}{u.id === currentUser?.id && <span className="users-self-tag">（你）</span>}</td>
                         <td>

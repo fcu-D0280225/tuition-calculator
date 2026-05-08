@@ -1,14 +1,42 @@
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { Fragment, useMemo, useState, useEffect, useCallback } from 'react'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import {
-  apiGetStudentEnrollment, apiSetStudentEnrollment, apiReorderStudents,
-  apiListStudentCourses,
+  apiGetStudentEnrollment, apiSetStudentEnrollment,
+  apiListStudentCourses, apiListLessons,
 } from '../data/api.js'
 
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
+
 function isActive(s) { return s?.active === undefined ? true : !!s.active }
+
+function slotsFromLessons(lessons) {
+  const todayStr = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  })()
+  const map = new Map() // course_id -> Set<"w|HH:MM">
+  for (const l of lessons) {
+    if (!l.lesson_date || l.lesson_date < todayStr) continue
+    const w = new Date(l.lesson_date).getDay()
+    const t = l.start_time ? String(l.start_time).slice(0, 5) : ''
+    const key = `${w}|${t}`
+    if (!map.has(l.course_id)) map.set(l.course_id, new Set())
+    map.get(l.course_id).add(key)
+  }
+  return map
+}
+
+function formatSlots(set) {
+  if (!set || set.size === 0) return ''
+  return [...set]
+    .map(k => { const [w, t] = k.split('|'); return { w: Number(w), t } })
+    .sort((a, b) => a.w - b.w || a.t.localeCompare(b.t))
+    .map(s => `週${WEEKDAY_LABELS[s.w]} ${s.t || '未排定'}`)
+    .join(' / ')
+}
 
 export default function StudentsPage({ onEnroll }) {
   const { state, loadStudents, createStudent, updateStudent, setStudentActive } = useStudents()
@@ -32,49 +60,40 @@ export default function StudentsPage({ onEnroll }) {
   const [expandedId, setExpandedId]         = useState(null)
   const [enrollmentById, setEnrollmentById] = useState({})
   const [historyById, setHistoryById]       = useState({})
+  const [lessonsByStudent, setLessonsByStudent] = useState({}) // { [id]: { loading, lessons } }
   const [removingKey, setRemovingKey]       = useState(null)
 
-  // 拖曳排序
-  const [dragId, setDragId] = useState(null)
-  const [overId, setOverId] = useState(null)
-  const [orderOverride, setOrderOverride] = useState(null)
+  // 名稱排序：null 維持後端順序，'asc' 升冪，'desc' 降冪
+  const [nameSort, setNameSort] = useState(null)
+  // 搜尋：比對姓名／聯絡人／電話（含子字串即匹配，不分大小寫）
+  const [query, setQuery] = useState('')
 
   useEffect(() => { loadStudents(); loadCourses(); loadGroups(); loadTeachers() },
     [loadStudents, loadCourses, loadGroups, loadTeachers])
 
-  function startDrag(id) { setDragId(id) }
-  function endDrag() { setDragId(null); setOverId(null) }
-
-  async function handleDrop(targetId) {
-    if (!dragId || dragId === targetId) { endDrag(); return }
-    const baseList = orderOverride ?? students
-    const list = baseList.map(s => s.id)
-    const fromIdx = list.indexOf(dragId)
-    const toIdx   = list.indexOf(targetId)
-    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
-    const next = list.slice()
-    next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, dragId)
-    const idMap = new Map(students.map(s => [s.id, s]))
-    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
-    endDrag()
-    try {
-      await apiReorderStudents(next)
-      await loadStudents()
-      setOrderOverride(null)
-    } catch {
-      setError('排序儲存失敗')
-      setOrderOverride(null)
-    }
+  function toggleNameSort() {
+    setNameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
   }
 
-  // 顯示順序：啟用中在前、已停用置底；組內維持後端/拖曳順序
-  const displayStudents = (() => {
-    const base = orderOverride ?? students
-    const actives = base.filter(isActive)
-    const inactives = base.filter(s => !isActive(s))
+  // 顯示順序：啟用中在前、已停用置底；點名稱欄位可切換升/降冪；query 套用於姓名/聯絡人/電話
+  const displayStudents = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const matches = q
+      ? students.filter(s =>
+          String(s.name || '').toLowerCase().includes(q) ||
+          String(s.contact_name || '').toLowerCase().includes(q) ||
+          String(s.contact_phone || '').toLowerCase().includes(q)
+        )
+      : students
+    const actives = matches.filter(isActive)
+    const inactives = matches.filter(s => !isActive(s))
+    if (nameSort) {
+      const cmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
+      actives.sort(nameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+      inactives.sort(nameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+    }
     return [...actives, ...inactives]
-  })()
+  }, [students, nameSort, query])
 
   async function handleAdd(e) {
     e.preventDefault()
@@ -117,7 +136,11 @@ export default function StudentsPage({ onEnroll }) {
 
   async function handleToggleActive(s) {
     const turningOff = isActive(s)
-    if (turningOff && !window.confirm(`確定要停用「${s.name}」？停用後該名學生不會出現在點名/上課紀錄等下拉選單中，但歷史紀錄保留。`)) return
+    if (turningOff && !window.confirm(
+      `確定要停用「${s.name}」？\n\n` +
+      `停用後該名學生不會出現在點名/上課紀錄等下拉選單。\n\n` +
+      `⚠️ 注意：尚未點名的家教課與團課紀錄會一併刪除；已點名（attended）與請假（leave）的歷史紀錄保留。`
+    )) return
     setSaving(true); setError('')
     try { await setStudentActive(s.id, !turningOff) }
     catch { setError(turningOff ? '停用失敗' : '啟用失敗') }
@@ -151,8 +174,8 @@ export default function StudentsPage({ onEnroll }) {
     const msg = kind === 'course'
       ? `確定要把「${targetName}」從「已選課程」中移除？\n\n` +
         `⚠️ 注意：\n` +
-        `• 已建立的上課紀錄不會被刪除，仍會列入學費計算\n` +
-        `• 不需要的紀錄請操作人員手動到「上課紀錄」頁刪除\n` +
+        `• 由「選課批次建立」且未點名／尚未開始的紀錄會一併刪除\n` +
+        `• 已點名、請假，以及手動建立的紀錄都保留，仍會列入學費計算\n` +
         `• 若再次選回此課程並建立日期，可能與既有紀錄重複`
       : `確定要把學生從團課「${targetName}」移除？\n\n` +
         `⚠️ 注意：\n` +
@@ -186,13 +209,24 @@ export default function StudentsPage({ onEnroll }) {
     }
   }
 
+  async function loadStudentLessons(studentId) {
+    setLessonsByStudent(prev => ({ ...prev, [studentId]: { ...(prev[studentId] || {}), loading: true } }))
+    try {
+      const lessons = await apiListLessons({ student_id: studentId })
+      setLessonsByStudent(prev => ({ ...prev, [studentId]: { loading: false, lessons } }))
+    } catch {
+      setLessonsByStudent(prev => ({ ...prev, [studentId]: { loading: false, lessons: [] } }))
+    }
+  }
+
   const toggleExpand = useCallback(async (id) => {
     if (editId === id) return
     if (expandedId === id) { setExpandedId(null); return }
     setExpandedId(id)
     if (!enrollmentById[id]?.course_ids) await loadEnrollment(id)
     if (!historyById[id]?.items)         await loadHistory(id)
-  }, [editId, expandedId, enrollmentById, historyById])
+    if (!lessonsByStudent[id]?.lessons)  await loadStudentLessons(id)
+  }, [editId, expandedId, enrollmentById, historyById, lessonsByStudent])
 
   function teacherName(id) {
     return teachersState.teachers.find(t => t.id === id)?.name || ''
@@ -237,14 +271,27 @@ export default function StudentsPage({ onEnroll }) {
 
       {error && <div className="error-msg">{error}</div>}
 
+      {students.length > 0 && (
+        <div className="roster-toolbar" style={{ marginTop: 16 }}>
+          <input
+            type="search"
+            className="roster-search"
+            placeholder="搜尋姓名 / 聯絡人 / 電話…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="loading">載入中⋯</div>
       ) : students.length === 0 ? (
         <div className="empty-hint">尚未新增任何學生</div>
+      ) : displayStudents.length === 0 ? (
+        <div className="empty-hint">找不到符合「{query}」的學生</div>
       ) : (
         <table className="entity-table">
           <colgroup>
-            <col style={{ width: 36 }} />
             <col />
             <col />
             <col />
@@ -252,8 +299,20 @@ export default function StudentsPage({ onEnroll }) {
           </colgroup>
           <thead>
             <tr>
-              <th aria-label="拖曳排序"></th>
-              <th>學生姓名</th>
+              <th>
+                <button
+                  type="button"
+                  className="th-sort-btn"
+                  onClick={toggleNameSort}
+                  aria-label={`學生姓名（${nameSort === 'asc' ? '升冪' : nameSort === 'desc' ? '降冪' : '預設順序'}，點擊切換）`}
+                  title="點擊切換排序"
+                >
+                  學生姓名
+                  <span className="th-sort-icon" aria-hidden="true">
+                    {nameSort === 'asc' ? '▲' : nameSort === 'desc' ? '▼' : '⇅'}
+                  </span>
+                </button>
+              </th>
               <th>聯絡人</th>
               <th>聯絡電話</th>
               <th></th>
@@ -268,19 +327,7 @@ export default function StudentsPage({ onEnroll }) {
               const active = isActive(s)
               return (
                 <Fragment key={s.id}>
-                  <tr
-                    className={`${dragId === s.id ? 'row-dragging' : ''} ${overId === s.id ? 'row-drop-target' : ''} ${active ? '' : 'row-inactive'}`}
-                    onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(s.id) } }}
-                    onDragLeave={() => { if (overId === s.id) setOverId(null) }}
-                    onDrop={e => { e.preventDefault(); handleDrop(s.id) }}
-                  >
-                    <td
-                      className="drag-handle"
-                      draggable={editId === null}
-                      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(s.id) }}
-                      onDragEnd={endDrag}
-                      title="拖曳調整順序"
-                    >⋮⋮</td>
+                  <tr className={active ? '' : 'row-inactive'}>
                     <td>
                       {isEditing ? (
                         <input
@@ -347,7 +394,7 @@ export default function StudentsPage({ onEnroll }) {
                   </tr>
                   {isExpanded && !isEditing && (
                     <tr className="expanded-row">
-                      <td colSpan={5}>
+                      <td colSpan={4}>
                         <div className="expanded-section">
                           <div className="expanded-label">已選課程</div>
                           {enrollInfo?.loading ? (
@@ -360,15 +407,24 @@ export default function StudentsPage({ onEnroll }) {
                             if (!courseIds.length && !groupIds.length) {
                               return <div className="empty-hint" style={{ textAlign: 'left', padding: 0 }}>尚未選任何課程</div>
                             }
+                            const slotMap = slotsFromLessons(lessonsByStudent[s.id]?.lessons || [])
                             return (
                               <ul className="enrollment-list">
                                 {courseIds.map(cid => {
                                   const c = courseById(cid)
                                   if (!c) return null
                                   const key = `${s.id}:course:${cid}`
+                                  const slotLabel = formatSlots(slotMap.get(cid))
                                   return (
                                     <li key={`c-${cid}`} className="enrollment-item">
-                                      <span className="enrollment-name">{courseLabel(c)}</span>
+                                      <span className="enrollment-name">
+                                        {courseLabel(c)}
+                                        {slotLabel && (
+                                          <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: 12 }}>
+                                            （{slotLabel}）
+                                          </span>
+                                        )}
+                                      </span>
                                       <button
                                         type="button"
                                         className="btn-sm btn-danger"

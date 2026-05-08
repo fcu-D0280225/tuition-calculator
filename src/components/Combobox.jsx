@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
  * Combobox — 可輸入文字的搜尋下拉
  *
  * Props:
- *   items      [{ id, name }]  選項清單
+ *   items      [{ id, name, meta? }]  選項清單；meta 為下拉副標（不影響輸入框與篩選）
  *   value      string          目前選中的 id（''  = 未選）
  *   onChange   (id) => void    選中後回傳 id
  *   placeholder string
@@ -90,7 +90,8 @@ export default function Combobox({ items, value, onChange, placeholder = '搜尋
               className={`combobox-item${item.id === value ? ' combobox-item--selected' : ''}`}
               onMouseDown={() => handleSelect(item.id, item.name)}
             >
-              {item.name}
+              <div className="combobox-item-name">{item.name}</div>
+              {item.meta && <div className="combobox-item-meta">{item.meta}</div>}
             </li>
           ))}
           {filtered.length === 0 && !allLabel && (

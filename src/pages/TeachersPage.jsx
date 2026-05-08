@@ -1,8 +1,8 @@
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { Fragment, useMemo, useState, useEffect, useCallback } from 'react'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useCourses } from '../contexts/CoursesContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
-import { apiReorderTeachers, apiListTeacherCourses } from '../data/api.js'
+import { apiListTeacherCourses } from '../data/api.js'
 
 function isActive(t) { return t?.active === undefined ? true : !!t.active }
 
@@ -23,44 +23,23 @@ export default function TeachersPage() {
   const [expandedId, setExpandedId] = useState(null)
   const [historyById, setHistoryById] = useState({}) // id → { loading, error, courses, groups }
 
-  // 拖曳排序
-  const [dragId, setDragId] = useState(null)
-  const [overId, setOverId] = useState(null)
-  const [orderOverride, setOrderOverride] = useState(null)
-
-  function startDrag(id) { setDragId(id) }
-  function endDrag() { setDragId(null); setOverId(null) }
-
-  async function handleDrop(targetId) {
-    if (!dragId || dragId === targetId) { endDrag(); return }
-    const baseList = orderOverride ?? teachers
-    const list = baseList.map(t => t.id)
-    const fromIdx = list.indexOf(dragId)
-    const toIdx   = list.indexOf(targetId)
-    if (fromIdx < 0 || toIdx < 0) { endDrag(); return }
-    const next = list.slice()
-    next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, dragId)
-    const idMap = new Map(teachers.map(t => [t.id, t]))
-    setOrderOverride(next.map(id => idMap.get(id)).filter(Boolean))
-    endDrag()
-    try {
-      await apiReorderTeachers(next)
-      await loadTeachers()
-      setOrderOverride(null)
-    } catch {
-      setError('排序儲存失敗')
-      setOrderOverride(null)
-    }
+  // 名稱排序：null 維持後端順序，'asc' 升冪，'desc' 降冪
+  const [nameSort, setNameSort] = useState(null)
+  function toggleNameSort() {
+    setNameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
   }
 
-  // 啟用中在前、已停用置底
-  const displayTeachers = (() => {
-    const base = orderOverride ?? teachers
-    const actives = base.filter(isActive)
-    const inactives = base.filter(t => !isActive(t))
+  // 啟用中在前、已停用置底；點名稱欄位可切換升/降冪
+  const displayTeachers = useMemo(() => {
+    const actives = teachers.filter(isActive)
+    const inactives = teachers.filter(t => !isActive(t))
+    if (nameSort) {
+      const cmp = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant')
+      actives.sort(nameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+      inactives.sort(nameSort === 'asc' ? cmp : (a, b) => cmp(b, a))
+    }
     return [...actives, ...inactives]
-  })()
+  }, [teachers, nameSort])
 
   useEffect(() => { loadTeachers(); loadCourses(); loadGroups() },
     [loadTeachers, loadCourses, loadGroups])
@@ -168,13 +147,29 @@ export default function TeachersPage() {
       ) : (
         <table className="entity-table">
           <colgroup>
-            <col style={{ width: 36 }} />
             <col />
             <col />
             <col style={{ width: 200 }} />
           </colgroup>
           <thead>
-            <tr><th aria-label="拖曳排序"></th><th>老師姓名</th><th>聯絡電話</th><th></th></tr>
+            <tr>
+              <th>
+                <button
+                  type="button"
+                  className="th-sort-btn"
+                  onClick={toggleNameSort}
+                  aria-label={`老師姓名（${nameSort === 'asc' ? '升冪' : nameSort === 'desc' ? '降冪' : '預設順序'}，點擊切換）`}
+                  title="點擊切換排序"
+                >
+                  老師姓名
+                  <span className="th-sort-icon" aria-hidden="true">
+                    {nameSort === 'asc' ? '▲' : nameSort === 'desc' ? '▼' : '⇅'}
+                  </span>
+                </button>
+              </th>
+              <th>聯絡電話</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
             {displayTeachers.map(t => {
@@ -185,19 +180,7 @@ export default function TeachersPage() {
               const cur = currentAssignments(t.id)
               return (
                 <Fragment key={t.id}>
-                  <tr
-                    className={`${dragId === t.id ? 'row-dragging' : ''} ${overId === t.id ? 'row-drop-target' : ''} ${active ? '' : 'row-inactive'}`}
-                    onDragOver={e => { if (dragId && editId === null) { e.preventDefault(); setOverId(t.id) } }}
-                    onDragLeave={() => { if (overId === t.id) setOverId(null) }}
-                    onDrop={e => { e.preventDefault(); handleDrop(t.id) }}
-                  >
-                    <td
-                      className="drag-handle"
-                      draggable={editId === null}
-                      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; startDrag(t.id) }}
-                      onDragEnd={endDrag}
-                      title="拖曳調整順序"
-                    >⋮⋮</td>
+                  <tr className={active ? '' : 'row-inactive'}>
                     <td>
                       {isEditing ? (
                         <input
@@ -249,7 +232,7 @@ export default function TeachersPage() {
                   </tr>
                   {isExpanded && !isEditing && (
                     <tr className="expanded-row">
-                      <td colSpan={4}>
+                      <td colSpan={3}>
                         <div className="expanded-section">
                           <div className="expanded-label">正在上的課程（被指派為預設老師）</div>
                           {cur.courses.length === 0 && cur.groups.length === 0 ? (
