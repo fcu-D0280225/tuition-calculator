@@ -11,10 +11,12 @@ const AVATAR_COLORS = ['', 'green', 'purple', 'orange', 'teal', 'pink']
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
 const STATUS_OPTIONS = [
-  { value: 'attended',   label: '已點名' },
-  { value: 'pending',    label: '未點名' },
-  { value: 'pre_enroll', label: '尚未開始' },
-  { value: 'leave',      label: '請假' },
+  { value: 'attended',    label: '已點名' },
+  { value: 'pending',     label: '未點名' },
+  { value: 'pre_enroll',  label: '尚未開始' },
+  { value: 'leave',       label: '請假' },
+  { value: 'rescheduled', label: '改課' },
+  { value: 'makeup',      label: '補課' },
 ]
 
 function getDisplayStatus(record) {
@@ -26,10 +28,12 @@ function getDisplayStatus(record) {
 function LessonStatus({ record }) {
   const s = getDisplayStatus(record)
   const map = {
-    leave:     { label: '請假',     cls: 'status-leave' },
-    pre_enroll:{ label: '尚未開始', cls: 'status-pre' },
-    pending:   { label: '未點名',   cls: 'status-pending' },
-    attended:  { label: '已點名',   cls: 'status-attended' },
+    leave:       { label: '請假',           cls: 'status-leave' },
+    pre_enroll:  { label: '尚未開始',       cls: 'status-pre' },
+    pending:     { label: '未點名',         cls: 'status-pending' },
+    attended:    { label: '已點名',         cls: 'status-attended' },
+    rescheduled: { label: '改課（不計費）', cls: 'status-rescheduled' },
+    makeup:      { label: '補課',           cls: 'status-makeup' },
   }
   const { label, cls } = map[s] || map.attended
   return <span className={`status-tag ${cls}`} title={record.leave_reason || ''}>{label}</span>

@@ -4404,10 +4404,12 @@ select.catalog-input.catalog-select {
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.status-tag.status-attended { background: #dcfce7; color: #15803d; border-color: transparent; }
-.status-tag.status-pending  { background: #f1f5f9; color: #64748b; border-color: transparent; }
-.status-tag.status-leave    { background: #ffedd5; color: #ea580c; border-color: transparent; }
-.status-tag.status-pre      { background: #ede9fe; color: #6d28d9; border-color: transparent; }
+.status-tag.status-attended    { background: #dcfce7; color: #15803d; border-color: transparent; }
+.status-tag.status-pending     { background: #f1f5f9; color: #64748b; border-color: transparent; }
+.status-tag.status-leave       { background: #ffedd5; color: #ea580c; border-color: transparent; }
+.status-tag.status-pre         { background: #ede9fe; color: #6d28d9; border-color: transparent; }
+.status-tag.status-rescheduled { background: #fee2e2; color: #b91c1c; border-color: transparent; }
+.status-tag.status-makeup      { background: #cffafe; color: #0e7490; border-color: transparent; }
 
 /* ── Inline time + duration edit cell ──────────────────────────────────── */
 .time-duration-edit {

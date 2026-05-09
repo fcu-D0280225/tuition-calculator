@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiSettlementTuition, apiSettlementSalary, apiListMiscExpenses, apiProfitLoss } from '../data/api.js'
+import { apiSettlementTuition, apiSettlementSalary, apiListMiscExpenses, apiProfitLoss, apiStatsReschedule } from '../data/api.js'
 
 function firstDayOfMonth() {
   const d = new Date()
@@ -73,6 +73,7 @@ export default function DashboardPage() {
   const [salary, setSalary]   = useState(null)
   const [misc, setMisc]       = useState(null)
   const [pl, setPl]           = useState(null) // 損益匯總（含教材成本 + 雜支分類）
+  const [stats, setStats]     = useState(null) // 改課/補課出勤統計
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
@@ -84,13 +85,14 @@ export default function DashboardPage() {
     e.preventDefault()
     setLoading(true); setError('')
     try {
-      const [t, s, m, p] = await Promise.all([
+      const [t, s, m, p, st] = await Promise.all([
         apiSettlementTuition(from, to),
         apiSettlementSalary(from, to),
         apiListMiscExpenses({ from, to }).catch(() => []),
         apiProfitLoss(from, to).catch(() => null),
+        apiStatsReschedule(from, to).catch(() => null),
       ])
-      setTuition(t); setSalary(s); setMisc(m); setPl(p)
+      setTuition(t); setSalary(s); setMisc(m); setPl(p); setStats(st)
     } catch {
       setError('載入資料失敗')
     } finally {
@@ -266,6 +268,43 @@ export default function DashboardPage() {
                     <td className="grand-total-label" colSpan={3}>合計</td>
                     <td className="num-cell grand-total-amount">{amt(totalExpense)}</td>
                   </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── 出勤統計（改課 / 補課） ── */}
+          {stats && stats.by_student && stats.by_student.length > 0 && (
+            <div className="settlement-section">
+              <div className="settlement-section-header">
+                <h2>出勤統計（改課 / 補課）</h2>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', margin: '8px 0 12px', fontSize: 14 }}>
+                <span>總課次：<strong>{stats.total_lessons}</strong></span>
+                <span>改課：<strong style={{ color: '#b91c1c' }}>{stats.reschedule_count}</strong></span>
+                <span>補課：<strong style={{ color: '#0e7490' }}>{stats.makeup_count}</strong></span>
+                <span>總改課率：<strong>{stats.reschedule_rate}%</strong></span>
+              </div>
+              <table className="settlement-table">
+                <thead>
+                  <tr>
+                    <th>學生</th>
+                    <th>總課次</th>
+                    <th>改課</th>
+                    <th>補課</th>
+                    <th>改課率</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.by_student.map(s => (
+                    <tr key={s.student_id}>
+                      <td>{s.student_name}</td>
+                      <td className="num-cell">{s.total_lessons}</td>
+                      <td className="num-cell" style={{ color: s.reschedule_count > 0 ? '#b91c1c' : undefined }}>{s.reschedule_count}</td>
+                      <td className="num-cell" style={{ color: s.makeup_count > 0 ? '#0e7490' : undefined }}>{s.makeup_count}</td>
+                      <td className="num-cell subtotal-amount">{s.reschedule_rate}%</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

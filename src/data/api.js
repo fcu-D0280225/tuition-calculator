@@ -226,6 +226,14 @@ export const apiSettlementSalary = (from, to) =>
 export const apiProfitLoss = (from, to) =>
   request(`/settlement/profit-loss?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
 
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+export const apiStatsReschedule = (from, to) =>
+  request(`/stats/reschedule?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+
+export const apiStudentStats = (studentId, from, to) =>
+  request(`/students/${encodeURIComponent(studentId)}/stats?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+
 // ── Leave Requests ────────────────────────────────────────────────────────────
 
 export const apiListStudentLeaveRequests = (studentId, { from, to } = {}) => {

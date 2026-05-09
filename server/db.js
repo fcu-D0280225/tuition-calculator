@@ -673,12 +673,12 @@ export async function setStudentActive(id, active) {
   if (!active) {
     await pool.query(
       `DELETE FROM lesson_records
-       WHERE student_id = ? AND status NOT IN ('attended', 'leave')`,
+       WHERE student_id = ? AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
       [id]
     )
     await pool.query(
       `DELETE FROM group_records
-       WHERE student_id = ? AND status NOT IN ('attended', 'leave')`,
+       WHERE student_id = ? AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
       [id]
     )
   }
@@ -721,7 +721,7 @@ export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
         `DELETE FROM lesson_records
          WHERE student_id = ? AND course_id IN (?)
            AND from_enroll_batch = 1
-           AND status NOT IN ('attended', 'leave')`,
+           AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
         [studentId, removed]
       )
     }
@@ -1077,6 +1077,7 @@ export async function deleteCourse(id) {
 }
 
 function priceForLessonRecord(lr, sessionStudents) {
+  if (lr.status === 'rescheduled') return 0
   if (lr.unit_price !== null && lr.unit_price !== undefined) return parseFloat(lr.unit_price)
   const key = `${lr.course_id}::${lr.lesson_date}::${lr.teacher_id}`
   const N = sessionStudents.get(key)?.size ?? 1
@@ -1208,6 +1209,7 @@ export async function settlementTuition(from, to) {
        lr.lesson_date,
        lr.hours,
        lr.unit_price,
+       lr.status,
        c.hourly_rate                                 AS course_hourly_rate,
        c.discount_per_student                        AS course_discount_per_student
      FROM lesson_records lr
@@ -1312,6 +1314,7 @@ export async function settlementSalary(from, to) {
        lr.course_id,
        c.name                                                          AS course_name,
        lr.hours,
+       lr.status,
        COALESCE(lr.teacher_unit_price, c.teacher_hourly_rate)          AS hourly_rate
      FROM lesson_records lr
      JOIN teachers t ON t.id = lr.teacher_id
@@ -1323,6 +1326,7 @@ export async function settlementSalary(from, to) {
 
   const map = new Map()
   for (const row of rows) {
+    if (row.status === 'rescheduled') continue
     if (!map.has(row.teacher_id)) {
       map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: new Map(), groups: new Map(), total: 0 })
     }
@@ -1387,6 +1391,82 @@ export async function settlementSalary(from, to) {
     groups:  Array.from(t.groups.values()),
     total: t.total,
   }))
+}
+
+// ── Reschedule / Makeup stats ────────────────────────────────────────────────
+
+// 計入「課次」的狀態（pending / pre_enroll 視為尚未發生，不算）
+const COUNTABLE_STATUSES = ['attended', 'leave', 'rescheduled', 'makeup']
+
+export async function statsReschedule(from, to, studentId = null) {
+  const params = [from, to, ...COUNTABLE_STATUSES]
+  let where = 'lr.lesson_date >= ? AND lr.lesson_date <= ? AND lr.status IN (?, ?, ?, ?)'
+  if (studentId) {
+    where += ' AND lr.student_id = ?'
+    params.push(studentId)
+  }
+  const [rows] = await pool.query(
+    `SELECT lr.student_id, s.name AS student_name, lr.status, COUNT(*) AS n
+       FROM lesson_records lr
+       JOIN students s ON s.id = lr.student_id
+      WHERE ${where}
+      GROUP BY lr.student_id, s.name, lr.status`,
+    params
+  )
+
+  const perStudent = new Map()
+  for (const r of rows) {
+    if (!perStudent.has(r.student_id)) {
+      perStudent.set(r.student_id, {
+        student_id: r.student_id,
+        student_name: r.student_name,
+        total_lessons: 0,
+        reschedule_count: 0,
+        makeup_count: 0,
+        reschedule_rate: 0,
+      })
+    }
+    const ent = perStudent.get(r.student_id)
+    const n = parseInt(r.n, 10)
+    ent.total_lessons += n
+    if (r.status === 'rescheduled') ent.reschedule_count = n
+    else if (r.status === 'makeup') ent.makeup_count = n
+  }
+  for (const ent of perStudent.values()) {
+    ent.reschedule_rate = ent.total_lessons > 0
+      ? Math.round((ent.reschedule_count / ent.total_lessons) * 1000) / 10
+      : 0
+  }
+
+  let total = 0, resched = 0, makeup = 0
+  for (const ent of perStudent.values()) {
+    total += ent.total_lessons
+    resched += ent.reschedule_count
+    makeup += ent.makeup_count
+  }
+
+  const summary = {
+    total_lessons: total,
+    reschedule_count: resched,
+    makeup_count: makeup,
+    reschedule_rate: total > 0 ? Math.round((resched / total) * 1000) / 10 : 0,
+  }
+
+  if (studentId) {
+    return perStudent.get(studentId) || {
+      student_id: studentId,
+      student_name: null,
+      total_lessons: 0,
+      reschedule_count: 0,
+      makeup_count: 0,
+      reschedule_rate: 0,
+    }
+  }
+
+  return {
+    ...summary,
+    by_student: Array.from(perStudent.values()).sort((a, b) => b.reschedule_rate - a.reschedule_rate),
+  }
 }
 
 // ── Materials ─────────────────────────────────────────────────────────────────

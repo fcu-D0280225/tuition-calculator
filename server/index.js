@@ -28,6 +28,8 @@ import {
   isDateLocked, isLessonLocked, isGroupRecordLocked,
   // settlement
   settlementTuition, settlementSalary,
+  // stats
+  statsReschedule,
   // share tokens
   insertShareToken, getShareTokenByToken, getStudentBill,
   // payment records
@@ -810,6 +812,24 @@ app.get('/api/settlement/profit-loss', async (req, res) => {
       profit,
     })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── Stats ────────────────────────────────────────────────────────────────────
+
+app.get('/api/stats/reschedule', async (req, res) => {
+  const { from, to } = req.query
+  if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
+  if (!DATE_RE.test(from) || !DATE_RE.test(to)) return res.status(400).json({ error: 'invalid_date' })
+  try { res.json(await statsReschedule(from, to)) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+app.get('/api/students/:id/stats', async (req, res) => {
+  const { from, to } = req.query
+  if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
+  if (!DATE_RE.test(from) || !DATE_RE.test(to)) return res.status(400).json({ error: 'invalid_date' })
+  try { res.json(await statsReschedule(from, to, req.params.id)) }
+  catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Leave Requests ────────────────────────────────────────────────────────────
