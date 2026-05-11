@@ -30,9 +30,9 @@ async function request(path, options = {}) {
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
-export const apiAuthMe     = ()                   => request('/auth/me')
-export const apiAuthLogin  = (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
-export const apiAuthLogout = ()                   => request('/auth/logout', { method: 'POST' })
+export const apiAuthMe     = ()                             => request('/auth/me')
+export const apiAuthLogin  = (username, password, tenantId) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password, tenant_id: Number(tenantId) || 1 }) })
+export const apiAuthLogout = ()                             => request('/auth/logout', { method: 'POST' })
 export const apiAuthChangePassword = (current_password, new_password) =>
   request('/auth/change-password', { method: 'POST', body: JSON.stringify({ current_password, new_password }) })
 
@@ -264,3 +264,20 @@ export const apiGetShare = (token) =>
 export const apiAiChat = (messages) =>
   request('/ai/chat', { method: 'POST', body: JSON.stringify({ messages }) })
     .then(r => r.reply)
+
+// ── Invites ───────────────────────────────────────────────────────────────────
+
+export const apiCreateInvite      = (groupId, expiresInDays = 7) =>
+  request('/admin/invites', { method: 'POST', body: JSON.stringify({ group_id: groupId, expires_in_days: expiresInDays }) })
+
+export const apiGetInvite         = (token) =>
+  request(`/invites/${encodeURIComponent(token)}`)
+
+export const apiRegisterWithInvite = (token, username, password) =>
+  request('/auth/register-with-invite', { method: 'POST', body: JSON.stringify({ token, username, password }) })
+
+export const apiListInvites       = () =>
+  request('/admin/invites')
+
+export const apiDeleteInvite      = (token) =>
+  request(`/admin/invites/${encodeURIComponent(token)}`, { method: 'DELETE' })

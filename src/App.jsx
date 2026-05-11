@@ -18,6 +18,7 @@ import DashboardPage     from './pages/DashboardPage.jsx'
 import AttendancePage    from './pages/AttendancePage.jsx'
 import SchedulePage      from './pages/SchedulePage.jsx'
 import UsersPage         from './pages/UsersPage.jsx'
+import InvitesPage       from './pages/InvitesPage.jsx'
 import AiAssistantPage   from './pages/AiAssistantPage.jsx'
 import LoginPage         from './pages/LoginPage.jsx'
 import { apiAuthMe, apiAuthLogout } from './data/api.js'
@@ -39,6 +40,7 @@ const NAV_ICONS = {
   dashboard:          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
   ai_assistant:       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
   users:              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>,
+  invites:            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
 }
 
 const GROUP_ICONS = {
@@ -78,11 +80,13 @@ const NAV = [
     { id: 'dashboard',     label: '財務總覽' },
     { id: 'ai_assistant',  label: 'AI 助理' },
     { id: 'users',         label: '使用者管理' },
+    { id: 'invites',       label: '邀請管理', adminOnly: true },
   ]},
 ]
 
 function filterNav(perms, isAdmin) {
   const has = id => {
+    if (id === 'invites') return isAdmin  // 邀請管理只有 admin 看得到
     if (isAdmin) return true
     if (perms.includes(id)) return true
     // 舊 'lessons' 權限視同包含拆分後的兩個頁
@@ -126,7 +130,7 @@ export default function App() {
   const [courseEditId, setCourseEditId] = useState(null)
   const [attendanceContext, setAttendanceContext] = useState(null) // { mode, id, date }
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [], teacher_id: null })
+  const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [], teacher_id: null, tenant_name: null })
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try {
       const raw = localStorage.getItem('nav_collapsed_groups')
@@ -167,16 +171,16 @@ export default function App() {
   useEffect(() => {
     let cancelled = false
     apiAuthMe()
-      .then(({ user, is_admin, permissions, teacher_id }) => {
-        if (!cancelled) setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null })
+      .then(({ user, is_admin, permissions, teacher_id, tenant_name }) => {
+        if (!cancelled) setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null, tenant_name: tenant_name || null })
       })
-      .catch(() => { if (!cancelled) setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], teacher_id: null }) })
+      .catch(() => { if (!cancelled) setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], teacher_id: null, tenant_name: null }) })
     return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
     function onUnauthorized() {
-      setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], teacher_id: null })
+      setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], teacher_id: null, tenant_name: null })
       setTab(null)
     }
     window.addEventListener('auth:unauthorized', onUnauthorized)
@@ -210,7 +214,7 @@ export default function App() {
 
   async function handleLogout() {
     try { await apiAuthLogout() } catch { /* ignore */ }
-    setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [] })
+    setAuthState({ status: 'guest', user: null, is_admin: false, permissions: [], tenant_name: null })
     setTab(null)
     setSidebarOpen(false)
   }
@@ -254,7 +258,7 @@ export default function App() {
     return <div className="login-shell"><div className="login-loading">載入中…</div></div>
   }
   if (authState.status !== 'authed') {
-    return <LoginPage onLoggedIn={({ user, is_admin, permissions, teacher_id }) => setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null })} />
+    return <LoginPage onLoggedIn={({ user, is_admin, permissions, teacher_id, tenant_name }) => setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null, tenant_name: tenant_name || null })} />
   }
 
   return (
@@ -392,6 +396,11 @@ export default function App() {
                 )}
               </button>
 
+              {authState.tenant_name && (
+                <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                  補習班：{authState.tenant_name}
+                </span>
+              )}
               <div className="topbar-user">
                 <div className="topbar-avatar">{authState.user?.username?.charAt(0)?.toUpperCase() || 'U'}</div>
                 <div className="topbar-user-info">
@@ -429,6 +438,7 @@ export default function App() {
             {tab === 'schedule'   && <SchedulePage onOpenAttendance={allowedTabIds.has('attendance') ? openAttendance : null} />}
             {tab === 'ai_assistant' && <AiAssistantPage />}
             {tab === 'users'      && <UsersPage currentUser={{ ...authState.user, is_admin: authState.is_admin }} />}
+            {tab === 'invites'    && authState.is_admin && <InvitesPage />}
           </main>
         </div>
       </div>

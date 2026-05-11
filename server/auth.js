@@ -363,10 +363,12 @@ async function createSession(userId) {
 async function getSessionUser(token) {
   if (!token) return null
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.group_id, u.teacher_id, u.tenant_id, g.name AS group_name, g.is_admin, s.expires_at
+    `SELECT u.id, u.username, u.group_id, u.teacher_id, u.tenant_id, g.name AS group_name, g.is_admin, s.expires_at,
+            t.name AS tenant_name
        FROM auth_sessions s
        JOIN auth_users u ON u.id = s.user_id
        LEFT JOIN auth_groups g ON g.id = u.group_id
+       LEFT JOIN tenants     t ON t.id = u.tenant_id
       WHERE s.token = ? LIMIT 1`,
     [token]
   )
@@ -381,6 +383,7 @@ async function getSessionUser(token) {
     group_id: row.group_id, group_name: row.group_name,
     teacher_id: row.teacher_id || null,
     tenant_id: row.tenant_id || 1,
+    tenant_name: row.tenant_name || null,
     is_admin: !!row.is_admin,
   }
 }
@@ -509,12 +512,16 @@ export function registerAuthRoutes(app) {
       const { token } = await createSession(user.id)
       res.setHeader('Set-Cookie', buildSessionCookie(token, SESSION_TTL_MS / 1000))
       const perms = await getPermissionsForUser(user)
+      // 拿 tenant_name
+      const [tenantRows] = await pool.query('SELECT name FROM tenants WHERE id = ? LIMIT 1', [user.tenant_id])
+      const tenantName = tenantRows[0]?.name || null
       res.json({
         user: { id: user.id, username: user.username },
         group: user.group_id ? { id: user.group_id, name: user.group_name } : null,
         is_admin: !!user.is_admin,
         teacher_id: user.teacher_id || null,
         tenant_id: user.tenant_id || 1,
+        tenant_name: tenantName,
         permissions: perms,
       })
     } catch (e) {
@@ -547,6 +554,7 @@ export function registerAuthRoutes(app) {
         is_admin: !!user.is_admin,
         teacher_id: user.teacher_id || null,
         tenant_id: user.tenant_id || 1,
+        tenant_name: user.tenant_name || null,
         permissions: perms,
       })
     } catch (e) {
