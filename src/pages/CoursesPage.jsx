@@ -15,7 +15,6 @@ export default function CoursesPage({ onEditCourse }) {
   const [newName, setNewName]                   = useState('')
   const [newRate, setNewRate]                   = useState('')
   const [newDefaultTeacher, setNewDefaultTeacher] = useState('')
-  const [newDurationHours, setNewDurationHours] = useState('1')
   // 列表只顯示至關欄位；其他欄位（學費／老師時薪／每多一人折扣／備註）改在獨立的編輯頁修改
   const [error, setError]                       = useState('')
   const [saving, setSaving]                     = useState(false)
@@ -43,13 +42,11 @@ export default function CoursesPage({ onEditCourse }) {
     if (!name) { setError('請輸入家教課名稱'); return }
     const hourlyRate = canViewRates ? parseFloat(newRate) : 0
     if (canViewRates && (isNaN(hourlyRate) || hourlyRate <= 0)) { setError('請輸入學費'); return }
-    const durationHours = parseFloat(newDurationHours || '1')
-    if (isNaN(durationHours) || durationHours <= 0 || durationHours > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError('')
     try {
-      // 老師時薪 / 每多一人折扣 / 備註 改在獨立的編輯頁設定
-      await createCourse(name, hourlyRate, 0, 0, newDefaultTeacher || null, durationHours, '')
-      setNewName(''); setNewRate(''); setNewDefaultTeacher(''); setNewDurationHours('1')
+      // 老師時薪 / 每多一人折扣 / 備註 改在獨立的編輯頁設定；時數於排課與上課紀錄時逐筆輸入
+      await createCourse(name, hourlyRate, 0, 0, newDefaultTeacher || null, 1, '')
+      setNewName(''); setNewRate(''); setNewDefaultTeacher('')
     }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -99,16 +96,6 @@ export default function CoursesPage({ onEditCourse }) {
                 </label>
               </>
             )}
-            <label title="每堂課的預設時數，學生選課建立上課紀錄時會帶入">每堂時數
-              <input
-                type="number"
-                min="0.5"
-                step="0.5"
-                placeholder="例如 1"
-                value={newDurationHours}
-                onChange={e => setNewDurationHours(e.target.value)}
-              />
-            </label>
             <label>預設老師
               <Combobox
                 items={activeTeachers}
@@ -143,7 +130,6 @@ export default function CoursesPage({ onEditCourse }) {
           <colgroup>
             <col />
             {canViewRates && <col style={{ width: 100 }} />}
-            <col style={{ width: 100 }} />
             <col style={{ width: 160 }} />
             <col style={{ width: 130 }} />
           </colgroup>
@@ -164,7 +150,6 @@ export default function CoursesPage({ onEditCourse }) {
                 </button>
               </th>
               {canViewRates && <th>學費</th>}
-              <th>每堂時數</th>
               <th>預設老師</th>
               <th></th>
             </tr>
@@ -174,7 +159,6 @@ export default function CoursesPage({ onEditCourse }) {
               <tr key={c.id}>
                 <td>{c.name}</td>
                 {canViewRates && <td>{amt(c.hourly_rate)}</td>}
-                <td>{`${parseFloat(c.duration_hours ?? 1)} 小時`}</td>
                 <td>{teachers.find(t => t.id === c.default_teacher_id)?.name || '—'}</td>
                 <td className="row-actions">
                   {canManageCourses ? (

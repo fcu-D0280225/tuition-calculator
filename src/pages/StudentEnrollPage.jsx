@@ -21,6 +21,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
   const [step, setStep] = useState('pick-course') // 'pick-course' | 'pick-dates'
   const [courseId, setCourseId] = useState(null)
   const [weekdayTimes, setWeekdayTimes] = useState(new Map()) // Map<0..6, timeStr>
+  const [weekdayHours, setWeekdayHours] = useState(new Map()) // Map<0..6, hoursStr>
   const [pendingWeekday, setPendingWeekday] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -152,6 +153,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     setCourseId(cid)
     setOverrideTeacherId(c?.default_teacher_id || '')
     setWeekdayTimes(new Map())
+    setWeekdayHours(new Map())
     setPendingWeekday(null)
     setDone(null)
     setError('')
@@ -163,6 +165,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     setCourseId(null)
     setOverrideTeacherId('')
     setWeekdayTimes(new Map())
+    setWeekdayHours(new Map())
     setPendingWeekday(null)
     setDone(null)
     setError('')
@@ -170,20 +173,17 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
 
   const effectiveTeacherId = overrideTeacherId || course?.default_teacher_id || ''
   const activeTeachers = teachersState.teachers.filter(t => t.active !== 0)
-  const lessonHours = course ? parseFloat(course.duration_hours ?? 1) || 1 : 1
 
   function toggleWeekday(w) {
-    setWeekdayTimes(prev => {
-      const next = new Map(prev)
-      if (next.has(w)) {
-        next.delete(w)
-        if (pendingWeekday === w) setPendingWeekday(null)
-      } else {
-        next.set(w, '')
-        setPendingWeekday(w)
-      }
-      return next
-    })
+    if (weekdayTimes.has(w)) {
+      setWeekdayTimes(prev => { const n = new Map(prev); n.delete(w); return n })
+      setWeekdayHours(prev => { const n = new Map(prev); n.delete(w); return n })
+      if (pendingWeekday === w) setPendingWeekday(null)
+    } else {
+      setWeekdayTimes(prev => { const n = new Map(prev); n.set(w, ''); return n })
+      setWeekdayHours(prev => { const n = new Map(prev); n.set(w, '1'); return n })
+      setPendingWeekday(w)
+    }
   }
 
   function setWeekdayTime(w, time) {
@@ -193,6 +193,20 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
       return next
     })
   }
+
+  function setWeekdayHoursValue(w, hours) {
+    setWeekdayHours(prev => {
+      const next = new Map(prev)
+      if (next.has(w)) next.set(w, hours)
+      return next
+    })
+  }
+
+  function parseHours(str) {
+    const n = parseFloat(str)
+    return !isNaN(n) && n > 0 ? n : 0
+  }
+  const allHoursValid = Array.from(weekdayHours.values()).every(h => parseHours(h) > 0)
 
   const today = useMemo(() => new Date(), [])
   // 建立範圍：今天 ~ 下個月最後一天
@@ -209,23 +223,34 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     while (cursor <= rangeEnd) {
       const w = cursor.getDay()
       if (weekdayTimes.has(w)) {
-        out.push({ date: fmtDate(cursor), time: weekdayTimes.get(w) || '', weekday: w })
+        out.push({
+          date: fmtDate(cursor),
+          time: weekdayTimes.get(w) || '',
+          hours: parseHours(weekdayHours.get(w)),
+          weekday: w,
+        })
       }
       cursor.setDate(cursor.getDate() + 1)
     }
     return out
-  }, [weekdayTimes, today, rangeEnd])
+  }, [weekdayTimes, weekdayHours, today, rangeEnd])
 
   const submitDisableReason = saving
     ? '建立中，請稍候'
     : weekdayTimes.size === 0
       ? '請至少選擇一個週幾'
-      : entriesToCreate.length === 0
-        ? '建立範圍內沒有符合的週幾'
-        : ''
+      : !allHoursValid
+        ? '請輸入有效的時數'
+        : entriesToCreate.length === 0
+          ? '建立範圍內沒有符合的週幾'
+          : ''
 
   async function handleSubmit() {
     if (!course) return
+    if (!allHoursValid) {
+      setError('請輸入有效的時數')
+      return
+    }
     if (entriesToCreate.length === 0) {
       setError('建立範圍內沒有符合的週幾，請至少選一個週幾')
       return
@@ -233,13 +258,13 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
     setSaving(true); setError(''); setDone(null)
     const failures = []
     let skipped = 0
-    for (const { date: d, time: t } of entriesToCreate) {
+    for (const { date: d, time: t, hours: h } of entriesToCreate) {
       try {
         await apiCreateLessonWithDupCheck({
           student_id: studentId,
           course_id: course.id,
           teacher_id: effectiveTeacherId || null,
-          hours: lessonHours,
+          hours: h,
           lesson_date: d,
           start_time: t || null,
           unit_price: null,
@@ -276,12 +301,23 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
       }
     }
     setSaving(false)
-    setDone({ total: entriesToCreate.length, failed: failures.length, skipped, failures })
-    if (failures.length === 0 && skipped === 0) {
-      setWeekdayTimes(new Map())
-      setPendingWeekday(null)
-    }
     if (successCount > 0) setLessonsReloadKey(k => k + 1)
+    if (failures.length === 0 && skipped === 0) {
+      // 全部成功 → 直接跳回該學生的選課列表，並顯示成功訊息
+      const courseName = course.name
+      const total = entriesToCreate.length
+      setWeekdayTimes(new Map())
+      setWeekdayHours(new Map())
+      setPendingWeekday(null)
+      setDone(null)
+      setError('')
+      setCourseId(null)
+      setOverrideTeacherId('')
+      setStep('pick-course')
+      setCourseMsg(`已建立 ${total} 筆「${courseName}」上課紀錄`)
+    } else {
+      setDone({ total: entriesToCreate.length, failed: failures.length, skipped, failures })
+    }
   }
 
   return (
@@ -435,10 +471,8 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
               )}
             </div>
             <div className="enroll-summary-row">
-              <strong className="enroll-summary-label">每筆時數：</strong>
-              <span>{lessonHours} 小時</span>
               <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                （建立範圍：{fmtDate(today)} ~ {fmtDate(rangeEnd)}）
+                建立範圍：{fmtDate(today)} ~ {fmtDate(rangeEnd)}
               </span>
             </div>
           </div>
@@ -451,6 +485,8 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
               {WEEKDAYS.map((label, w) => {
                 const active = weekdayTimes.has(w)
                 const t = active ? weekdayTimes.get(w) : ''
+                const h = active ? (weekdayHours.get(w) ?? '1') : ''
+                const hoursInvalid = active && parseHours(h) <= 0
                 return (
                   <label
                     key={w}
@@ -490,6 +526,29 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
                         opacity: active ? 1 : 0.5,
                       }}
                     />
+                    <input
+                      type="number"
+                      min="0.5"
+                      step="0.5"
+                      value={h}
+                      disabled={!active || saving}
+                      onChange={e => setWeekdayHoursValue(w, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                      placeholder="1"
+                      aria-label={`週${label}時數`}
+                      style={{
+                        width: 80,
+                        padding: '7px 10px',
+                        border: `1px solid ${hoursInvalid ? 'var(--danger, #c00)' : 'var(--border)'}`,
+                        borderRadius: 'var(--radius-sm)',
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        color: 'var(--text)',
+                        background: active ? 'var(--surface)' : 'var(--bg)',
+                        opacity: active ? 1 : 0.5,
+                      }}
+                    />
+                    <span style={{ color: 'var(--muted)', fontSize: 12, opacity: active ? 1 : 0.5 }}>小時</span>
                     {active && t && (
                       <button
                         type="button"
@@ -504,21 +563,9 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
             </div>
           </div>
 
-          {weekdayTimes.size > 0 && (
+          {weekdayTimes.size > 0 && entriesToCreate.length === 0 && (
             <div className="enroll-selected" style={{ marginTop: 12 }}>
-              {entriesToCreate.length === 0
-                ? <span style={{ color: 'var(--muted)' }}>建立範圍內沒有符合所選週幾的日子</span>
-                : <>
-                    將建立 {entriesToCreate.length} 筆上課紀錄：
-                    <div className="chip-list" style={{ marginTop: 6 }}>
-                      {entriesToCreate.map(e => (
-                        <span className="chip" key={e.date}>
-                          {e.date}（週{WEEKDAYS[e.weekday]}）{e.time && `・${e.time}`}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-              }
+              <span style={{ color: 'var(--muted)' }}>建立範圍內沒有符合所選週幾的日子</span>
             </div>
           )}
 
@@ -539,7 +586,6 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
           )}
 
           <div className="modal-actions" style={{ marginTop: 16 }}>
-            <button type="button" onClick={onBack} disabled={saving}>完成</button>
             <span
               title={submitDisableReason}
               style={{ display: 'inline-block' }}
@@ -551,7 +597,7 @@ export default function StudentEnrollPage({ studentId, studentName, onBack }) {
                 disabled={!!submitDisableReason}
                 title={submitDisableReason}
               >
-                {saving ? '建立中⋯' : `建立 ${entriesToCreate.length} 筆上課紀錄`}
+                {saving ? '建立中⋯' : '完成'}
               </button>
             </span>
             {submitDisableReason && !saving && (

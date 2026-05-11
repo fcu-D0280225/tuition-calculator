@@ -52,7 +52,7 @@ function WeekdayPicker({ value, onChange, disabled }) {
   )
 }
 
-const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', teacher_hourly_rate: '', note: '', default_teacher_id: '' }
+const EMPTY_GROUP = { name: '', weekdays: '', duration_months: 0, monthly_fee: '', start_time: '', duration_hours: '', teacher_hourly_rate: '', salary_type: 'hourly', monthly_salary: '', note: '', default_teacher_id: '' }
 
 export default function GroupsPage() {
   const { state, loadGroups, createGroup, updateGroup, removeGroup } = useGroups()
@@ -112,9 +112,13 @@ export default function GroupsPage() {
     if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
     const thr = newGroup.teacher_hourly_rate === '' ? 0 : parseFloat(newGroup.teacher_hourly_rate)
     if (isNaN(thr) || thr < 0) { setError('老師時薪格式不正確'); return }
+    const salaryType = newGroup.salary_type === 'monthly' ? 'monthly' : 'hourly'
+    const ms = newGroup.monthly_salary === '' ? 0 : parseFloat(newGroup.monthly_salary)
+    if (isNaN(ms) || ms < 0) { setError('月薪格式不正確'); return }
+    if (salaryType === 'monthly' && ms <= 0) { setError('請輸入月薪金額'); return }
     setSaving(true); setError('')
     try {
-      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, teacher_hourly_rate: thr, note: newGroup.note, default_teacher_id: newGroup.default_teacher_id || null })
+      await createGroup({ name, weekdays: newGroup.weekdays, duration_months: newGroup.duration_months, monthly_fee: fee, start_time: newGroup.start_time || null, duration_hours: dh, teacher_hourly_rate: thr, salary_type: salaryType, monthly_salary: ms, note: newGroup.note, default_teacher_id: newGroup.default_teacher_id || null })
       setNewGroup(EMPTY_GROUP)
     } catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -130,6 +134,8 @@ export default function GroupsPage() {
       start_time: g.start_time ? String(g.start_time).slice(0, 5) : '',
       duration_hours: g.duration_hours != null ? String(g.duration_hours) : '',
       teacher_hourly_rate: g.teacher_hourly_rate != null ? String(g.teacher_hourly_rate) : '',
+      salary_type: g.salary_type === 'monthly' ? 'monthly' : 'hourly',
+      monthly_salary: g.monthly_salary != null ? String(g.monthly_salary) : '',
       note: g.note || '',
       default_teacher_id: g.default_teacher_id || '',
     })
@@ -144,9 +150,13 @@ export default function GroupsPage() {
     if (isNaN(dh) || dh < 0 || dh > 24) { setError('課堂時數格式不正確'); return }
     const thr = editGroup.teacher_hourly_rate === '' ? 0 : parseFloat(editGroup.teacher_hourly_rate)
     if (isNaN(thr) || thr < 0) { setError('老師時薪格式不正確'); return }
+    const salaryType = editGroup.salary_type === 'monthly' ? 'monthly' : 'hourly'
+    const ms = editGroup.monthly_salary === '' ? 0 : parseFloat(editGroup.monthly_salary)
+    if (isNaN(ms) || ms < 0) { setError('月薪格式不正確'); return }
+    if (salaryType === 'monthly' && ms <= 0) { setError('請輸入月薪金額'); return }
     setSaving(true); setError('')
     try {
-      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, teacher_hourly_rate: thr, note: editGroup.note, default_teacher_id: editGroup.default_teacher_id || null })
+      await updateGroup(id, { name, weekdays: editGroup.weekdays, duration_months: editGroup.duration_months, monthly_fee: fee, start_time: editGroup.start_time || null, duration_hours: dh, teacher_hourly_rate: thr, salary_type: salaryType, monthly_salary: ms, note: editGroup.note, default_teacher_id: editGroup.default_teacher_id || null })
       setEditId(null)
     } catch { setError('更新失敗') }
     finally { setSaving(false) }
@@ -222,7 +232,31 @@ export default function GroupsPage() {
               />
             </label>
             {canViewRates && (
-              <label title="團課老師時薪：每堂課（duration_hours 小時）老師可拿的鐘點費">老師時薪（元/小時）
+              <label>計薪方式
+                <select
+                  value={newGroup.salary_type}
+                  onChange={e => setNewGroup(g => ({ ...g, salary_type: e.target.value }))}
+                >
+                  <option value="hourly">時薪</option>
+                  <option value="monthly">月薪</option>
+                </select>
+              </label>
+            )}
+            {canViewRates && newGroup.salary_type === 'monthly' && (
+              <label title="月薪型團課：預設老師按該月實際上課堂數比例領薪">月薪（元/月）
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="例如 8000"
+                  value={newGroup.monthly_salary}
+                  onChange={e => setNewGroup(g => ({ ...g, monthly_salary: e.target.value }))}
+                />
+              </label>
+            )}
+            {canViewRates && (
+              <label title={newGroup.salary_type === 'monthly' ? '代課老師（非預設老師）的鐘點費' : '團課老師時薪：每堂課老師可拿的鐘點費'}>
+                {newGroup.salary_type === 'monthly' ? '代課時薪（元/小時）' : '老師時薪（元/小時）'}
                 <input
                   type="number"
                   min="0"
@@ -296,7 +330,7 @@ export default function GroupsPage() {
               <col style={{ width: 140 }} />
               <col style={{ width: 90 }} />
               <col style={{ width: 80 }} />
-              {canViewRates && <col style={{ width: 90 }} />}
+              {canViewRates && <col style={{ width: 150 }} />}
               <col style={{ width: 110 }} />
               <col style={{ width: 70 }} />
               <col />
@@ -322,7 +356,7 @@ export default function GroupsPage() {
                 <th>上課時段</th>
                 <th>持續時間</th>
                 <th>月費</th>
-                {canViewRates && <th>老師時薪</th>}
+                {canViewRates && <th>計薪</th>}
                 <th>預設老師</th>
                 <th>報名人數</th>
                 <th>備註</th>
@@ -397,15 +431,60 @@ export default function GroupsPage() {
                   {canViewRates && (
                     <td>
                       {editId === g.id ? (
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          className="inline-edit-input"
-                          value={editGroup.teacher_hourly_rate}
-                          onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
-                        />
-                      ) : (g.teacher_hourly_rate > 0 ? amt(g.teacher_hourly_rate) : '—')}
+                        <div className="salary-cell-edit">
+                          <select
+                            className="inline-edit-input"
+                            value={editGroup.salary_type}
+                            onChange={e => setEditGroup(eg => ({ ...eg, salary_type: e.target.value }))}
+                          >
+                            <option value="hourly">時薪</option>
+                            <option value="monthly">月薪</option>
+                          </select>
+                          {editGroup.salary_type === 'monthly' ? (
+                            <>
+                              <input
+                                type="number" min="0" step="1"
+                                className="inline-edit-input"
+                                placeholder="月薪"
+                                value={editGroup.monthly_salary}
+                                onChange={e => setEditGroup(eg => ({ ...eg, monthly_salary: e.target.value }))}
+                              />
+                              <input
+                                type="number" min="0" step="1"
+                                className="inline-edit-input"
+                                placeholder="代課時薪"
+                                value={editGroup.teacher_hourly_rate}
+                                onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
+                              />
+                            </>
+                          ) : (
+                            <input
+                              type="number" min="0" step="1"
+                              className="inline-edit-input"
+                              placeholder="時薪"
+                              value={editGroup.teacher_hourly_rate}
+                              onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        g.salary_type === 'monthly'
+                          ? (
+                            <>
+                              <span className="salary-type-badge salary-type-monthly">月薪</span>
+                              <span style={{ marginLeft: 6 }}>{g.monthly_salary > 0 ? amt(g.monthly_salary) : '—'}</span>
+                              {g.teacher_hourly_rate > 0 && (
+                                <div style={{ fontSize: 11, color: '#64748b' }}>代課 {amt(g.teacher_hourly_rate)}/時</div>
+                              )}
+                            </>
+                          )
+                          : (
+                            <>
+                              <span className="salary-type-badge salary-type-hourly">時薪</span>
+                              <span style={{ marginLeft: 6 }}>{g.teacher_hourly_rate > 0 ? amt(g.teacher_hourly_rate) : '—'}</span>
+                            </>
+                          )
+                      )}
                     </td>
                   )}
                   <td>

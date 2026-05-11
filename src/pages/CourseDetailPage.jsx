@@ -19,7 +19,6 @@ export default function CourseDetailPage({ courseId, onBack }) {
   const [teacherHourlyRate, setTeacherHourlyRate] = useState('')
   const [discountAmt, setDiscountAmt]       = useState('0')
   const [defaultTeacher, setDefaultTeacher] = useState('')
-  const [durationHours, setDurationHours]   = useState('1')
   const [note, setNote]                     = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -35,7 +34,6 @@ export default function CourseDetailPage({ courseId, onBack }) {
     setTeacherHourlyRate(String(course.teacher_hourly_rate ?? 0))
     setDiscountAmt(course.discount_per_student != null ? String(parseFloat(course.discount_per_student)) : '0')
     setDefaultTeacher(course.default_teacher_id || '')
-    setDurationHours(course.duration_hours != null ? String(parseFloat(course.duration_hours)) : '1')
     setNote(course.note || '')
   }, [course])
 
@@ -50,14 +48,11 @@ export default function CourseDetailPage({ courseId, onBack }) {
     if (canViewRates && (isNaN(thr) || thr < 0)) { setError('老師時薪格式不正確'); return }
     const da = parseFloat(discountAmt || '0')
     if (canViewRates && (isNaN(da) || da < 0 || da > 100000)) { setError('每多一人折扣格式不正確'); return }
-    const dh = parseFloat(durationHours || '1')
-    if (isNaN(dh) || dh <= 0 || dh > 24) { setError('每堂時數需大於 0 且不超過 24'); return }
     setSaving(true); setError(''); setDone('')
     try {
       const patch = {
         name: trimmedName,
         default_teacher_id: defaultTeacher || null,
-        duration_hours: dh,
         note,
       }
       if (canViewRates) {
@@ -120,10 +115,6 @@ export default function CourseDetailPage({ courseId, onBack }) {
           <div className="lesson-form-row">
             <label>家教課名稱
               <input type="text" value={name} onChange={e => setName(e.target.value)} />
-            </label>
-            <label>每堂時數
-              <input type="number" min="0.5" step="0.5" value={durationHours}
-                onChange={e => setDurationHours(e.target.value)} />
             </label>
             <label>預設老師
               <Combobox

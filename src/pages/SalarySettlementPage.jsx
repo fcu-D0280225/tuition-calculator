@@ -89,7 +89,7 @@ export default function SalarySettlementPage() {
           ) : (
             <table className="settlement-table">
               <thead>
-                <tr><th>老師</th><th>課程</th><th>總時數</th><th>時薪</th><th>金額</th><th></th></tr>
+                <tr><th>老師</th><th>計薪方式</th><th>課程</th><th>總時數</th><th>時薪 / 月薪</th><th>金額</th><th></th></tr>
               </thead>
               <tbody>
                 {salary.map(teacher => {
@@ -117,6 +117,7 @@ export default function SalarySettlementPage() {
                       {cs.map((c, i) => (
                         <tr key={`c-${c.course_id}`}>
                           {i === 0 && firstKind === 'course' && nameCell}
+                          <td><span className="salary-type-badge salary-type-hourly">時薪</span></td>
                           <td>{c.course_name}</td>
                           <td className="num-cell">{c.total_hours}</td>
                           <td className="num-cell">{amt(c.hourly_rate)}</td>
@@ -124,18 +125,36 @@ export default function SalarySettlementPage() {
                           {i === 0 && firstKind === 'course' && actionCell}
                         </tr>
                       ))}
-                      {gs.map((g, i) => (
-                        <tr key={`g-${g.group_id}`} style={{ background: '#ecfdf5' }}>
-                          {i === 0 && firstKind === 'group' && nameCell}
-                          <td style={{ color: '#166534' }}>團課：{g.group_name}（{g.session_count} 堂 × {g.duration_hours} 小時）</td>
-                          <td className="num-cell">{g.total_hours}</td>
-                          <td className="num-cell">{amt(g.hourly_rate)}</td>
-                          <td className="num-cell">{amt(g.amount)}</td>
-                          {i === 0 && firstKind === 'group' && actionCell}
-                        </tr>
-                      ))}
+                      {gs.map((g, i) => {
+                        const isMonthly = g.kind === 'monthly'
+                        return (
+                          <tr key={`g-${isMonthly ? 'm' : 'h'}-${g.group_id}`} style={{ background: '#ecfdf5' }}>
+                            {i === 0 && firstKind === 'group' && nameCell}
+                            <td>
+                              <span className={`salary-type-badge ${isMonthly ? 'salary-type-monthly' : 'salary-type-hourly'}`}>
+                                {isMonthly ? '月薪' : '時薪'}
+                              </span>
+                            </td>
+                            <td style={{ color: '#166534' }}>
+                              {isMonthly
+                                ? <>團課：{g.group_name}（{g.x_sum}/{g.y_sum} 堂）</>
+                                : <>團課：{g.group_name}（{g.session_count} 堂 × {g.duration_hours} 小時）</>
+                              }
+                            </td>
+                            <td className="num-cell">{isMonthly ? '—' : g.total_hours}</td>
+                            <td className="num-cell">
+                              {isMonthly
+                                ? <>月薪 {amt(g.monthly_salary)} × {(g.month_fraction || 0).toFixed(2)} 個月</>
+                                : amt(g.hourly_rate)
+                              }
+                            </td>
+                            <td className="num-cell">{amt(g.amount)}</td>
+                            {i === 0 && firstKind === 'group' && actionCell}
+                          </tr>
+                        )
+                      })}
                       <tr className="subtotal-row">
-                        <td colSpan={3}></td>
+                        <td colSpan={4}></td>
                         <td className="subtotal-label">小計</td>
                         <td className="num-cell subtotal-amount">{amt(teacher.total)}</td>
                         <td></td>
@@ -144,7 +163,7 @@ export default function SalarySettlementPage() {
                   )
                 })}
                 <tr className="grand-total-row">
-                  <td colSpan={4} className="grand-total-label">合計</td>
+                  <td colSpan={5} className="grand-total-label">合計</td>
                   <td className="num-cell grand-total-amount">
                     {amt(salary.reduce((sum, t) => sum + t.total, 0))}
                   </td>

@@ -229,14 +229,42 @@ function salarySummaryHtml(salary, period, dateStr) {
 }
 
 function singleSalaryHtml(teacher, period, dateStr) {
-  const rows = teacher.courses.map((c, i) => `
+  const courses = teacher.courses || []
+  const groups  = teacher.groups  || []
+  let i = -1
+  const courseRows = courses.map(c => {
+    i += 1
+    return `
     <tr style="border-bottom:1px solid #f1f5f9; ${i % 2 === 1 ? 'background:#fafafa;' : ''}">
+      <td style="padding:10px 12px; font-size:11px; color:#4338ca;">時薪</td>
       <td style="padding:10px 12px; font-weight:600; color:#7c3aed;">${escapeHtml(c.course_name)}</td>
       <td style="padding:10px 12px; text-align:right;">${escapeHtml(c.total_hours)}</td>
       <td style="padding:10px 12px; text-align:right; color:#64748b;">NT$ ${money(c.hourly_rate)}</td>
       <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(c.amount)}</td>
     </tr>
-  `).join('')
+  `}).join('')
+  const groupRows = groups.map(g => {
+    i += 1
+    const isMonthly = g.kind === 'monthly'
+    const typeLabel = isMonthly ? '月薪' : '時薪'
+    const typeColor = isMonthly ? '#166534' : '#4338ca'
+    const desc = isMonthly
+      ? `團課：${escapeHtml(g.group_name)}（${g.x_sum}/${g.y_sum} 堂）`
+      : `團課：${escapeHtml(g.group_name)}（${g.session_count} 堂 × ${g.duration_hours} 小時）`
+    const hours = isMonthly ? '—' : escapeHtml(g.total_hours)
+    const rate  = isMonthly
+      ? `月薪 NT$ ${money(g.monthly_salary)} × ${(g.month_fraction || 0).toFixed(2)}`
+      : `NT$ ${money(g.hourly_rate)}`
+    return `
+    <tr style="border-bottom:1px solid #f1f5f9; background:${i % 2 === 1 ? '#f0fdf4' : '#ecfdf5'};">
+      <td style="padding:10px 12px; font-size:11px; color:${typeColor};">${typeLabel}</td>
+      <td style="padding:10px 12px; font-weight:600; color:#166534;">${desc}</td>
+      <td style="padding:10px 12px; text-align:right;">${hours}</td>
+      <td style="padding:10px 12px; text-align:right; color:#64748b;">${rate}</td>
+      <td style="padding:10px 12px; text-align:right; font-weight:500;">NT$ ${money(g.amount)}</td>
+    </tr>
+  `}).join('')
+  const rows = courseRows + groupRows
 
   return `
     <div style="border-bottom:3px solid #7c3aed; padding-bottom:24px; margin-bottom:32px;">
@@ -263,9 +291,10 @@ function singleSalaryHtml(teacher, period, dateStr) {
     <table style="width:100%; border-collapse:collapse; margin-bottom:24px;">
       <thead>
         <tr style="background:#f3e8ff;">
+          <th style="padding:10px 12px; text-align:left; font-size:12px; color:#6b21a8; font-weight:600; border-bottom:2px solid #ddd6fe;">計薪方式</th>
           <th style="padding:10px 12px; text-align:left; font-size:12px; color:#6b21a8; font-weight:600; border-bottom:2px solid #ddd6fe;">課程</th>
           <th style="padding:10px 12px; text-align:right; font-size:12px; color:#6b21a8; font-weight:600; border-bottom:2px solid #ddd6fe;">時數</th>
-          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#6b21a8; font-weight:600; border-bottom:2px solid #ddd6fe;">時薪(元/時)</th>
+          <th style="padding:10px 12px; text-align:right; font-size:12px; color:#6b21a8; font-weight:600; border-bottom:2px solid #ddd6fe;">時薪 / 月薪</th>
           <th style="padding:10px 12px; text-align:right; font-size:12px; color:#6b21a8; font-weight:600; border-bottom:2px solid #ddd6fe;">金額</th>
         </tr>
       </thead>
