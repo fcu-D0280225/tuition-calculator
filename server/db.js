@@ -32,18 +32,24 @@ export async function initSchema() {
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
 
-  // Migration: 既有 students 表補上聯絡人 / 電話欄位
-  const [stuContactCols] = await pool.query(
+  // Migration: 既有 students 表補上聯絡人 / 電話 / 學校 / 年級欄位
+  const [stuExtraCols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'students'
-       AND COLUMN_NAME IN ('contact_name', 'contact_phone')`
+       AND COLUMN_NAME IN ('contact_name', 'contact_phone', 'school', 'grade')`
   )
-  const stuContactSet = new Set(stuContactCols.map(c => c.COLUMN_NAME))
-  if (!stuContactSet.has('contact_name')) {
+  const stuExtraSet = new Set(stuExtraCols.map(c => c.COLUMN_NAME))
+  if (!stuExtraSet.has('contact_name')) {
     await pool.query(`ALTER TABLE students ADD COLUMN contact_name VARCHAR(128) NOT NULL DEFAULT '' AFTER name`)
   }
-  if (!stuContactSet.has('contact_phone')) {
+  if (!stuExtraSet.has('contact_phone')) {
     await pool.query(`ALTER TABLE students ADD COLUMN contact_phone VARCHAR(64) NOT NULL DEFAULT '' AFTER contact_name`)
+  }
+  if (!stuExtraSet.has('school')) {
+    await pool.query(`ALTER TABLE students ADD COLUMN school VARCHAR(128) NOT NULL DEFAULT '' AFTER name`)
+  }
+  if (!stuExtraSet.has('grade')) {
+    await pool.query(`ALTER TABLE students ADD COLUMN grade VARCHAR(32) NOT NULL DEFAULT '' AFTER school`)
   }
 
   await pool.query(`
@@ -390,6 +396,22 @@ export async function initSchema() {
     await pool.query('ALTER TABLE `groups` ADD COLUMN teacher_hourly_rate DECIMAL(10,2) NOT NULL DEFAULT 0')
   }
 
+  // Migration: 加 groups.salary_type / monthly_salary（月薪型團課）
+  const [gStCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'salary_type'`
+  )
+  if (gStCols.length === 0) {
+    await pool.query("ALTER TABLE `groups` ADD COLUMN salary_type ENUM('hourly','monthly') NOT NULL DEFAULT 'hourly'")
+  }
+  const [gMsCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'groups' AND COLUMN_NAME = 'monthly_salary'`
+  )
+  if (gMsCols.length === 0) {
+    await pool.query('ALTER TABLE `groups` ADD COLUMN monthly_salary DECIMAL(10,2) NOT NULL DEFAULT 0')
+  }
+
   // Migration: 加 groups.default_teacher_id（點名時自動帶入的老師）
   const [gDefTcols] = await pool.query(
     `SELECT COLUMN_NAME FROM information_schema.COLUMNS
@@ -644,22 +666,24 @@ export async function deleteLeaveRequest(id) {
 
 export async function listStudents() {
   const [rows] = await pool.query(
-    'SELECT id, name, contact_name, contact_phone, sort_order, active FROM students ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC'
+    'SELECT id, name, school, grade, contact_name, contact_phone, sort_order, active FROM students ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC'
   )
   return rows
 }
 
-export async function insertStudent({ id, name, contactName, contactPhone }) {
+export async function insertStudent({ id, name, school, grade, contactName, contactPhone }) {
   await pool.query(
-    'INSERT INTO students (id, name, contact_name, contact_phone) VALUES (?, ?, ?, ?)',
-    [id, name, contactName || '', contactPhone || '']
+    'INSERT INTO students (id, name, school, grade, contact_name, contact_phone) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, name, school || '', grade || '', contactName || '', contactPhone || '']
   )
 }
 
-export async function updateStudent(id, { name, contactName, contactPhone }) {
+export async function updateStudent(id, { name, school, grade, contactName, contactPhone }) {
   const sets = []
   const params = []
   if (name         !== undefined) { sets.push('name = ?');          params.push(name) }
+  if (school       !== undefined) { sets.push('school = ?');        params.push(school || '') }
+  if (grade        !== undefined) { sets.push('grade = ?');         params.push(grade || '') }
   if (contactName  !== undefined) { sets.push('contact_name = ?');  params.push(contactName || '') }
   if (contactPhone !== undefined) { sets.push('contact_phone = ?'); params.push(contactPhone || '') }
   if (!sets.length) return false
@@ -1342,8 +1366,12 @@ export async function settlementSalary(from, to) {
     teacher.total += Math.round(h * entry.hourly_rate)
   }
 
-  // 團課薪資：每一個 (group, record_date, teacher) 為一堂，無論該堂出席學生多少；
-  // 排除 pre_enroll（尚未開始）與沒指派老師的紀錄。
+  // 團課薪資：每一個 (group, record_date, teacher) 為一堂；排除 pre_enroll、無指派老師。
+  // 時薪型 (salary_type='hourly')：金額 = duration_hours × teacher_hourly_rate，逐堂累加。
+  // 月薪型 (salary_type='monthly')：以 (group_id, year-month) 為池，
+  //   分母 Y = 該整月該團課所有老師上的總堂數；
+  //   每位老師金額 = monthly_salary × (區間內該老師堂數 / Y)。
+  //   預設老師當月零堂自然為 0；代課老師按比例分。
   const [groupRows] = await pool.query(
     `SELECT gr.teacher_id,
             t.name                          AS teacher_name,
@@ -1351,37 +1379,124 @@ export async function settlementSalary(from, to) {
             g.name                          AS group_name,
             g.duration_hours                AS duration_hours,
             g.teacher_hourly_rate           AS hourly_rate,
-            gr.record_date
+            g.salary_type                   AS salary_type,
+            g.monthly_salary                AS monthly_salary,
+            gr.record_date,
+            DATE_FORMAT(gr.record_date, '%Y-%m') AS ym
        FROM group_records gr
        JOIN \`groups\` g ON g.id = gr.group_id
        JOIN teachers   t ON t.id = gr.teacher_id
       WHERE gr.record_date >= ? AND gr.record_date <= ?
         AND gr.teacher_id IS NOT NULL
         AND gr.status <> 'pre_enroll'
-      GROUP BY gr.teacher_id, t.name, gr.group_id, g.name, g.duration_hours, g.teacher_hourly_rate, gr.record_date
+      GROUP BY gr.teacher_id, t.name, gr.group_id, g.name, g.duration_hours,
+               g.teacher_hourly_rate, g.salary_type, g.monthly_salary, gr.record_date
       ORDER BY t.name ASC, g.name ASC, gr.record_date ASC`,
     [from, to]
   )
+
+  // 收集月薪型 (group_id, ym) 桶與 (teacher, group, ym) 區間內堂數 X
+  const monthlyBuckets = new Map()  // key: `${group_id}::${ym}` -> { group_id, group_name, ym, monthly_salary, teachers: Map<teacher_id, { teacher_name, x }> }
+  const monthlyGroupIds = new Set()
+  const monthlyYms = new Set()
+
   for (const row of groupRows) {
     if (!map.has(row.teacher_id)) {
       map.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, courses: new Map(), groups: new Map(), total: 0 })
     }
-    const teacher = map.get(row.teacher_id)
-    const rate = parseFloat(row.hourly_rate || 0)
-    const dh   = parseFloat(row.duration_hours || 0)
-    const key  = `${row.group_id}::${rate}::${dh}`
-    if (!teacher.groups.has(key)) {
-      teacher.groups.set(key, {
-        group_id: row.group_id, group_name: row.group_name,
-        duration_hours: dh, hourly_rate: rate,
-        session_count: 0, total_hours: 0, amount: 0,
-      })
+
+    if (row.salary_type === 'monthly') {
+      const ym = String(row.ym)
+      const key = `${row.group_id}::${ym}`
+      if (!monthlyBuckets.has(key)) {
+        monthlyBuckets.set(key, {
+          group_id: row.group_id, group_name: row.group_name,
+          ym, monthly_salary: parseFloat(row.monthly_salary || 0),
+          teachers: new Map(),
+        })
+      }
+      const bucket = monthlyBuckets.get(key)
+      if (!bucket.teachers.has(row.teacher_id)) {
+        bucket.teachers.set(row.teacher_id, { teacher_id: row.teacher_id, teacher_name: row.teacher_name, x: 0 })
+      }
+      bucket.teachers.get(row.teacher_id).x += 1
+      monthlyGroupIds.add(row.group_id)
+      monthlyYms.add(ym)
+    } else {
+      const teacher = map.get(row.teacher_id)
+      const rate = parseFloat(row.hourly_rate || 0)
+      const dh   = parseFloat(row.duration_hours || 0)
+      const key  = `hourly::${row.group_id}::${rate}::${dh}`
+      if (!teacher.groups.has(key)) {
+        teacher.groups.set(key, {
+          kind: 'hourly',
+          group_id: row.group_id, group_name: row.group_name,
+          duration_hours: dh, hourly_rate: rate,
+          session_count: 0, total_hours: 0, amount: 0,
+        })
+      }
+      const entry = teacher.groups.get(key)
+      entry.session_count += 1
+      entry.total_hours = Math.round((entry.session_count * dh) * 100) / 100
+      entry.amount = Math.round(entry.total_hours * rate)
+      teacher.total += Math.round(dh * rate)
     }
-    const entry = teacher.groups.get(key)
-    entry.session_count += 1
-    entry.total_hours = Math.round((entry.session_count * dh) * 100) / 100
-    entry.amount = Math.round(entry.total_hours * rate)
-    teacher.total += Math.round(dh * rate)
+  }
+
+  // 月薪型：查每個 (group_id, ym) 的整月分母 Y（不限區間）
+  if (monthlyBuckets.size > 0) {
+    const yms = Array.from(monthlyYms).sort()
+    const firstYm = yms[0]
+    const lastYm  = yms[yms.length - 1]
+    const [ly, lm] = lastYm.split('-').map(s => parseInt(s, 10))
+    const lastDay = new Date(ly, lm, 0).getDate()
+    const monthRangeFrom = `${firstYm}-01`
+    const monthRangeTo   = `${lastYm}-${String(lastDay).padStart(2, '0')}`
+
+    const [yRows] = await pool.query(
+      `SELECT gr.group_id,
+              DATE_FORMAT(gr.record_date, '%Y-%m') AS ym,
+              COUNT(DISTINCT CONCAT(gr.record_date, '|', gr.teacher_id)) AS total
+         FROM group_records gr
+         JOIN \`groups\` g ON g.id = gr.group_id
+        WHERE gr.group_id IN (?)
+          AND gr.record_date >= ? AND gr.record_date <= ?
+          AND gr.teacher_id IS NOT NULL
+          AND gr.status <> 'pre_enroll'
+          AND g.salary_type = 'monthly'
+        GROUP BY gr.group_id, ym`,
+      [Array.from(monthlyGroupIds), monthRangeFrom, monthRangeTo]
+    )
+    const yMap = new Map()
+    for (const r of yRows) yMap.set(`${r.group_id}::${r.ym}`, parseInt(r.total, 10))
+
+    for (const bucket of monthlyBuckets.values()) {
+      const Y = yMap.get(`${bucket.group_id}::${bucket.ym}`) || 0
+      if (Y === 0) continue
+      for (const tEntry of bucket.teachers.values()) {
+        if (tEntry.x === 0) continue
+        const teacher = map.get(tEntry.teacher_id)
+        const fraction = tEntry.x / Y
+        const amount = Math.round(bucket.monthly_salary * fraction)
+        const key = `monthly::${bucket.group_id}::${bucket.monthly_salary}`
+        if (!teacher.groups.has(key)) {
+          teacher.groups.set(key, {
+            kind: 'monthly',
+            group_id: bucket.group_id, group_name: bucket.group_name,
+            monthly_salary: bucket.monthly_salary,
+            month_fraction: 0,
+            x_sum: 0, y_sum: 0,
+            amount: 0,
+          })
+        }
+        const entry = teacher.groups.get(key)
+        entry.month_fraction = Math.round((entry.month_fraction + fraction) * 10000) / 10000
+        entry.x_sum += tEntry.x
+        entry.y_sum += Y
+        entry.amount += amount
+        teacher.total += amount
+      }
+    }
   }
 
   return Array.from(map.values()).map(t => ({
@@ -1578,12 +1693,13 @@ export async function deleteMaterialRecord(id) {
 
 export async function listGroups() {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, note, default_teacher_id, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, salary_type, monthly_salary, note, default_teacher_id, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
   )
   return rows.map(r => ({
     ...r,
     duration_hours: parseFloat(r.duration_hours),
     teacher_hourly_rate: parseFloat(r.teacher_hourly_rate || 0),
+    monthly_salary: parseFloat(r.monthly_salary || 0),
   }))
 }
 
@@ -1594,14 +1710,14 @@ export async function reorderGroups(orderedIds) {
   await pool.query(sql, [...orderedIds, orderedIds])
 }
 
-export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, note, defaultTeacherId }) {
+export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, teacherHourlyRate ?? 0, note || '', defaultTeacherId || null]
+    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, salary_type, monthly_salary, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, teacherHourlyRate ?? 0, salaryType || 'hourly', monthlySalary ?? 0, note || '', defaultTeacherId || null]
   )
 }
 
-export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, note, defaultTeacherId }) {
+export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId }) {
   const sets = []; const params = []
   if (name              !== undefined) { sets.push('name = ?');                params.push(name) }
   if (weekdays          !== undefined) { sets.push('weekdays = ?');            params.push(weekdays || '') }
@@ -1610,6 +1726,8 @@ export async function updateGroup(id, { name, weekdays, durationMonths, monthlyF
   if (startTime         !== undefined) { sets.push('start_time = ?');          params.push(startTime || null) }
   if (durationHours     !== undefined) { sets.push('duration_hours = ?');      params.push(durationHours) }
   if (teacherHourlyRate !== undefined) { sets.push('teacher_hourly_rate = ?'); params.push(teacherHourlyRate) }
+  if (salaryType        !== undefined) { sets.push('salary_type = ?');         params.push(salaryType) }
+  if (monthlySalary     !== undefined) { sets.push('monthly_salary = ?');      params.push(monthlySalary) }
   if (note              !== undefined) { sets.push('note = ?');                params.push(note || '') }
   if (defaultTeacherId  !== undefined) { sets.push('default_teacher_id = ?');  params.push(defaultTeacherId || null) }
   if (!sets.length) return false

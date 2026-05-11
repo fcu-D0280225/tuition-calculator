@@ -35,7 +35,7 @@ const HOUR_PX = 48
 const MIN_HOUR = 7
 const MAX_HOUR = 22 // 顯示 7:00 ~ 22:00（最後一格 22:00 起算 1 小時）
 
-export default function SchedulePage() {
+export default function SchedulePage({ onOpenAttendance = null } = {}) {
   const { state: studentsState, loadStudents } = useStudents()
   const { state: teachersState, loadTeachers } = useTeachers()
   const { state: groupsState, loadGroups } = useGroups()
@@ -166,6 +166,8 @@ export default function SchedulePage() {
         kind: 'lesson',
         id: l.id,
         dayIdx,
+        date: dateStr,
+        courseId: l.course_id,
         startMin: t,
         durationMin: Math.max(15, Math.round(parseFloat(l.hours) * 60)),
         title: l.course_name,
@@ -185,6 +187,8 @@ export default function SchedulePage() {
         kind: 'group',
         id: gr.id,
         dayIdx,
+        date: dateStr,
+        groupId: gr.group_id,
         startMin: t,
         durationMin: Math.max(15, Math.round((dh > 0 ? dh : 1) * 60)),
         title: '團 ' + gr.group_name,
@@ -200,6 +204,7 @@ export default function SchedulePage() {
       ...lessons.filter(l => !l.start_time).map(l => ({
         kind: 'lesson', id: l.id,
         date: String(l.lesson_date).slice(0, 10),
+        courseId: l.course_id,
         title: l.course_name,
         sub: mode === 'student' ? (l.teacher_name || '未指派老師') : l.student_name,
         hours: l.hours,
@@ -207,6 +212,28 @@ export default function SchedulePage() {
       })),
     ]
   ), [lessons, mode])
+
+  function isStarted(it) {
+    if (!it?.date) return false
+    const now = new Date()
+    const todayStr = fmtDate(now)
+    if (it.date < todayStr) return true
+    if (it.date > todayStr) return false
+    // 當日：必須有開始時間且已到
+    if (it.startMin == null) return false
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    return nowMin >= it.startMin
+  }
+
+  function gotoAttendance(it) {
+    if (!onOpenAttendance) return
+    if (!isStarted(it)) return
+    if (it.kind === 'lesson') {
+      onOpenAttendance({ mode: 'tutoring', id: it.courseId, date: it.date })
+    } else if (it.kind === 'group') {
+      onOpenAttendance({ mode: 'group', id: it.groupId, date: it.date })
+    }
+  }
 
   function shiftWeek(delta) {
     setWeekStart(prev => addDays(prev, 7 * delta))
@@ -284,12 +311,20 @@ export default function SchedulePage() {
                   if (top + height < 0 || top > HOUR_PX * (MAX_HOUR - MIN_HOUR + 1)) return null
                   const leave = it.kind === 'lesson' && mode === 'student' ? findLeaveForLesson(it.lesson) : null
                   const isOnLeave = !!leave
+                  const started = isStarted(it)
+                  const clickable = !!onOpenAttendance && started
+                  const titleBase = leave ? `(請假) ${leave.reason}` : (it.note || '')
+                  const titleHint = clickable ? '・點擊前往點名' : (onOpenAttendance && !started ? '・尚未開始，無法點名' : '')
                   return (
                     <div
                       key={`${it.kind}-${it.id}`}
-                      className={`schedule-item schedule-item--${it.kind}${isOnLeave ? ' schedule-item--leave' : ''}`}
-                      style={{ top: Math.max(0, top), height: Math.max(20, height) }}
-                      title={leave ? `(請假) ${leave.reason}` : (it.note || '')}
+                      className={`schedule-item schedule-item--${it.kind}${isOnLeave ? ' schedule-item--leave' : ''}${clickable ? ' schedule-item--clickable' : ''}`}
+                      style={{ top: Math.max(0, top), height: Math.max(20, height), ...(clickable ? { cursor: 'pointer' } : null) }}
+                      title={(titleBase + titleHint).trim() || undefined}
+                      onClick={clickable ? () => gotoAttendance(it) : undefined}
+                      role={clickable ? 'button' : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); gotoAttendance(it) } } : undefined}
                     >
                       <div className="schedule-item-time">
                         {pad(Math.floor(it.startMin / 60))}:{pad(it.startMin % 60)}
@@ -328,11 +363,28 @@ export default function SchedulePage() {
               <ul className="schedule-no-time-list">
                 {noTimeItems.map(it => {
                   const leave = it.kind === 'lesson' && mode === 'student' ? findLeaveForLesson(it.lesson) : null
+                  // noTimeItems 沒有 startMin → 當日視為尚未開始，僅過去日期可點
+                  const clickable = !!onOpenAttendance && isStarted(it)
                   return (
                     <li key={it.id}>
-                      {it.date}・{leave && <span className="leave-tag">(請假)</span>}{it.title}
-                      {it.sub && <span style={{ color: 'var(--muted)' }}>（{it.sub}）</span>}
-                      {it.hours && <span style={{ color: 'var(--muted)' }}>・{it.hours} 小時</span>}
+                      {clickable ? (
+                        <button
+                          type="button"
+                          className="schedule-no-time-link"
+                          onClick={() => gotoAttendance(it)}
+                          title="點擊前往點名"
+                        >
+                          {it.date}・{leave && <span className="leave-tag">(請假)</span>}{it.title}
+                          {it.sub && <span style={{ color: 'var(--muted)' }}>（{it.sub}）</span>}
+                          {it.hours && <span style={{ color: 'var(--muted)' }}>・{it.hours} 小時</span>}
+                        </button>
+                      ) : (
+                        <>
+                          {it.date}・{leave && <span className="leave-tag">(請假)</span>}{it.title}
+                          {it.sub && <span style={{ color: 'var(--muted)' }}>（{it.sub}）</span>}
+                          {it.hours && <span style={{ color: 'var(--muted)' }}>・{it.hours} 小時</span>}
+                        </>
+                      )}
                       {it.kind === 'lesson' && mode === 'student' && (
                         leave ? (
                           <button className="btn-sm" style={{ marginLeft: 8 }} onClick={() => cancelLeave(leave.id)}>取消請假</button>

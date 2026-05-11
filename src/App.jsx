@@ -124,6 +124,7 @@ export default function App() {
   const [tab, setTab] = useState(null)
   const [enrollContext, setEnrollContext] = useState(null) // { studentId, studentName }
   const [courseEditId, setCourseEditId] = useState(null)
+  const [attendanceContext, setAttendanceContext] = useState(null) // { mode, id, date }
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [authState, setAuthState] = useState({ status: 'loading', user: null, is_admin: false, permissions: [], teacher_id: null })
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
@@ -217,6 +218,13 @@ export default function App() {
   function navigate(id) {
     setTab(id)
     setEnrollContext(null)
+    if (id !== 'attendance') setAttendanceContext(null)
+    setSidebarOpen(false)
+  }
+
+  function openAttendance(ctx) {
+    setAttendanceContext(ctx)
+    setTab('attendance')
     setSidebarOpen(false)
   }
 
@@ -417,8 +425,8 @@ export default function App() {
             )}
             {tab === 'materials'  && <MaterialsPage />}
             {tab === 'groups'     && <GroupsPage />}
-            {tab === 'attendance' && <AttendancePage />}
-            {tab === 'schedule'   && <SchedulePage />}
+            {tab === 'attendance' && <AttendancePage initialContext={attendanceContext} />}
+            {tab === 'schedule'   && <SchedulePage onOpenAttendance={allowedTabIds.has('attendance') ? openAttendance : null} />}
             {tab === 'ai_assistant' && <AiAssistantPage />}
             {tab === 'users'      && <UsersPage currentUser={{ ...authState.user, is_admin: authState.is_admin }} />}
           </main>

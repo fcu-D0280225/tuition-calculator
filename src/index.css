@@ -4419,6 +4419,27 @@ select.catalog-input.catalog-select {
 }
 .time-duration-edit > input { flex: 1; min-width: 0; }
 
+/* ── 團課計薪 cell（編輯態：select + input(s) 直排）──────────────────── */
+.salary-cell-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.salary-cell-edit > select,
+.salary-cell-edit > input { width: 100%; }
+
+/* ── 計薪方式 badge ──────────────────────────────────────────────────── */
+.salary-type-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.salary-type-hourly  { background: #eef2ff; color: #4338ca; }
+.salary-type-monthly { background: #ecfdf5; color: #166534; }
+
 /* ── Enrollment list（已選課程） ────────────────────────────────────────── */
 .enrollment-list {
   list-style: none;
@@ -4569,6 +4590,20 @@ select.catalog-input.catalog-select {
 .schedule-item-title { font-weight: 700; line-height: 1.2; }
 .schedule-item-sub { font-size: 11px; opacity: 0.85; }
 .schedule-no-time-list { margin: 0; padding-left: 1.2em; line-height: 1.8; }
+.schedule-no-time-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent, #2563eb);
+  cursor: pointer;
+  text-align: left;
+}
+.schedule-no-time-link:hover { text-decoration: underline; }
+
+.schedule-item--clickable { transition: filter 0.12s, box-shadow 0.12s; }
+.schedule-item--clickable:hover { filter: brightness(0.96); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15); }
+.schedule-item--clickable:focus-visible { outline: 2px solid var(--accent, #2563eb); outline-offset: 2px; }
 
 /* 請假狀態 */
 .schedule-item--leave {

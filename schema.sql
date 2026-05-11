@@ -20,6 +20,8 @@ DROP TABLE IF EXISTS `students`;
 CREATE TABLE `students` (
   `id`            VARCHAR(64)  NOT NULL,
   `name`          VARCHAR(128) NOT NULL,
+  `school`        VARCHAR(128) NOT NULL DEFAULT '',
+  `grade`         VARCHAR(32)  NOT NULL DEFAULT '',
   `contact_name`  VARCHAR(128) NOT NULL DEFAULT '',
   `contact_phone` VARCHAR(64)  NOT NULL DEFAULT '',
   `sort_order`    INT          NOT NULL DEFAULT 0,
@@ -141,6 +143,8 @@ CREATE TABLE `groups` (
   `start_time`           TIME           NULL DEFAULT NULL,
   `duration_hours`       DECIMAL(4,2)   NOT NULL DEFAULT 0,
   `teacher_hourly_rate`  DECIMAL(10,2)  NOT NULL DEFAULT 0,
+  `salary_type`          ENUM('hourly','monthly') NOT NULL DEFAULT 'hourly',
+  `monthly_salary`       DECIMAL(10,2)  NOT NULL DEFAULT 0,
   `default_teacher_id`   VARCHAR(64)    NULL DEFAULT NULL,
   `sort_order`           INT            NOT NULL DEFAULT 0,
   `note`                 VARCHAR(256)   NOT NULL DEFAULT '',

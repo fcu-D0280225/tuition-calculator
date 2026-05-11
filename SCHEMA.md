@@ -41,6 +41,8 @@
 |------|------|------|
 | id | VARCHAR(64) PK | |
 | name | VARCHAR(128) NOT NULL | |
+| school | VARCHAR(128) DEFAULT '' | 就讀學校 |
+| grade | VARCHAR(32) DEFAULT '' | 年級（自由文字，例：國一、高三、小六） |
 | contact_name | VARCHAR(128) DEFAULT '' | 家長 / 聯絡人姓名 |
 | contact_phone | VARCHAR(64) DEFAULT '' | 聯絡電話 |
 | sort_order | INT DEFAULT 0 | 拖曳排序 |
@@ -130,7 +132,9 @@
 | monthly_fee | DECIMAL(10,2) DEFAULT 0 | 學生月費 |
 | start_time | TIME NULL | 課表顯示用 |
 | duration_hours | DECIMAL(4,2) DEFAULT 0 | 每堂時數 |
-| teacher_hourly_rate | DECIMAL(10,2) DEFAULT 0 | 老師時薪 |
+| teacher_hourly_rate | DECIMAL(10,2) DEFAULT 0 | 老師時薪（時薪型 + 月薪型代課用） |
+| salary_type | ENUM('hourly','monthly') DEFAULT 'hourly' | 計薪方式：時薪／月薪 |
+| monthly_salary | DECIMAL(10,2) DEFAULT 0 | 月薪（僅 salary_type='monthly' 時使用） |
 | default_teacher_id | VARCHAR(64) FK SET NULL → teachers | |
 | sort_order | INT DEFAULT 0 | |
 | note | VARCHAR(256) DEFAULT '' | |

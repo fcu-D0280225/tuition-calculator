@@ -46,11 +46,15 @@ export default function StudentsPage({ onEnroll }) {
   const { students, loading } = state
 
   const [newName, setNewName]           = useState('')
+  const [newSchool, setNewSchool]       = useState('')
+  const [newGrade, setNewGrade]         = useState('')
   const [newContact, setNewContact]     = useState('')
   const [newPhone, setNewPhone]         = useState('')
 
   const [editId, setEditId]             = useState(null)
   const [editName, setEditName]         = useState('')
+  const [editSchool, setEditSchool]     = useState('')
+  const [editGrade, setEditGrade]       = useState('')
   const [editContact, setEditContact]   = useState('')
   const [editPhone, setEditPhone]       = useState('')
 
@@ -75,12 +79,14 @@ export default function StudentsPage({ onEnroll }) {
     setNameSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')
   }
 
-  // 顯示順序：啟用中在前、已停用置底；點名稱欄位可切換升/降冪；query 套用於姓名/聯絡人/電話
+  // 顯示順序：啟用中在前、已停用置底；點名稱欄位可切換升/降冪；query 套用於姓名/學校/年級/聯絡人/電話
   const displayStudents = useMemo(() => {
     const q = query.trim().toLowerCase()
     const matches = q
       ? students.filter(s =>
           String(s.name || '').toLowerCase().includes(q) ||
+          String(s.school || '').toLowerCase().includes(q) ||
+          String(s.grade || '').toLowerCase().includes(q) ||
           String(s.contact_name || '').toLowerCase().includes(q) ||
           String(s.contact_phone || '').toLowerCase().includes(q)
         )
@@ -103,10 +109,12 @@ export default function StudentsPage({ onEnroll }) {
     try {
       await createStudent({
         name,
+        school:        newSchool.trim(),
+        grade:         newGrade.trim(),
         contact_name:  newContact.trim(),
         contact_phone: newPhone.trim(),
       })
-      setNewName(''); setNewContact(''); setNewPhone('')
+      setNewName(''); setNewSchool(''); setNewGrade(''); setNewContact(''); setNewPhone('')
     }
     catch { setError('新增失敗') }
     finally { setSaving(false) }
@@ -115,6 +123,8 @@ export default function StudentsPage({ onEnroll }) {
   function startEdit(s) {
     setEditId(s.id)
     setEditName(s.name)
+    setEditSchool(s.school || '')
+    setEditGrade(s.grade || '')
     setEditContact(s.contact_name || '')
     setEditPhone(s.contact_phone || '')
   }
@@ -126,6 +136,8 @@ export default function StudentsPage({ onEnroll }) {
     try {
       await updateStudent(id, {
         name,
+        school:        editSchool.trim(),
+        grade:         editGrade.trim(),
         contact_name:  editContact.trim(),
         contact_phone: editPhone.trim(),
       })
@@ -256,6 +268,18 @@ export default function StudentsPage({ onEnroll }) {
         />
         <input
           className="add-input"
+          placeholder="學校（選填）"
+          value={newSchool}
+          onChange={e => setNewSchool(e.target.value)}
+        />
+        <input
+          className="add-input"
+          placeholder="年級（選填）"
+          value={newGrade}
+          onChange={e => setNewGrade(e.target.value)}
+        />
+        <input
+          className="add-input"
           placeholder="聯絡人（選填）"
           value={newContact}
           onChange={e => setNewContact(e.target.value)}
@@ -276,7 +300,7 @@ export default function StudentsPage({ onEnroll }) {
           <input
             type="search"
             className="roster-search"
-            placeholder="搜尋姓名 / 聯絡人 / 電話…"
+            placeholder="搜尋姓名 / 學校 / 年級 / 聯絡人 / 電話…"
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
@@ -293,6 +317,8 @@ export default function StudentsPage({ onEnroll }) {
         <table className="entity-table">
           <colgroup>
             <col />
+            <col />
+            <col style={{ width: 80 }} />
             <col />
             <col />
             <col style={{ width: 260 }} />
@@ -313,6 +339,8 @@ export default function StudentsPage({ onEnroll }) {
                   </span>
                 </button>
               </th>
+              <th>學校</th>
+              <th>年級</th>
               <th>聯絡人</th>
               <th>聯絡電話</th>
               <th></th>
@@ -343,6 +371,30 @@ export default function StudentsPage({ onEnroll }) {
                           {!active && <span className="inactive-tag">已停用</span>}
                           <span className="expand-icon">{isExpanded ? '▼' : '▶'}</span>
                         </span>
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          className="inline-edit-input"
+                          placeholder="學校"
+                          value={editSchool}
+                          onChange={e => setEditSchool(e.target.value)}
+                        />
+                      ) : (
+                        s.school || <span style={{ color: 'var(--muted)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          className="inline-edit-input"
+                          placeholder="年級"
+                          value={editGrade}
+                          onChange={e => setEditGrade(e.target.value)}
+                        />
+                      ) : (
+                        s.grade || <span style={{ color: 'var(--muted)' }}>—</span>
                       )}
                     </td>
                     <td>
@@ -394,7 +446,7 @@ export default function StudentsPage({ onEnroll }) {
                   </tr>
                   {isExpanded && !isEditing && (
                     <tr className="expanded-row">
-                      <td colSpan={4}>
+                      <td colSpan={6}>
                         <div className="expanded-section">
                           <div className="expanded-label">已選課程</div>
                           {enrollInfo?.loading ? (

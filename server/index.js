@@ -95,12 +95,14 @@ app.get('/api/students', async (_req, res) => {
 app.post('/api/students', async (req, res) => {
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
+  const school       = typeof req.body?.school        === 'string' ? req.body.school.trim()        : ''
+  const grade        = typeof req.body?.grade         === 'string' ? req.body.grade.trim()         : ''
   const contactName  = typeof req.body?.contact_name  === 'string' ? req.body.contact_name.trim()  : ''
   const contactPhone = typeof req.body?.contact_phone === 'string' ? req.body.contact_phone.trim() : ''
   const id = genId('sr')
   try {
-    await insertStudent({ id, name, contactName, contactPhone })
-    res.status(201).json({ id, name, contact_name: contactName, contact_phone: contactPhone })
+    await insertStudent({ id, name, school, grade, contactName, contactPhone })
+    res.status(201).json({ id, name, school, grade, contact_name: contactName, contact_phone: contactPhone })
   }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
@@ -111,6 +113,12 @@ app.patch('/api/students/:id', async (req, res) => {
     const name = normalizeName(req.body.name)
     if (!name) return res.status(400).json({ error: 'name_required' })
     update.name = name
+  }
+  if (req.body?.school !== undefined) {
+    update.school = typeof req.body.school === 'string' ? req.body.school.trim() : ''
+  }
+  if (req.body?.grade !== undefined) {
+    update.grade = typeof req.body.grade === 'string' ? req.body.grade.trim() : ''
   }
   if (req.body?.contact_name !== undefined) {
     update.contactName = typeof req.body.contact_name === 'string' ? req.body.contact_name.trim() : ''
@@ -124,6 +132,8 @@ app.patch('/api/students/:id', async (req, res) => {
     if (!ok) return res.status(404).json({ error: 'not_found' })
     const out = { id: req.params.id }
     if (update.name         !== undefined) out.name          = update.name
+    if (update.school       !== undefined) out.school        = update.school
+    if (update.grade        !== undefined) out.grade         = update.grade
     if (update.contactName  !== undefined) out.contact_name  = update.contactName
     if (update.contactPhone !== undefined) out.contact_phone = update.contactPhone
     res.json(out)
@@ -595,13 +605,16 @@ app.post('/api/groups', async (req, res) => {
   if (isNaN(durationHours) || durationHours < 0 || durationHours > 24) return res.status(400).json({ error: 'invalid_duration_hours' })
   const teacherHourlyRate = req.body?.teacher_hourly_rate !== undefined ? parseFloat(req.body.teacher_hourly_rate) : 0
   if (isNaN(teacherHourlyRate) || teacherHourlyRate < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
+  const salaryType = req.body?.salary_type === 'monthly' ? 'monthly' : 'hourly'
+  const monthlySalary = req.body?.monthly_salary !== undefined ? parseFloat(req.body.monthly_salary) : 0
+  if (isNaN(monthlySalary) || monthlySalary < 0) return res.status(400).json({ error: 'invalid_monthly_salary' })
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const defaultTeacherId = req.body?.default_teacher_id != null && req.body.default_teacher_id !== ''
     ? String(req.body.default_teacher_id) : null
   const id = genId('gr')
   try {
-    await insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, note, defaultTeacherId })
-    res.status(201).json({ id, name, weekdays, duration_months: durationMonths, monthly_fee: monthlyFee, start_time: startTime, duration_hours: durationHours, teacher_hourly_rate: teacherHourlyRate, note, default_teacher_id: defaultTeacherId })
+    await insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId })
+    res.status(201).json({ id, name, weekdays, duration_months: durationMonths, monthly_fee: monthlyFee, start_time: startTime, duration_hours: durationHours, teacher_hourly_rate: teacherHourlyRate, salary_type: salaryType, monthly_salary: monthlySalary, note, default_teacher_id: defaultTeacherId })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
@@ -640,6 +653,17 @@ app.patch('/api/groups/:id', async (req, res) => {
     const thr = parseFloat(req.body.teacher_hourly_rate)
     if (isNaN(thr) || thr < 0) return res.status(400).json({ error: 'invalid_teacher_hourly_rate' })
     update.teacherHourlyRate = thr
+  }
+  if (req.body?.salary_type !== undefined) {
+    if (req.body.salary_type !== 'hourly' && req.body.salary_type !== 'monthly') {
+      return res.status(400).json({ error: 'invalid_salary_type' })
+    }
+    update.salaryType = req.body.salary_type
+  }
+  if (req.body?.monthly_salary !== undefined) {
+    const ms = parseFloat(req.body.monthly_salary)
+    if (isNaN(ms) || ms < 0) return res.status(400).json({ error: 'invalid_monthly_salary' })
+    update.monthlySalary = ms
   }
   if (req.body?.note !== undefined) {
     update.note = typeof req.body.note === 'string' ? req.body.note : ''

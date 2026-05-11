@@ -158,7 +158,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
   )
 }
 
-export default function AttendancePage() {
+export default function AttendancePage({ initialContext = null } = {}) {
   const { state: groupsState, loadGroups } = useGroups()
   const { state: studentsState, loadStudents } = useStudents()
   const { state: coursesState, loadCourses } = useCourses()
@@ -166,17 +166,17 @@ export default function AttendancePage() {
   const { teacher_id: ownTeacherId, is_admin: isAdmin } = useAuth()
 
   // 'group' = 團課點名； 'tutoring' = 家教課點名
-  const [mode, setMode] = useState('group')
+  const [mode, setMode] = useState(initialContext?.mode || 'group')
 
-  const [selectedGroup, setSelectedGroup] = useState('')
-  const [selectedDate, setSelectedDate]   = useState(todayStr)
+  const [selectedGroup, setSelectedGroup] = useState(initialContext?.mode === 'group' ? (initialContext.id || '') : '')
+  const [selectedDate, setSelectedDate]   = useState(initialContext?.date || todayStr)
   // 團課的老師、開始時間、時數（中間格子可編輯，預設帶該團課的設定）
   const [groupTeacher, setGroupTeacher]   = useState('')
   const [groupStart,   setGroupStart]     = useState('')
   const [groupHours,   setGroupHours]     = useState('')
 
   // 家教課專用
-  const [selectedCourse, setSelectedCourse]   = useState('')
+  const [selectedCourse, setSelectedCourse]   = useState(initialContext?.mode === 'tutoring' ? (initialContext.id || '') : '')
   const [selectedTeacher, setSelectedTeacher] = useState('')
   const [tutoringHours, setTutoringHours]     = useState('1')
   const [tutoringStart, setTutoringStart]     = useState('')
