@@ -186,6 +186,78 @@ export async function initAuthSchema() {
       await pool.query('UPDATE auth_users SET group_id = ? WHERE username = ?', [adminGroupId, DEFAULT_ADMIN_USER])
     }
   }
+
+  // ─── FEAT-012 Step 1: 多租戶 — auth_users / auth_groups 加 tenant_id ───
+  // initSchema() 已建好 tenants 表（含預設 id=1）；這裡只負責 auth 層。
+  // 此 step 不改 query 邏輯，僅讓 schema 帶 tenant 維度、既有資料 backfill = 1。
+  for (const tbl of ['auth_users', 'auth_groups']) {
+    const [cols] = await pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'tenant_id'`,
+      [tbl]
+    )
+    if (cols.length === 0) {
+      await pool.query(`ALTER TABLE ${tbl} ADD COLUMN tenant_id INT UNSIGNED NOT NULL DEFAULT 1`)
+      await pool.query(`UPDATE ${tbl} SET tenant_id = 1`)
+      await pool.query(`ALTER TABLE ${tbl} ADD INDEX idx_${tbl}_tenant (tenant_id)`)
+      await pool.query(
+        `ALTER TABLE ${tbl} ADD CONSTRAINT fk_${tbl}_tenant ` +
+        `FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE RESTRICT`
+      )
+    }
+  }
+
+  // auth_groups.name UNIQUE → (tenant_id, name) UNIQUE（不同 tenant 可同名群組）
+  const [agOldIdx] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_groups' AND INDEX_NAME = 'name'`
+  )
+  if (agOldIdx.length > 0) {
+    await pool.query('ALTER TABLE auth_groups DROP INDEX `name`')
+  }
+  const [agNewIdx] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_groups' AND INDEX_NAME = 'uk_auth_groups_tenant_name'`
+  )
+  if (agNewIdx.length === 0) {
+    await pool.query('ALTER TABLE auth_groups ADD UNIQUE KEY uk_auth_groups_tenant_name (tenant_id, name)')
+  }
+
+  // auth_users.username UNIQUE → (tenant_id, username) UNIQUE（不同 tenant 可同名帳號）
+  const [auOldIdx] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_users' AND INDEX_NAME = 'username'`
+  )
+  if (auOldIdx.length > 0) {
+    await pool.query('ALTER TABLE auth_users DROP INDEX `username`')
+  }
+  const [auNewIdx] = await pool.query(
+    `SELECT INDEX_NAME FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'auth_users' AND INDEX_NAME = 'uk_auth_users_tenant_username'`
+  )
+  if (auNewIdx.length === 0) {
+    await pool.query('ALTER TABLE auth_users ADD UNIQUE KEY uk_auth_users_tenant_username (tenant_id, username)')
+  }
+
+  // tenant_invites：邀請 token 表（骨架先就位，邏輯在後續 step 實作）
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tenant_invites (
+      token            VARCHAR(64)  NOT NULL PRIMARY KEY,
+      tenant_id        INT UNSIGNED NOT NULL,
+      group_id         VARCHAR(64)  NOT NULL,
+      created_by       VARCHAR(64)  NOT NULL,
+      expires_at       DATETIME     NOT NULL,
+      used_at          DATETIME     NULL DEFAULT NULL,
+      used_by_user_id  VARCHAR(64)  NULL DEFAULT NULL,
+      created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_tenant_invites_tenant (tenant_id),
+      INDEX idx_tenant_invites_expires (expires_at),
+      FOREIGN KEY (tenant_id)       REFERENCES tenants(id)     ON DELETE CASCADE,
+      FOREIGN KEY (group_id)        REFERENCES auth_groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (created_by)      REFERENCES auth_users(id)  ON DELETE CASCADE,
+      FOREIGN KEY (used_by_user_id) REFERENCES auth_users(id)  ON DELETE SET NULL
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
 }
 
 function hashPassword(password) {

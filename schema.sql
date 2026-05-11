@@ -15,6 +15,19 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
+-- ── 0. Tenants（多租戶主表，FEAT-012） ─────────────────────────────────────
+-- 所有領域表都帶 tenant_id 欄位指回此表；新環境預設建立 id=1「預設補習班」。
+-- 各領域表的 tenant_id 欄位、INDEX、FK 透過檔尾的 ALTER TABLE 區塊統一加上。
+DROP TABLE IF EXISTS `tenants`;
+CREATE TABLE `tenants` (
+  `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name`       VARCHAR(128) NOT NULL,
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+INSERT INTO `tenants` (`id`, `name`) VALUES (1, '預設補習班');
+
 -- ── 1. 學生 ─────────────────────────────────────────────────────────────────
 DROP TABLE IF EXISTS `students`;
 CREATE TABLE `students` (
@@ -292,5 +305,23 @@ CREATE TABLE `leave_requests` (
   CONSTRAINT `fk_leave_lesson`
     FOREIGN KEY (`lesson_record_id`) REFERENCES `lesson_records`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- ── 16. 多租戶欄位（FEAT-012 Step 1） ─────────────────────────────────────
+-- 每張領域表加 tenant_id 欄位（NOT NULL DEFAULT 1），INDEX 與 FK 指向 tenants。
+ALTER TABLE `students`         ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_students_tenant`         (`tenant_id`), ADD CONSTRAINT `fk_students_tenant`         FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `teachers`         ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_teachers_tenant`         (`tenant_id`), ADD CONSTRAINT `fk_teachers_tenant`         FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `courses`          ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_courses_tenant`          (`tenant_id`), ADD CONSTRAINT `fk_courses_tenant`          FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `lesson_records`   ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_lesson_records_tenant`   (`tenant_id`), ADD CONSTRAINT `fk_lesson_records_tenant`   FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `materials`        ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_materials_tenant`        (`tenant_id`), ADD CONSTRAINT `fk_materials_tenant`        FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `material_records` ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_material_records_tenant` (`tenant_id`), ADD CONSTRAINT `fk_material_records_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `groups`           ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_groups_tenant`           (`tenant_id`), ADD CONSTRAINT `fk_groups_tenant`           FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `group_members`    ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_group_members_tenant`    (`tenant_id`), ADD CONSTRAINT `fk_group_members_tenant`    FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `group_records`    ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_group_records_tenant`    (`tenant_id`), ADD CONSTRAINT `fk_group_records_tenant`    FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `misc_expenses`    ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_misc_expenses_tenant`    (`tenant_id`), ADD CONSTRAINT `fk_misc_expenses_tenant`    FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `student_courses`  ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_student_courses_tenant`  (`tenant_id`), ADD CONSTRAINT `fk_student_courses_tenant`  FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `period_locks`     ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_period_locks_tenant`     (`tenant_id`), ADD CONSTRAINT `fk_period_locks_tenant`     FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `share_tokens`     ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_share_tokens_tenant`     (`tenant_id`), ADD CONSTRAINT `fk_share_tokens_tenant`     FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `payment_records`  ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_payment_records_tenant`  (`tenant_id`), ADD CONSTRAINT `fk_payment_records_tenant`  FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
+ALTER TABLE `leave_requests`   ADD COLUMN `tenant_id` INT UNSIGNED NOT NULL DEFAULT 1, ADD INDEX `idx_leave_requests_tenant`   (`tenant_id`), ADD CONSTRAINT `fk_leave_requests_tenant`   FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON DELETE RESTRICT;
 
 SET FOREIGN_KEY_CHECKS = 1;

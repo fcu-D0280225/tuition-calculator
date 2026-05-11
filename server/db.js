@@ -629,6 +629,42 @@ export async function initSchema() {
       await pool.query(`ALTER TABLE \`${tbl}\` ADD INDEX idx_${tbl}_active (active)`)
     }
   }
+
+  // ─── FEAT-012 Step 1: 多租戶 schema 預備 ────────────────────────────────
+  // 新增 tenants 主表，並讓所有領域表帶 tenant_id（既有資料 backfill = 1）。
+  // 此 step 只動 schema 不動 query —— query filter 在後續 step 加上。
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tenants (
+      id          INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      name        VARCHAR(128) NOT NULL,
+      created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+  await pool.query("INSERT IGNORE INTO tenants (id, name) VALUES (1, '預設補習班')")
+
+  const tenantAwareTables = [
+    'students', 'teachers', 'courses', 'lesson_records',
+    'materials', 'material_records',
+    'groups', 'group_members', 'group_records',
+    'misc_expenses', 'student_courses',
+    'period_locks', 'share_tokens', 'payment_records', 'leave_requests',
+  ]
+  for (const tbl of tenantAwareTables) {
+    const [cols] = await pool.query(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'tenant_id'`,
+      [tbl]
+    )
+    if (cols.length === 0) {
+      await pool.query(`ALTER TABLE \`${tbl}\` ADD COLUMN tenant_id INT UNSIGNED NOT NULL DEFAULT 1`)
+      await pool.query(`UPDATE \`${tbl}\` SET tenant_id = 1`)
+      await pool.query(`ALTER TABLE \`${tbl}\` ADD INDEX idx_${tbl}_tenant (tenant_id)`)
+      await pool.query(
+        `ALTER TABLE \`${tbl}\` ADD CONSTRAINT fk_${tbl}_tenant ` +
+        `FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE RESTRICT`
+      )
+    }
+  }
 }
 
 // ── Leave Requests ───────────────────────────────────────────────────────────

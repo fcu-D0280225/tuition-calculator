@@ -16,10 +16,19 @@
 
 > 完整 DDL 請見專案根目錄的 [`schema.sql`](./schema.sql)。
 
+### 多租戶（FEAT-012）
+
+- `tenants` 為主表（INT UNSIGNED AUTO_INCREMENT），新環境預設建立 `id=1`「預設補習班」
+- 所有領域表（students / teachers / courses / ...）與 `auth_users` / `auth_groups` 均帶 `tenant_id INT UNSIGNED NOT NULL DEFAULT 1` 欄位、`idx_<table>_tenant` 索引與 `fk_<table>_tenant` FK（ON DELETE RESTRICT）
+- `auth_users.username` / `auth_groups.name` 的 UNIQUE 已改為 `(tenant_id, username)` / `(tenant_id, name)` 複合 UNIQUE
+- `tenant_invites` 表存放邀請 token（後續 step 啟用邏輯）
+- **Step 1 階段**：schema 已就緒、所有既有資料 backfill `tenant_id=1`，但 query 層尚未加 tenant filter，行為與單租戶等價
+
 ### Table 總覽
 
 | # | Table | 用途 |
 |---|-------|------|
+| 0 | `tenants` | 租戶主表 |
 | 1 | `students` | 學生（含聯絡人 / 軟停用） |
 | 2 | `teachers` | 教師（含電話 / 軟停用） |
 | 3 | `courses` | 家教課程（含時薪 / 老師時薪 / 折扣） |
@@ -35,6 +44,7 @@
 | 13 | `share_tokens` | 家長分享連結 token |
 | 14 | `payment_records` | 收款紀錄（每位學生每段期間最多一筆） |
 | 15 | `leave_requests` | 請假紀錄（可綁定具體 lesson） |
+| 16 | `tenant_invites` | 租戶邀請 token（FEAT-012 step 3 啟用） |
 
 ### 1. students
 | 欄位 | 型別 | 說明 |
