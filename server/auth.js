@@ -300,13 +300,13 @@ function buildSessionCookie(token, maxAgeSec) {
   return parts.join('; ')
 }
 
-async function findUserByUsername(username) {
+async function findUserByUsername(tenantId, username) {
   const [rows] = await pool.query(
     `SELECT u.id, u.username, u.password_hash, u.group_id, u.teacher_id, u.tenant_id, g.name AS group_name, g.is_admin
        FROM auth_users u
        LEFT JOIN auth_groups g ON g.id = u.group_id
-      WHERE u.username = ? LIMIT 1`,
-    [username]
+      WHERE u.tenant_id = ? AND u.username = ? LIMIT 1`,
+    [tenantId, username]
   )
   return rows[0] || null
 }
@@ -497,9 +497,10 @@ export function registerAuthRoutes(app) {
   app.post('/api/auth/login', async (req, res) => {
     const username = typeof req.body?.username === 'string' ? req.body.username.trim() : ''
     const password = typeof req.body?.password === 'string' ? req.body.password : ''
+    const tenantId = parseInt(req.body?.tenant_id, 10) || 1
     if (!username || !password) return res.status(400).json({ error: 'username_and_password_required' })
     try {
-      const user = await findUserByUsername(username)
+      const user = await findUserByUsername(tenantId, username)
       if (!user || !verifyPassword(password, user.password_hash)) {
         return res.status(401).json({ error: 'invalid_credentials' })
       }
@@ -729,7 +730,7 @@ export function registerAdminRoutes(app) {
     try {
       const group = await findGroupById(groupId)
       if (!group) return res.status(400).json({ error: 'invalid_group' })
-      const exists = await findUserByUsername(username)
+      const exists = await findUserByUsername(req.user.tenant_id || 1, username)
       if (exists) return res.status(409).json({ error: 'username_taken' })
       const id = `au_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
       await pool.query(

@@ -812,8 +812,8 @@ export async function setStudentEnrollment(tenantId, studentId, { courseIds, gro
     )
     if (cleaned.length) {
       await pool.query(
-        'INSERT INTO group_members (group_id, student_id) VALUES ?',
-        [cleaned.map(gid => [gid, studentId])]
+        'INSERT INTO group_members (group_id, student_id, tenant_id) VALUES ?',
+        [cleaned.map(gid => [gid, studentId, tenantId])]
       )
     }
 
@@ -1863,16 +1863,16 @@ export async function listGroupMembers(tenantId, groupId) {
 export async function setGroupMembers(tenantId, groupId, studentIds) {
   const cleaned = Array.from(new Set((studentIds || []).filter(Boolean)))
   const [existRows] = await pool.query(
-    'SELECT student_id FROM group_members WHERE group_id = ?',
-    [groupId]
+    'SELECT student_id FROM group_members WHERE group_id = ? AND tenant_id = ?',
+    [groupId, tenantId]
   )
   const existingSet = new Set(existRows.map(r => r.student_id))
   const newlyAdded = cleaned.filter(sid => !existingSet.has(sid))
 
-  await pool.query('DELETE FROM group_members WHERE group_id = ?', [groupId])
+  await pool.query('DELETE FROM group_members WHERE group_id = ? AND tenant_id = ?', [groupId, tenantId])
   if (cleaned.length) {
-    const values = cleaned.map(sid => [groupId, sid])
-    await pool.query('INSERT INTO group_members (group_id, student_id) VALUES ?', [values])
+    const values = cleaned.map(sid => [groupId, sid, tenantId])
+    await pool.query('INSERT INTO group_members (group_id, student_id, tenant_id) VALUES ?', [values])
   }
 
   for (const sid of newlyAdded) {
