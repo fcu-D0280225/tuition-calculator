@@ -610,9 +610,11 @@ export function registerAuthRoutes(app) {
       // 用 FOR UPDATE 鎖住 token row，防止 race condition
       const [invRows] = await conn.query(
         `SELECT i.token, i.tenant_id, i.group_id, i.expires_at, i.used_at,
-                g.is_admin AS group_is_admin
+                g.is_admin AS group_is_admin,
+                t.name AS tenant_name
            FROM tenant_invites i
            JOIN auth_groups g ON g.id = i.group_id
+           JOIN tenants     t ON t.id = i.tenant_id
           WHERE i.token = ? LIMIT 1 FOR UPDATE`,
         [token]
       )
@@ -681,6 +683,7 @@ export function registerAuthRoutes(app) {
         is_admin: !!grp?.is_admin,
         teacher_id: null,
         tenant_id: inv.tenant_id,
+        tenant_name: inv.tenant_name || null,
         permissions: perms,
       })
     } catch (e) {
