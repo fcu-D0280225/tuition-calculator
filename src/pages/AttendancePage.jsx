@@ -18,6 +18,19 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
 
+// 規則同課表：未來日期 / 當日尚未到 start_time / 當日無 start_time 都視為「尚未開始」
+function isLessonStarted(dateStr, startTime) {
+  if (!dateStr) return false
+  const now = new Date()
+  const today = todayStr()
+  if (dateStr < today) return true
+  if (dateStr > today) return false
+  if (!startTime) return false
+  const [h, m] = String(startTime).split(':').map(n => parseInt(n, 10))
+  if (isNaN(h) || isNaN(m)) return false
+  return now.getHours() * 60 + now.getMinutes() >= h * 60 + m
+}
+
 function buildLineMessage(groupName, date, studentNames, startTime = '') {
   const d = new Date(date + 'T00:00:00')
   const weekdays = ['日', '一', '二', '三', '四', '五', '六']
@@ -51,6 +64,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
   const roster = allStudents.filter(s => rosterIds.includes(s.id))
   const presentCount = roster.filter(s => checked.has(s.id)).length
   const allChecked = roster.length > 0 && roster.every(s => checked.has(s.id))
+  const started = isLessonStarted(selectedDate, startTime)
 
   function toggleAll() {
     setChecked(prev => {
@@ -69,6 +83,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
   }
 
   async function save() {
+    if (!started) { setErr('該堂課尚未開始，無法點名'); return }
     setSaving(true); setErr(''); setOkMsg('')
     const h = parseFloat(hours)
     if (isNaN(h) || h <= 0) { setErr('請輸入有效時數'); setSaving(false); return }
@@ -116,13 +131,19 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
         </div>
       </div>
 
+      {!started && (
+        <div className="empty-hint" style={{ marginBottom: 8, color: 'var(--muted)' }}>
+          該堂尚未開始，無法點名（請先確認日期與開始時間）。請假可照常操作。
+        </div>
+      )}
+
       {/* 點名清單 */}
       {roster.length === 0 ? (
         <div className="empty-hint">本堂無學生</div>
       ) : (
         <div className="attendance-list">
           <label className="attendance-item attendance-item-all">
-            <input type="checkbox" checked={allChecked} onChange={toggleAll} />
+            <input type="checkbox" checked={allChecked} onChange={toggleAll} disabled={!started} />
             <span>全選</span>
           </label>
           {roster.map(s => {
@@ -133,7 +154,7 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
                 key={s.id}
                 className={`attendance-item${checked.has(s.id) ? ' attendance-item--checked' : ''}${onLeave ? ' attendance-item--leave' : ''}`}
               >
-                <input type="checkbox" checked={checked.has(s.id)} disabled={onLeave} onChange={() => toggleOne(s.id)} />
+                <input type="checkbox" checked={checked.has(s.id)} disabled={onLeave || !started} onChange={() => toggleOne(s.id)} />
                 <span className="attendance-name">
                   {s.name}
                   {onLeave && <span className="leave-tag" style={{ marginLeft: 6 }}>請假</span>}
@@ -151,7 +172,14 @@ function TutoringSessionCard({ session, allStudents, teachers, leaveMap, leaveBu
 
       {err && <div className="error-msg">{err}</div>}
       {okMsg && <div className="success-msg" style={{ marginTop: 8 }}>{okMsg}</div>}
-      <button className="btn-primary" type="button" onClick={save} disabled={saving} style={{ marginTop: 12 }}>
+      <button
+        className="btn-primary"
+        type="button"
+        onClick={save}
+        disabled={saving || !started}
+        title={!started ? '該堂尚未開始，無法點名' : undefined}
+        style={{ marginTop: 12 }}
+      >
         {saving ? '儲存中…' : '儲存點名'}
       </button>
     </div>
@@ -441,6 +469,10 @@ export default function AttendancePage({ initialContext = null } = {}) {
   }
 
   async function handleSave() {
+    if (mode === 'group' && !isLessonStarted(selectedDate, groupStart)) {
+      setError('該堂課尚未開始，無法點名')
+      return
+    }
     setSaving(true)
     setError('')
     setSuccessMsg('')
@@ -684,7 +716,9 @@ export default function AttendancePage({ initialContext = null } = {}) {
       )}
 
       {/* 團課點名表（單一 session） */}
-      {!fetching && loaded && dateMatchesGroup && mode === 'group' && (
+      {!fetching && loaded && dateMatchesGroup && mode === 'group' && (() => {
+        const groupStarted = isLessonStarted(selectedDate, groupStart)
+        return (
         <div className="lesson-form-card">
           <div className="form-section-title attendance-header-row">
             <span>{headerLabel}・{selectedDate}{startTimeLabel ? `・${startTimeLabel}` : ''}</span>
@@ -698,6 +732,11 @@ export default function AttendancePage({ initialContext = null } = {}) {
             <div className="empty-hint">尚未新增任何學生</div>
           ) : (
             <>
+              {!groupStarted && (
+                <div className="empty-hint" style={{ textAlign: 'left', padding: '8px 0', color: 'var(--muted)' }}>
+                  該堂課尚未開始，無法點名（請先確認日期與開始時間）。
+                </div>
+              )}
               <div className="attendance-section-label attendance-roster-header">
                 <span>應到名單（{rosterCount} 人）</span>
               </div>
@@ -707,26 +746,34 @@ export default function AttendancePage({ initialContext = null } = {}) {
               ) : (
                 <div className="attendance-list">
                   <label className="attendance-item attendance-item-all">
-                    <input type="checkbox" checked={rosterAllChecked} onChange={handleToggleAllRoster} />
+                    <input type="checkbox" checked={rosterAllChecked} onChange={handleToggleAllRoster} disabled={!groupStarted} />
                     <span>全選應到</span>
                   </label>
                   {rosterStudents.map(s => (
                     <div key={s.id}
                       className={`attendance-item${checked.has(s.id) ? ' attendance-item--checked' : ''}`}>
-                      <input type="checkbox" checked={checked.has(s.id)} onChange={() => toggleStudent(s.id)} />
+                      <input type="checkbox" checked={checked.has(s.id)} disabled={!groupStarted} onChange={() => toggleStudent(s.id)} />
                       <span className="attendance-name">{s.name}</span>
                     </div>
                   ))}
                 </div>
               )}
 
-              <button className="btn-primary" type="button" onClick={handleSave} disabled={saving} style={{ marginTop: 16 }}>
+              <button
+                className="btn-primary"
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !groupStarted}
+                title={!groupStarted ? '該堂尚未開始，無法點名' : undefined}
+                style={{ marginTop: 16 }}
+              >
                 {saving ? '儲存中…' : '儲存點名'}
               </button>
             </>
           )}
         </div>
-      )}
+        )
+      })()}
 
       {/* 家教課點名表（每堂分卡） */}
       {!fetching && loaded && mode === 'tutoring' && (
