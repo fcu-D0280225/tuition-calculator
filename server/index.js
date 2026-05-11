@@ -87,12 +87,14 @@ registerAdminRoutes(app)
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
-app.get('/api/students', async (_req, res) => {
-  try { res.json(await listStudents()) }
+app.get('/api/students', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listStudents(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/students', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
   const school       = typeof req.body?.school        === 'string' ? req.body.school.trim()        : ''
@@ -101,13 +103,14 @@ app.post('/api/students', async (req, res) => {
   const contactPhone = typeof req.body?.contact_phone === 'string' ? req.body.contact_phone.trim() : ''
   const id = genId('sr')
   try {
-    await insertStudent({ id, name, school, grade, contactName, contactPhone })
+    await insertStudent(tenantId, { id, name, school, grade, contactName, contactPhone })
     res.status(201).json({ id, name, school, grade, contact_name: contactName, contact_phone: contactPhone })
   }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/students/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const update = {}
   if (req.body?.name !== undefined) {
     const name = normalizeName(req.body.name)
@@ -128,7 +131,7 @@ app.patch('/api/students/:id', async (req, res) => {
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
-    const ok = await updateStudent(req.params.id, update)
+    const ok = await updateStudent(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     const out = { id: req.params.id }
     if (update.name         !== undefined) out.name          = update.name
@@ -141,59 +144,67 @@ app.patch('/api/students/:id', async (req, res) => {
 })
 
 app.put('/api/students/:id/active', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   if (typeof req.body?.active !== 'boolean') return res.status(400).json({ error: 'active_required' })
   try {
-    const ok = await setStudentActive(req.params.id, req.body.active)
+    const ok = await setStudentActive(tenantId, req.params.id, req.body.active)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, active: req.body.active })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/students/:id/courses', async (req, res) => {
-  try { res.json(await listStudentCourses(req.params.id)) }
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listStudentCourses(tenantId, req.params.id)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/students/:id/enrollment', async (req, res) => {
-  try { res.json(await getStudentEnrollment(req.params.id)) }
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await getStudentEnrollment(tenantId, req.params.id)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/students/:id/enrollment', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { course_ids, group_ids } = req.body || {}
   if (course_ids !== undefined && !Array.isArray(course_ids)) return res.status(400).json({ error: 'invalid_course_ids' })
   if (group_ids  !== undefined && !Array.isArray(group_ids))  return res.status(400).json({ error: 'invalid_group_ids' })
   try {
-    await setStudentEnrollment(req.params.id, { courseIds: course_ids, groupIds: group_ids })
-    res.json(await getStudentEnrollment(req.params.id))
+    await setStudentEnrollment(tenantId, req.params.id, { courseIds: course_ids, groupIds: group_ids })
+    res.json(await getStudentEnrollment(tenantId, req.params.id))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
-app.get('/api/enrollments', async (_req, res) => {
-  try { res.json(await listAllEnrollments()) }
+app.get('/api/enrollments', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listAllEnrollments(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 
 // ── Teachers ──────────────────────────────────────────────────────────────────
 
-app.get('/api/teachers', async (_req, res) => {
-  try { res.json(await listTeachers()) }
+app.get('/api/teachers', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listTeachers(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/teachers', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
   const contactPhone = typeof req.body?.contact_phone === 'string' ? req.body.contact_phone.trim() : ''
   const id = genId('tr')
   try {
-    await insertTeacher({ id, name, contactPhone })
+    await insertTeacher(tenantId, { id, name, contactPhone })
     res.status(201).json({ id, name, contact_phone: contactPhone })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/teachers/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const update = {}
   if (req.body?.name !== undefined) {
     const name = normalizeName(req.body.name)
@@ -205,44 +216,49 @@ app.patch('/api/teachers/:id', async (req, res) => {
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
-    const ok = await updateTeacher(req.params.id, update)
+    const ok = await updateTeacher(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...update })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/teachers/:id/courses', async (req, res) => {
-  try { res.json(await listTeacherCourses(req.params.id)) }
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listTeacherCourses(tenantId, req.params.id)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/teachers/:id/active', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   if (typeof req.body?.active !== 'boolean') return res.status(400).json({ error: 'active_required' })
   try {
-    const ok = await setTeacherActive(req.params.id, req.body.active)
+    const ok = await setTeacherActive(tenantId, req.params.id, req.body.active)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, active: req.body.active })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/teachers/reorder', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
   if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
   try {
-    await reorderTeachers(ids)
-    res.json(await listTeachers())
+    await reorderTeachers(tenantId, ids)
+    res.json(await listTeachers(tenantId))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 
 // ── Courses ───────────────────────────────────────────────────────────────────
 
-app.get('/api/courses', async (_req, res) => {
-  try { res.json(await listCourses()) }
+app.get('/api/courses', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listCourses(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/courses', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
   const hourlyRate = req.body?.hourly_rate !== undefined ? parseFloat(req.body.hourly_rate) : 0
@@ -260,13 +276,14 @@ app.post('/api/courses', async (req, res) => {
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const id = genId('cr')
   try {
-    await insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note })
+    await insertCourse(tenantId, { id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note })
     res.status(201).json({ id, name, hourly_rate: hourlyRate, teacher_hourly_rate: teacherHourlyRate, discount_per_student: discountPerStudent, default_teacher_id: defaultTeacherId, duration_hours: durationHours, note })
   }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/courses/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const update = {}
   if (req.body?.name !== undefined) {
     const name = normalizeName(req.body.name)
@@ -302,37 +319,41 @@ app.patch('/api/courses/:id', async (req, res) => {
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
-    const ok = await updateCourse(req.params.id, update)
+    const ok = await updateCourse(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...req.body })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/courses/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deleteCourse(req.params.id)
+    const ok = await deleteCourse(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/courses/reorder', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
   if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
   try {
-    await reorderCourses(ids)
-    res.json(await listCourses())
+    await reorderCourses(tenantId, ids)
+    res.json(await listCourses(tenantId))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Period Locks ──────────────────────────────────────────────────────────────
 
-app.get('/api/period-locks', async (_req, res) => {
-  try { res.json(await listPeriodLocks()) }
+app.get('/api/period-locks', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listPeriodLocks(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/period-locks', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const period_from = req.body?.period_from
   const period_to   = req.body?.period_to
   if (!period_from || !/^\d{4}-\d{2}-\d{2}$/.test(period_from)) return res.status(400).json({ error: 'invalid_period_from' })
@@ -341,14 +362,15 @@ app.post('/api/period-locks', async (req, res) => {
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const id = `lock_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   try {
-    await insertPeriodLock({ id, periodFrom: period_from, periodTo: period_to, note })
+    await insertPeriodLock(tenantId, { id, periodFrom: period_from, periodTo: period_to, note })
     res.status(201).json({ id, period_from, period_to, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/period-locks/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deletePeriodLock(req.params.id)
+    const ok = await deletePeriodLock(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -357,18 +379,21 @@ app.delete('/api/period-locks/:id', async (req, res) => {
 // ── Misc Expenses ─────────────────────────────────────────────────────────────
 
 app.get('/api/misc-expenses', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to, category } = req.query
-  try { res.json(await listMiscExpenses({ from, to, category })) }
+  try { res.json(await listMiscExpenses(tenantId, { from, to, category })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/misc-expenses/summary', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
-  try { res.json(await sumMiscExpensesByCategory({ from, to })) }
+  try { res.json(await sumMiscExpensesByCategory(tenantId, { from, to })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/misc-expenses', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
   if (!name) return res.status(400).json({ error: 'name_required' })
   const amount = parseFloat(req.body?.amount)
@@ -379,12 +404,13 @@ app.post('/api/misc-expenses', async (req, res) => {
   const category = typeof req.body?.category === 'string' && req.body.category.trim() ? req.body.category.trim() : '其他'
   const id = `me_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   try {
-    await insertMiscExpense({ id, name, category, amount, expenseDate: expense_date, note })
+    await insertMiscExpense(tenantId, { id, name, category, amount, expenseDate: expense_date, note })
     res.status(201).json({ id, name, category, amount, expense_date, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/misc-expenses/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
   if (!name) return res.status(400).json({ error: 'name_required' })
   const amount = parseFloat(req.body?.amount)
@@ -394,15 +420,16 @@ app.put('/api/misc-expenses/:id', async (req, res) => {
   const note = typeof req.body?.note === 'string' ? req.body.note : ''
   const category = typeof req.body?.category === 'string' && req.body.category.trim() ? req.body.category.trim() : '其他'
   try {
-    const ok = await updateMiscExpense(req.params.id, { name, category, amount, expenseDate: expense_date, note })
+    const ok = await updateMiscExpense(tenantId, req.params.id, { name, category, amount, expenseDate: expense_date, note })
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, name, category, amount, expense_date, note })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/misc-expenses/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deleteMiscExpense(req.params.id)
+    const ok = await deleteMiscExpense(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -411,16 +438,18 @@ app.delete('/api/misc-expenses/:id', async (req, res) => {
 // ── Lesson Records ────────────────────────────────────────────────────────────
 
 app.get('/api/lessons', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to, student_id, teacher_id, course_id } = req.query
   // 老師帳號（非 admin 且綁了 teacher_id）：強制只看自己的課
   const enforcedTeacherId = (!req.user?.is_admin && req.user?.teacher_id) ? req.user.teacher_id : teacher_id
   try {
-    const rows = await listLessons({ from, to, studentId: student_id, teacherId: enforcedTeacherId, courseId: course_id })
+    const rows = await listLessons(tenantId, { from, to, studentId: student_id, teacherId: enforcedTeacherId, courseId: course_id })
     res.json(rows)
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/lessons', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status, from_enroll_batch } = req.body || {}
   if (!student_id || !course_id) return res.status(400).json({ error: 'student_id_course_id_required' })
   const teacherId = (teacher_id === undefined || teacher_id === null || teacher_id === '') ? null : String(teacher_id)
@@ -432,21 +461,22 @@ app.post('/api/lessons', async (req, res) => {
   const parsedTeacherPrice = (teacher_unit_price === undefined || teacher_unit_price === null || teacher_unit_price === '') ? null : parseFloat(teacher_unit_price)
   if (parsedTeacherPrice !== null && (isNaN(parsedTeacherPrice) || parsedTeacherPrice < 0)) return res.status(400).json({ error: 'invalid_teacher_unit_price' })
   const cleanStart = start_time && /^\d{2}:\d{2}(:\d{2})?$/.test(start_time) ? start_time : null
-  if (await isDateLocked(lesson_date)) return res.status(423).json({ error: 'period_locked' })
+  if (await isDateLocked(tenantId, lesson_date)) return res.status(423).json({ error: 'period_locked' })
   if (!req.body?.force) {
-    const dups = await findDuplicateLesson({ studentId: student_id, courseId: course_id, lessonDate: lesson_date })
+    const dups = await findDuplicateLesson(tenantId, { studentId: student_id, courseId: course_id, lessonDate: lesson_date })
     if (dups.length > 0) {
       return res.status(409).json({ error: 'duplicate_lesson', existing: dups })
     }
   }
   const id = genId('lr')
   try {
-    await insertLesson({ id, studentId: student_id, courseId: course_id, teacherId, hours: parsedHours, lessonDate: lesson_date, startTime: cleanStart, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note, status, fromEnrollBatch: !!from_enroll_batch })
+    await insertLesson(tenantId, { id, studentId: student_id, courseId: course_id, teacherId, hours: parsedHours, lessonDate: lesson_date, startTime: cleanStart, unitPrice: parsedPrice, teacherUnitPrice: parsedTeacherPrice, note, status, fromEnrollBatch: !!from_enroll_batch })
     res.status(201).json({ id, student_id, course_id, teacher_id: teacherId, hours: parsedHours, lesson_date, start_time: cleanStart, unit_price: parsedPrice, teacher_unit_price: parsedTeacherPrice, note: note || '', status: status || 'pending', from_enroll_batch: !!from_enroll_batch })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/lessons/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status } = req.body || {}
   const update = {}
   if (student_id        !== undefined) update.studentId        = student_id
@@ -460,18 +490,19 @@ app.patch('/api/lessons/:id', async (req, res) => {
   if (note              !== undefined) update.note             = note
   if (status            !== undefined) update.status           = status
   try {
-    if (await isLessonLocked(req.params.id)) return res.status(423).json({ error: 'period_locked' })
-    if (update.lessonDate && await isDateLocked(update.lessonDate)) return res.status(423).json({ error: 'period_locked' })
-    const ok = await updateLesson(req.params.id, update)
+    if (await isLessonLocked(tenantId, req.params.id)) return res.status(423).json({ error: 'period_locked' })
+    if (update.lessonDate && await isDateLocked(tenantId, update.lessonDate)) return res.status(423).json({ error: 'period_locked' })
+    const ok = await updateLesson(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...req.body })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/lessons/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    if (await isLessonLocked(req.params.id)) return res.status(423).json({ error: 'period_locked' })
-    const ok = await deleteLesson(req.params.id)
+    if (await isLessonLocked(tenantId, req.params.id)) return res.status(423).json({ error: 'period_locked' })
+    const ok = await deleteLesson(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -479,22 +510,25 @@ app.delete('/api/lessons/:id', async (req, res) => {
 
 // ── Materials ─────────────────────────────────────────────────────────────────
 
-app.get('/api/materials', async (_req, res) => {
-  try { res.json(await listMaterials()) }
+app.get('/api/materials', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listMaterials(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/materials', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
   const unitPrice = req.body?.unit_price !== undefined ? parseFloat(req.body.unit_price) : 0
   if (isNaN(unitPrice) || unitPrice < 0) return res.status(400).json({ error: 'invalid_unit_price' })
   const id = genId('mat')
-  try { await insertMaterial({ id, name, unitPrice }); res.status(201).json({ id, name, unit_price: unitPrice }) }
+  try { await insertMaterial(tenantId, { id, name, unitPrice }); res.status(201).json({ id, name, unit_price: unitPrice }) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/materials/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const update = {}
   if (req.body?.name !== undefined) {
     const name = normalizeName(req.body.name)
@@ -508,15 +542,16 @@ app.patch('/api/materials/:id', async (req, res) => {
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
-    const ok = await updateMaterial(req.params.id, update)
+    const ok = await updateMaterial(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...req.body })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/materials/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deleteMaterial(req.params.id)
+    const ok = await deleteMaterial(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -525,12 +560,14 @@ app.delete('/api/materials/:id', async (req, res) => {
 // ── Material Records ──────────────────────────────────────────────────────────
 
 app.get('/api/material-records', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to, student_id } = req.query
-  try { res.json(await listMaterialRecords({ from, to, studentId: student_id })) }
+  try { res.json(await listMaterialRecords(tenantId, { from, to, studentId: student_id })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/material-records', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { student_id, material_id, quantity, record_date, note } = req.body || {}
   if (!student_id || !material_id) return res.status(400).json({ error: 'student_id_and_material_id_required' })
   const qty = quantity !== undefined ? parseFloat(quantity) : 1
@@ -538,12 +575,13 @@ app.post('/api/material-records', async (req, res) => {
   if (!record_date || !/^\d{4}-\d{2}-\d{2}$/.test(record_date)) return res.status(400).json({ error: 'invalid_record_date' })
   const id = genId('mr')
   try {
-    await insertMaterialRecord({ id, studentId: student_id, materialId: material_id, quantity: qty, recordDate: record_date, note })
+    await insertMaterialRecord(tenantId, { id, studentId: student_id, materialId: material_id, quantity: qty, recordDate: record_date, note })
     res.status(201).json({ id, student_id, material_id, quantity: qty, record_date, note: note || '' })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/material-records/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { student_id, material_id, quantity, record_date, note } = req.body || {}
   const update = {}
   if (student_id  !== undefined) update.studentId  = student_id
@@ -552,15 +590,16 @@ app.patch('/api/material-records/:id', async (req, res) => {
   if (record_date !== undefined) update.recordDate = record_date
   if (note        !== undefined) update.note       = note
   try {
-    const ok = await updateMaterialRecord(req.params.id, update)
+    const ok = await updateMaterialRecord(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...req.body })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/material-records/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deleteMaterialRecord(req.params.id)
+    const ok = await deleteMaterialRecord(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -586,12 +625,14 @@ function normalizeWeekdays(raw) {
   return cleaned.join(',')
 }
 
-app.get('/api/groups', async (_req, res) => {
-  try { res.json(await listGroups()) }
+app.get('/api/groups', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listGroups(tenantId)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/groups', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const name = normalizeName(req.body?.name)
   if (!name) return res.status(400).json({ error: 'name_required' })
   const weekdays = normalizeWeekdays(req.body?.weekdays)
@@ -613,12 +654,13 @@ app.post('/api/groups', async (req, res) => {
     ? String(req.body.default_teacher_id) : null
   const id = genId('gr')
   try {
-    await insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId })
+    await insertGroup(tenantId, { id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId })
     res.status(201).json({ id, name, weekdays, duration_months: durationMonths, monthly_fee: monthlyFee, start_time: startTime, duration_hours: durationHours, teacher_hourly_rate: teacherHourlyRate, salary_type: salaryType, monthly_salary: monthlySalary, note, default_teacher_id: defaultTeacherId })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/groups/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const update = {}
   if (req.body?.name !== undefined) {
     const name = normalizeName(req.body.name)
@@ -674,52 +716,57 @@ app.patch('/api/groups/:id', async (req, res) => {
   }
   if (!Object.keys(update).length) return res.status(400).json({ error: 'nothing_to_update' })
   try {
-    const ok = await updateGroup(req.params.id, update)
+    const ok = await updateGroup(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...update })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/groups/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deleteGroup(req.params.id)
+    const ok = await deleteGroup(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/groups/reorder', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const ids = Array.isArray(req.body?.ids) ? req.body.ids : null
   if (ids === null || ids.some(id => typeof id !== 'string')) return res.status(400).json({ error: 'ids_required' })
   try {
-    await reorderGroups(ids)
-    res.json(await listGroups())
+    await reorderGroups(tenantId, ids)
+    res.json(await listGroups(tenantId))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Group Records ─────────────────────────────────────────────────────────────
 
 app.get('/api/group-records', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to, group_id, student_id, teacher_id } = req.query
   const enforcedTeacherId = (!req.user?.is_admin && req.user?.teacher_id) ? req.user.teacher_id : teacher_id
-  try { res.json(await listGroupRecords({ from, to, groupId: group_id, studentId: student_id, teacherId: enforcedTeacherId })) }
+  try { res.json(await listGroupRecords(tenantId, { from, to, groupId: group_id, studentId: student_id, teacherId: enforcedTeacherId })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/group-records', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { group_id, student_id, teacher_id, record_date, note, status } = req.body || {}
   if (!group_id || !student_id) return res.status(400).json({ error: 'group_id_and_student_id_required' })
   if (!record_date || !/^\d{4}-\d{2}-\d{2}$/.test(record_date)) return res.status(400).json({ error: 'invalid_record_date' })
   const teacherId = teacher_id ? String(teacher_id) : null
-  if (await isDateLocked(record_date)) return res.status(423).json({ error: 'period_locked' })
+  if (await isDateLocked(tenantId, record_date)) return res.status(423).json({ error: 'period_locked' })
   const id = genId('grr')
   try {
-    await insertGroupRecord({ id, groupId: group_id, studentId: student_id, teacherId, recordDate: record_date, note, status })
+    await insertGroupRecord(tenantId, { id, groupId: group_id, studentId: student_id, teacherId, recordDate: record_date, note, status })
     res.status(201).json({ id, group_id, student_id, teacher_id: teacherId, record_date, note: note || '', status: status || 'pending' })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.patch('/api/group-records/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { group_id, student_id, teacher_id, record_date, note, status } = req.body || {}
   const update = {}
   if (group_id    !== undefined) update.groupId    = group_id
@@ -729,18 +776,19 @@ app.patch('/api/group-records/:id', async (req, res) => {
   if (note        !== undefined) update.note       = note
   if (status      !== undefined) update.status     = status
   try {
-    if (await isGroupRecordLocked(req.params.id)) return res.status(423).json({ error: 'period_locked' })
-    if (update.recordDate && await isDateLocked(update.recordDate)) return res.status(423).json({ error: 'period_locked' })
-    const ok = await updateGroupRecord(req.params.id, update)
+    if (await isGroupRecordLocked(tenantId, req.params.id)) return res.status(423).json({ error: 'period_locked' })
+    if (update.recordDate && await isDateLocked(tenantId, update.recordDate)) return res.status(423).json({ error: 'period_locked' })
+    const ok = await updateGroupRecord(tenantId, req.params.id, update)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.json({ id: req.params.id, ...req.body })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.delete('/api/group-records/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    if (await isGroupRecordLocked(req.params.id)) return res.status(423).json({ error: 'period_locked' })
-    const ok = await deleteGroupRecord(req.params.id)
+    if (await isGroupRecordLocked(tenantId, req.params.id)) return res.status(423).json({ error: 'period_locked' })
+    const ok = await deleteGroupRecord(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -749,28 +797,32 @@ app.delete('/api/group-records/:id', async (req, res) => {
 // ── Group Members（應到名單） ─────────────────────────────────────────────────
 
 app.get('/api/groups/:id/members', async (req, res) => {
-  try { res.json(await listGroupMembers(req.params.id)) }
+  const tenantId = req.user?.tenant_id || 1
+  try { res.json(await listGroupMembers(tenantId, req.params.id)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.put('/api/groups/:id/members', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const ids = Array.isArray(req.body?.student_ids) ? req.body.student_ids : null
   if (ids === null) return res.status(400).json({ error: 'student_ids_required' })
   try {
-    await setGroupMembers(req.params.id, ids)
-    res.json(await listGroupMembers(req.params.id))
+    await setGroupMembers(tenantId, req.params.id, ids)
+    res.json(await listGroupMembers(tenantId, req.params.id))
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Payment Records ───────────────────────────────────────────────────────────
 
 app.get('/api/payment-records', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
-  try { res.json(await listPaymentRecords({ from, to })) }
+  try { res.json(await listPaymentRecords(tenantId, { from, to })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/payment-records', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { student_id, period_from, period_to, note } = req.body || {}
   if (!student_id) return res.status(400).json({ error: 'student_id_required' })
   if (!period_from || !DATE_RE.test(period_from)) return res.status(400).json({ error: 'invalid_period_from' })
@@ -778,7 +830,7 @@ app.post('/api/payment-records', async (req, res) => {
   if (period_from > period_to) return res.status(400).json({ error: 'period_from_after_to' })
   const id = genId('pay')
   try {
-    await insertPaymentRecord({ id, studentId: student_id, periodFrom: period_from, periodTo: period_to, note })
+    await insertPaymentRecord(tenantId, { id, studentId: student_id, periodFrom: period_from, periodTo: period_to, note })
     const paid_at = new Date().toISOString().slice(0, 19).replace('T', ' ')
     res.status(201).json({ id, student_id, period_from, period_to, paid_at, note: note || '' })
   } catch (e) {
@@ -788,8 +840,9 @@ app.post('/api/payment-records', async (req, res) => {
 })
 
 app.delete('/api/payment-records/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deletePaymentRecord(req.params.id)
+    const ok = await deletePaymentRecord(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -798,28 +851,31 @@ app.delete('/api/payment-records/:id', async (req, res) => {
 // ── Settlement ────────────────────────────────────────────────────────────────
 
 app.get('/api/settlement/tuition', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
-  try { res.json(await settlementTuition(from, to)) }
+  try { res.json(await settlementTuition(tenantId, from, to)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/settlement/salary', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
-  try { res.json(await settlementSalary(from, to)) }
+  try { res.json(await settlementSalary(tenantId, from, to)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/settlement/profit-loss', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   try {
     const [tuition, salary, expensesByCat, materialCost] = await Promise.all([
-      settlementTuition(from, to),
-      settlementSalary(from, to),
-      sumMiscExpensesByCategory({ from, to }),
-      sumMaterialCost({ from, to }),
+      settlementTuition(tenantId, from, to),
+      settlementSalary(tenantId, from, to),
+      sumMiscExpensesByCategory(tenantId, { from, to }),
+      sumMaterialCost(tenantId, { from, to }),
     ])
     const tuitionTotal = (tuition || []).reduce((s, st) => s + parseFloat(st.total || 0), 0)
     const salaryTotal  = (salary  || []).reduce((s, t)  => s + parseFloat(t.total  || 0), 0)
@@ -841,32 +897,36 @@ app.get('/api/settlement/profit-loss', async (req, res) => {
 // ── Stats ────────────────────────────────────────────────────────────────────
 
 app.get('/api/stats/reschedule', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   if (!DATE_RE.test(from) || !DATE_RE.test(to)) return res.status(400).json({ error: 'invalid_date' })
-  try { res.json(await statsReschedule(from, to)) }
+  try { res.json(await statsReschedule(tenantId, from, to)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.get('/api/students/:id/stats', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
   if (!from || !to) return res.status(400).json({ error: 'from_and_to_required' })
   if (!DATE_RE.test(from) || !DATE_RE.test(to)) return res.status(400).json({ error: 'invalid_date' })
-  try { res.json(await statsReschedule(from, to, req.params.id)) }
+  try { res.json(await statsReschedule(tenantId, from, to, req.params.id)) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 // ── Leave Requests ────────────────────────────────────────────────────────────
 
 app.get('/api/students/:id/leave-requests', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to } = req.query
   if (from && !DATE_RE.test(from)) return res.status(400).json({ error: 'invalid_from' })
   if (to   && !DATE_RE.test(to))   return res.status(400).json({ error: 'invalid_to' })
-  try { res.json(await listStudentLeaveRequests(req.params.id, { from, to })) }
+  try { res.json(await listStudentLeaveRequests(tenantId, req.params.id, { from, to })) }
   catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
 
 app.post('/api/leave-requests', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { student_id, course_id, leave_date, reason, lesson_record_id } = req.body || {}
   if (!student_id) return res.status(400).json({ error: 'student_id_required' })
   if (!course_id)  return res.status(400).json({ error: 'course_id_required' })
@@ -876,7 +936,7 @@ app.post('/api/leave-requests', async (req, res) => {
   if (cleanReason.length > 512) return res.status(400).json({ error: 'reason_too_long' })
   const id = genId('lvr')
   try {
-    await insertLeaveRequest({ id, studentId: student_id, courseId: course_id, leaveDate: leave_date, reason: cleanReason, lessonRecordId: lesson_record_id || null })
+    await insertLeaveRequest(tenantId, { id, studentId: student_id, courseId: course_id, leaveDate: leave_date, reason: cleanReason, lessonRecordId: lesson_record_id || null })
     res.status(201).json({ id, student_id, course_id, leave_date, reason: cleanReason, lesson_record_id: lesson_record_id || null })
   } catch (e) {
     if (e.code === 'ER_NO_REFERENCED_ROW_2') return res.status(404).json({ error: 'student_or_course_not_found' })
@@ -885,8 +945,9 @@ app.post('/api/leave-requests', async (req, res) => {
 })
 
 app.delete('/api/leave-requests/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   try {
-    const ok = await deleteLeaveRequest(req.params.id)
+    const ok = await deleteLeaveRequest(tenantId, req.params.id)
     if (!ok) return res.status(404).json({ error: 'not_found' })
     res.status(204).end()
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
@@ -895,6 +956,7 @@ app.delete('/api/leave-requests/:id', async (req, res) => {
 // ── Share Tokens ──────────────────────────────────────────────────────────────
 
 app.post('/api/students/:id/share-token', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
   const { from, to, expires_days } = req.body || {}
   if (!from || !DATE_RE.test(from)) return res.status(400).json({ error: 'invalid_from' })
   if (!to   || !DATE_RE.test(to))   return res.status(400).json({ error: 'invalid_to' })
@@ -902,14 +964,14 @@ app.post('/api/students/:id/share-token', async (req, res) => {
   const days = expires_days !== undefined ? parseInt(expires_days, 10) : 30
   if (!Number.isFinite(days) || days <= 0 || days > 365) return res.status(400).json({ error: 'invalid_expires_days' })
 
-  const students = await listStudents()
+  const students = await listStudents(tenantId)
   if (!students.some(s => s.id === req.params.id)) return res.status(404).json({ error: 'student_not_found' })
 
   const id      = genId('stk')
   const token   = crypto.randomBytes(24).toString('base64url')
   const expires = new Date(Date.now() + days * 86400_000).toISOString().slice(0, 19).replace('T', ' ')
   try {
-    await insertShareToken({ id, token, studentId: req.params.id, periodFrom: from, periodTo: to, expiresAt: expires })
+    await insertShareToken(tenantId, { id, token, studentId: req.params.id, periodFrom: from, periodTo: to, expiresAt: expires })
     res.status(201).json({ token, from, to, expires_at: expires })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
@@ -919,7 +981,7 @@ app.get('/api/share/:token', async (req, res) => {
     const row = await getShareTokenByToken(req.params.token)
     if (!row) return res.status(404).json({ error: 'not_found' })
     if (new Date(row.expires_at) < new Date()) return res.status(410).json({ error: 'expired' })
-    const bill = await getStudentBill(row.student_id, row.period_from, row.period_to)
+    const bill = await getStudentBill(row.tenant_id, row.student_id, row.period_from, row.period_to)
     res.json({
       student: { id: row.student_id, name: row.student_name },
       period:  { from: row.period_from, to: row.period_to },
@@ -937,9 +999,16 @@ app.post('/api/ai/chat', requireAuth, async (req, res) => {
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages 必須為非空陣列' })
     }
+    const tenantId = req.user?.tenant_id || 1
     const db = {
-      settlementTuition, settlementSalary, sumMiscExpensesByCategory,
-      listLessons, listMiscExpenses, listStudents, listTeachers, listCourses,
+      settlementTuition:       (...args) => settlementTuition(tenantId, ...args),
+      settlementSalary:        (...args) => settlementSalary(tenantId, ...args),
+      sumMiscExpensesByCategory: (...args) => sumMiscExpensesByCategory(tenantId, ...args),
+      listLessons:             (...args) => listLessons(tenantId, ...args),
+      listMiscExpenses:        (...args) => listMiscExpenses(tenantId, ...args),
+      listStudents:            (...args) => listStudents(tenantId, ...args),
+      listTeachers:            (...args) => listTeachers(tenantId, ...args),
+      listCourses:             (...args) => listCourses(tenantId, ...args),
     }
     const reply = await runAiChat(messages, db)
     res.json({ reply })

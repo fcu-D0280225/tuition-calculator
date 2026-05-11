@@ -669,23 +669,23 @@ export async function initSchema() {
 
 // ── Leave Requests ───────────────────────────────────────────────────────────
 
-export async function insertLeaveRequest({ id, studentId, courseId, leaveDate, reason, lessonRecordId }) {
+export async function insertLeaveRequest(tenantId, { id, studentId, courseId, leaveDate, reason, lessonRecordId }) {
   await pool.query(
-    'INSERT INTO leave_requests (id, student_id, course_id, leave_date, reason, lesson_record_id) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, studentId, courseId, leaveDate, reason, lessonRecordId || null]
+    'INSERT INTO leave_requests (id, tenant_id, student_id, course_id, leave_date, reason, lesson_record_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, tenantId, studentId, courseId, leaveDate, reason, lessonRecordId || null]
   )
 }
 
-export async function listStudentLeaveRequests(studentId, { from, to } = {}) {
-  const where = ['lr.student_id = ?']
-  const params = [studentId]
+export async function listStudentLeaveRequests(tenantId, studentId, { from, to } = {}) {
+  const where = ['lr.tenant_id = ?', 'lr.student_id = ?']
+  const params = [tenantId, studentId]
   if (from) { where.push('lr.leave_date >= ?'); params.push(from) }
   if (to)   { where.push('lr.leave_date <= ?'); params.push(to) }
   const [rows] = await pool.query(
     `SELECT lr.id, lr.student_id, lr.course_id, lr.leave_date, lr.reason, lr.created_at, lr.lesson_record_id,
             c.name AS course_name
        FROM leave_requests lr
-       JOIN courses c ON c.id = lr.course_id
+       JOIN courses c ON c.id = lr.course_id AND c.tenant_id = lr.tenant_id
       WHERE ${where.join(' AND ')}
       ORDER BY lr.leave_date DESC, lr.created_at DESC`,
     params
@@ -693,28 +693,29 @@ export async function listStudentLeaveRequests(studentId, { from, to } = {}) {
   return rows
 }
 
-export async function deleteLeaveRequest(id) {
-  const [r] = await pool.query('DELETE FROM leave_requests WHERE id = ?', [id])
+export async function deleteLeaveRequest(tenantId, id) {
+  const [r] = await pool.query('DELETE FROM leave_requests WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return r.affectedRows > 0
 }
 
 // ── Students ─────────────────────────────────────────────────────────────────
 
-export async function listStudents() {
+export async function listStudents(tenantId) {
   const [rows] = await pool.query(
-    'SELECT id, name, school, grade, contact_name, contact_phone, sort_order, active FROM students ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC'
+    'SELECT id, name, school, grade, contact_name, contact_phone, sort_order, active FROM students WHERE tenant_id = ? ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC',
+    [tenantId]
   )
   return rows
 }
 
-export async function insertStudent({ id, name, school, grade, contactName, contactPhone }) {
+export async function insertStudent(tenantId, { id, name, school, grade, contactName, contactPhone }) {
   await pool.query(
-    'INSERT INTO students (id, name, school, grade, contact_name, contact_phone) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, name, school || '', grade || '', contactName || '', contactPhone || '']
+    'INSERT INTO students (id, tenant_id, name, school, grade, contact_name, contact_phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, tenantId, name, school || '', grade || '', contactName || '', contactPhone || '']
   )
 }
 
-export async function updateStudent(id, { name, school, grade, contactName, contactPhone }) {
+export async function updateStudent(tenantId, id, { name, school, grade, contactName, contactPhone }) {
   const sets = []
   const params = []
   if (name         !== undefined) { sets.push('name = ?');          params.push(name) }
@@ -723,40 +724,40 @@ export async function updateStudent(id, { name, school, grade, contactName, cont
   if (contactName  !== undefined) { sets.push('contact_name = ?');  params.push(contactName || '') }
   if (contactPhone !== undefined) { sets.push('contact_phone = ?'); params.push(contactPhone || '') }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE students SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE students SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function setStudentActive(id, active) {
+export async function setStudentActive(tenantId, id, active) {
   // 停用時清除「尚未點名」的家教課/團課紀錄（status NOT IN attended/leave，與 setStudentEnrollment 一致）
   if (!active) {
     await pool.query(
       `DELETE FROM lesson_records
-       WHERE student_id = ? AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
-      [id]
+       WHERE student_id = ? AND tenant_id = ? AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
+      [id, tenantId]
     )
     await pool.query(
       `DELETE FROM group_records
-       WHERE student_id = ? AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
-      [id]
+       WHERE student_id = ? AND tenant_id = ? AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
+      [id, tenantId]
     )
   }
   const [res] = await pool.query(
-    'UPDATE students SET active = ? WHERE id = ?',
-    [active ? 1 : 0, id]
+    'UPDATE students SET active = ? WHERE id = ? AND tenant_id = ?',
+    [active ? 1 : 0, id, tenantId]
   )
   return res.affectedRows > 0
 }
 
-export async function getStudentEnrollment(studentId) {
+export async function getStudentEnrollment(tenantId, studentId) {
   const [courseRows] = await pool.query(
-    'SELECT course_id FROM student_courses WHERE student_id = ?',
-    [studentId]
+    'SELECT course_id FROM student_courses WHERE tenant_id = ? AND student_id = ?',
+    [tenantId, studentId]
   )
   const [groupRows] = await pool.query(
-    'SELECT group_id FROM group_members WHERE student_id = ?',
-    [studentId]
+    'SELECT gm.group_id FROM group_members gm JOIN `groups` g ON g.id = gm.group_id AND g.tenant_id = ? WHERE gm.student_id = ?',
+    [tenantId, studentId]
   )
   return {
     course_ids: courseRows.map(r => r.course_id),
@@ -764,33 +765,33 @@ export async function getStudentEnrollment(studentId) {
   }
 }
 
-export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
+export async function setStudentEnrollment(tenantId, studentId, { courseIds, groupIds }) {
   if (Array.isArray(courseIds)) {
     const cleaned = Array.from(new Set(courseIds.filter(Boolean)))
 
     // 找出本次被移除的家教課；只清除「由選課批次建立 + 未點名／尚未開始」的紀錄
     // （已點名 'attended' / 請假 'leave' / 手動建立的紀錄都保留）
     const [existRows] = await pool.query(
-      'SELECT course_id FROM student_courses WHERE student_id = ?',
-      [studentId]
+      'SELECT course_id FROM student_courses WHERE tenant_id = ? AND student_id = ?',
+      [tenantId, studentId]
     )
     const newSet = new Set(cleaned)
     const removed = existRows.map(r => r.course_id).filter(cid => !newSet.has(cid))
     if (removed.length) {
       await pool.query(
         `DELETE FROM lesson_records
-         WHERE student_id = ? AND course_id IN (?)
+         WHERE tenant_id = ? AND student_id = ? AND course_id IN (?)
            AND from_enroll_batch = 1
            AND status NOT IN ('attended', 'leave', 'rescheduled', 'makeup')`,
-        [studentId, removed]
+        [tenantId, studentId, removed]
       )
     }
 
-    await pool.query('DELETE FROM student_courses WHERE student_id = ?', [studentId])
+    await pool.query('DELETE FROM student_courses WHERE tenant_id = ? AND student_id = ?', [tenantId, studentId])
     if (cleaned.length) {
       await pool.query(
-        'INSERT INTO student_courses (student_id, course_id) VALUES ?',
-        [cleaned.map(cid => [studentId, cid])]
+        'INSERT INTO student_courses (tenant_id, student_id, course_id) VALUES ?',
+        [cleaned.map(cid => [tenantId, studentId, cid])]
       )
     }
   }
@@ -798,13 +799,17 @@ export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
     const cleaned = Array.from(new Set(groupIds.filter(Boolean)))
     // 抓既有 group_ids，找出本次「新增」的，用來自動補上課紀錄
     const [existRows] = await pool.query(
-      'SELECT group_id FROM group_members WHERE student_id = ?',
-      [studentId]
+      'SELECT gm.group_id FROM group_members gm JOIN `groups` g ON g.id = gm.group_id AND g.tenant_id = ? WHERE gm.student_id = ?',
+      [tenantId, studentId]
     )
     const existingSet = new Set(existRows.map(r => r.group_id))
     const newlyAdded = cleaned.filter(gid => !existingSet.has(gid))
 
-    await pool.query('DELETE FROM group_members WHERE student_id = ?', [studentId])
+    // 刪除時也需限 tenant（透過 JOIN groups）
+    await pool.query(
+      'DELETE gm FROM group_members gm JOIN `groups` g ON g.id = gm.group_id AND g.tenant_id = ? WHERE gm.student_id = ?',
+      [tenantId, studentId]
+    )
     if (cleaned.length) {
       await pool.query(
         'INSERT INTO group_members (group_id, student_id) VALUES ?',
@@ -813,7 +818,7 @@ export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
     }
 
     for (const gid of newlyAdded) {
-      try { await backfillGroupRecordsForStudent(gid, studentId) }
+      try { await backfillGroupRecordsForStudent(tenantId, gid, studentId) }
       catch (e) { console.error('[backfillGroupRecords] failed:', gid, studentId, e) }
     }
   }
@@ -821,56 +826,57 @@ export async function setStudentEnrollment(studentId, { courseIds, groupIds }) {
 
 // ── Period Locks ─────────────────────────────────────────────────────────────
 
-export async function listPeriodLocks() {
+export async function listPeriodLocks(tenantId) {
   const [rows] = await pool.query(
-    'SELECT id, period_from, period_to, note, locked_at FROM period_locks ORDER BY period_from DESC'
+    'SELECT id, period_from, period_to, note, locked_at FROM period_locks WHERE tenant_id = ? ORDER BY period_from DESC',
+    [tenantId]
   )
   return rows
 }
 
-export async function insertPeriodLock({ id, periodFrom, periodTo, note }) {
+export async function insertPeriodLock(tenantId, { id, periodFrom, periodTo, note }) {
   await pool.query(
-    'INSERT INTO period_locks (id, period_from, period_to, note) VALUES (?, ?, ?, ?)',
-    [id, periodFrom, periodTo, note || '']
+    'INSERT INTO period_locks (id, tenant_id, period_from, period_to, note) VALUES (?, ?, ?, ?, ?)',
+    [id, tenantId, periodFrom, periodTo, note || '']
   )
 }
 
-export async function deletePeriodLock(id) {
-  const [res] = await pool.query('DELETE FROM period_locks WHERE id = ?', [id])
+export async function deletePeriodLock(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM period_locks WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
 // 檢查某日期是否落在任一鎖定區間中（含端點）
-export async function isDateLocked(dateStr) {
+export async function isDateLocked(tenantId, dateStr) {
   if (!dateStr) return false
   const [rows] = await pool.query(
-    'SELECT 1 FROM period_locks WHERE ? BETWEEN period_from AND period_to LIMIT 1',
-    [dateStr]
+    'SELECT 1 FROM period_locks WHERE tenant_id = ? AND ? BETWEEN period_from AND period_to LIMIT 1',
+    [tenantId, dateStr]
   )
   return rows.length > 0
 }
 
 // 檢查紀錄 id 對應的日期是否被鎖
-export async function isLessonLocked(id) {
-  const [rows] = await pool.query('SELECT lesson_date FROM lesson_records WHERE id = ?', [id])
+export async function isLessonLocked(tenantId, id) {
+  const [rows] = await pool.query('SELECT lesson_date FROM lesson_records WHERE id = ? AND tenant_id = ?', [id, tenantId])
   if (rows.length === 0) return false
-  return isDateLocked(String(rows[0].lesson_date).slice(0, 10))
+  return isDateLocked(tenantId, String(rows[0].lesson_date).slice(0, 10))
 }
 
-export async function isGroupRecordLocked(id) {
-  const [rows] = await pool.query('SELECT record_date FROM group_records WHERE id = ?', [id])
+export async function isGroupRecordLocked(tenantId, id) {
+  const [rows] = await pool.query('SELECT record_date FROM group_records WHERE id = ? AND tenant_id = ?', [id, tenantId])
   if (rows.length === 0) return false
-  return isDateLocked(String(rows[0].record_date).slice(0, 10))
+  return isDateLocked(tenantId, String(rows[0].record_date).slice(0, 10))
 }
 
 // ── Misc Expenses ────────────────────────────────────────────────────────────
 
-export async function listMiscExpenses({ from, to, category } = {}) {
-  const conds = []; const params = []
+export async function listMiscExpenses(tenantId, { from, to, category } = {}) {
+  const conds = ['tenant_id = ?']; const params = [tenantId]
   if (from)     { conds.push('expense_date >= ?'); params.push(from) }
   if (to)       { conds.push('expense_date <= ?'); params.push(to) }
   if (category) { conds.push('category = ?');      params.push(category) }
-  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
+  const where = 'WHERE ' + conds.join(' AND ')
   const [rows] = await pool.query(
     `SELECT id, name, category, amount, expense_date, note FROM misc_expenses ${where} ORDER BY expense_date DESC, created_at DESC`,
     params
@@ -878,18 +884,18 @@ export async function listMiscExpenses({ from, to, category } = {}) {
   return rows.map(r => ({ ...r, amount: parseFloat(r.amount) }))
 }
 
-export async function insertMiscExpense({ id, name, category, amount, expenseDate, note }) {
+export async function insertMiscExpense(tenantId, { id, name, category, amount, expenseDate, note }) {
   await pool.query(
-    'INSERT INTO misc_expenses (id, name, category, amount, expense_date, note) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, name, category || '其他', amount, expenseDate, note || '']
+    'INSERT INTO misc_expenses (id, tenant_id, name, category, amount, expense_date, note) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [id, tenantId, name, category || '其他', amount, expenseDate, note || '']
   )
 }
 
-export async function sumMiscExpensesByCategory({ from, to } = {}) {
-  const conds = []; const params = []
+export async function sumMiscExpensesByCategory(tenantId, { from, to } = {}) {
+  const conds = ['tenant_id = ?']; const params = [tenantId]
   if (from) { conds.push('expense_date >= ?'); params.push(from) }
   if (to)   { conds.push('expense_date <= ?'); params.push(to) }
-  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
+  const where = 'WHERE ' + conds.join(' AND ')
   const [rows] = await pool.query(
     `SELECT category, SUM(amount) AS total FROM misc_expenses ${where} GROUP BY category ORDER BY category ASC`,
     params
@@ -897,16 +903,16 @@ export async function sumMiscExpensesByCategory({ from, to } = {}) {
   return rows.map(r => ({ category: r.category, total: parseFloat(r.total || 0) }))
 }
 
-export async function updateMiscExpense(id, { name, category, amount, expenseDate, note }) {
+export async function updateMiscExpense(tenantId, id, { name, category, amount, expenseDate, note }) {
   const [res] = await pool.query(
-    'UPDATE misc_expenses SET name = ?, category = ?, amount = ?, expense_date = ?, note = ? WHERE id = ?',
-    [name, category || '其他', amount, expenseDate, note || '', id]
+    'UPDATE misc_expenses SET name = ?, category = ?, amount = ?, expense_date = ?, note = ? WHERE id = ? AND tenant_id = ?',
+    [name, category || '其他', amount, expenseDate, note || '', id, tenantId]
   )
   return res.affectedRows > 0
 }
 
-export async function deleteMiscExpense(id) {
-  const [res] = await pool.query('DELETE FROM misc_expenses WHERE id = ?', [id])
+export async function deleteMiscExpense(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM misc_expenses WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
@@ -921,10 +927,10 @@ function todayLocalIso() {
 // 早於當日的紀錄會標註 note='尚未開始開課'，方便結算與點名時辨別
 const PRE_ENROLL_NOTE = '尚未開始開課'
 
-async function backfillGroupRecordsForStudent(groupId, studentId) {
+async function backfillGroupRecordsForStudent(tenantId, groupId, studentId) {
   const [groupRows] = await pool.query(
-    'SELECT weekdays, duration_months, default_teacher_id FROM `groups` WHERE id = ? LIMIT 1',
-    [groupId]
+    'SELECT weekdays, duration_months, default_teacher_id FROM `groups` WHERE id = ? AND tenant_id = ? LIMIT 1',
+    [groupId, tenantId]
   )
   const g = groupRows[0]
   if (!g) return
@@ -986,48 +992,51 @@ async function backfillGroupRecordsForStudent(groupId, studentId) {
   const ts = Date.now()
   const rows = toInsert.map((d, i) => [
     `grr_${ts}_${i}_${Math.random().toString(36).slice(2, 6)}`,
-    groupId, studentId, teacherId, d, '',
+    tenantId, groupId, studentId, teacherId, d, '',
     d < todayStr ? 'pre_enroll' : 'pending',
   ])
   await pool.query(
-    'INSERT INTO group_records (id, group_id, student_id, teacher_id, record_date, note, status) VALUES ?',
+    'INSERT INTO group_records (id, tenant_id, group_id, student_id, teacher_id, record_date, note, status) VALUES ?',
     [rows]
   )
 }
 
-export async function listAllEnrollments() {
-  const [courseRows] = await pool.query('SELECT student_id, course_id FROM student_courses')
-  const [groupRows]  = await pool.query('SELECT student_id, group_id FROM group_members')
+export async function listAllEnrollments(tenantId) {
+  const [courseRows] = await pool.query('SELECT student_id, course_id FROM student_courses WHERE tenant_id = ?', [tenantId])
+  const [groupRows]  = await pool.query(
+    'SELECT gm.student_id, gm.group_id FROM group_members gm JOIN `groups` g ON g.id = gm.group_id AND g.tenant_id = ?',
+    [tenantId]
+  )
   return { courses: courseRows, groups: groupRows }
 }
 
-export async function listStudentCourses(studentId) {
+export async function listStudentCourses(tenantId, studentId) {
   const [rows] = await pool.query(
     `SELECT lr.course_id, c.name AS course_name, lr.teacher_id, t.name AS teacher_name,
             MAX(lr.lesson_date) AS last_lesson_date
        FROM lesson_records lr
-       JOIN courses  c ON c.id = lr.course_id
-       LEFT JOIN teachers t ON t.id = lr.teacher_id
-      WHERE lr.student_id = ?
+       JOIN courses  c ON c.id = lr.course_id AND c.tenant_id = lr.tenant_id
+       LEFT JOIN teachers t ON t.id = lr.teacher_id AND t.tenant_id = lr.tenant_id
+      WHERE lr.tenant_id = ? AND lr.student_id = ?
       GROUP BY lr.course_id, c.name, lr.teacher_id, t.name
       ORDER BY last_lesson_date DESC, c.name ASC`,
-    [studentId]
+    [tenantId, studentId]
   )
   return rows
 }
 
-export async function listTeacherCourses(teacherId) {
+export async function listTeacherCourses(tenantId, teacherId) {
   // 家教課（distinct course）
   const [courseRows] = await pool.query(
     `SELECT lr.course_id, c.name AS course_name,
             COUNT(*) AS lesson_count,
             MAX(lr.lesson_date) AS last_lesson_date
        FROM lesson_records lr
-       JOIN courses c ON c.id = lr.course_id
-      WHERE lr.teacher_id = ?
+       JOIN courses c ON c.id = lr.course_id AND c.tenant_id = lr.tenant_id
+      WHERE lr.tenant_id = ? AND lr.teacher_id = ?
       GROUP BY lr.course_id, c.name
       ORDER BY last_lesson_date DESC, c.name ASC`,
-    [teacherId]
+    [tenantId, teacherId]
   )
   // 團課（distinct group）
   const [groupRows] = await pool.query(
@@ -1035,63 +1044,65 @@ export async function listTeacherCourses(teacherId) {
             COUNT(*) AS record_count,
             MAX(gr.record_date) AS last_record_date
        FROM group_records gr
-       JOIN \`groups\` g ON g.id = gr.group_id
-      WHERE gr.teacher_id = ?
+       JOIN \`groups\` g ON g.id = gr.group_id AND g.tenant_id = gr.tenant_id
+      WHERE gr.tenant_id = ? AND gr.teacher_id = ?
       GROUP BY gr.group_id, g.name
       ORDER BY last_record_date DESC, g.name ASC`,
-    [teacherId]
+    [tenantId, teacherId]
   )
   return { courses: courseRows, groups: groupRows }
 }
 
 // ── Teachers ──────────────────────────────────────────────────────────────────
 
-export async function listTeachers() {
+export async function listTeachers(tenantId) {
   const [rows] = await pool.query(
-    'SELECT id, name, contact_phone, sort_order, active FROM teachers ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC'
+    'SELECT id, name, contact_phone, sort_order, active FROM teachers WHERE tenant_id = ? ORDER BY active DESC, sort_order ASC, created_at DESC, id DESC',
+    [tenantId]
   )
   return rows
 }
 
-export async function reorderTeachers(orderedIds) {
+export async function reorderTeachers(tenantId, orderedIds) {
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
   const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
-  const sql = `UPDATE teachers SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?)`
-  await pool.query(sql, [...orderedIds, orderedIds])
+  const sql = `UPDATE teachers SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?) AND tenant_id = ?`
+  await pool.query(sql, [...orderedIds, orderedIds, tenantId])
 }
 
-export async function insertTeacher({ id, name, contactPhone }) {
-  await pool.query('INSERT INTO teachers (id, name, contact_phone) VALUES (?, ?, ?)', [id, name, contactPhone || ''])
+export async function insertTeacher(tenantId, { id, name, contactPhone }) {
+  await pool.query('INSERT INTO teachers (id, tenant_id, name, contact_phone) VALUES (?, ?, ?, ?)', [id, tenantId, name, contactPhone || ''])
 }
 
-export async function updateTeacher(id, { name, contactPhone }) {
+export async function updateTeacher(tenantId, id, { name, contactPhone }) {
   const sets = []; const params = []
   if (name         !== undefined) { sets.push('name = ?');          params.push(name) }
   if (contactPhone !== undefined) { sets.push('contact_phone = ?'); params.push(contactPhone || '') }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE teachers SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE teachers SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function updateTeacherName(id, name) {
-  const [res] = await pool.query('UPDATE teachers SET name = ? WHERE id = ?', [name, id])
+export async function updateTeacherName(tenantId, id, name) {
+  const [res] = await pool.query('UPDATE teachers SET name = ? WHERE id = ? AND tenant_id = ?', [name, id, tenantId])
   return res.affectedRows > 0
 }
 
-export async function setTeacherActive(id, active) {
+export async function setTeacherActive(tenantId, id, active) {
   const [res] = await pool.query(
-    'UPDATE teachers SET active = ? WHERE id = ?',
-    [active ? 1 : 0, id]
+    'UPDATE teachers SET active = ? WHERE id = ? AND tenant_id = ?',
+    [active ? 1 : 0, id, tenantId]
   )
   return res.affectedRows > 0
 }
 
 // ── Courses ───────────────────────────────────────────────────────────────────
 
-export async function listCourses() {
+export async function listCourses(tenantId) {
   const [rows] = await pool.query(
-    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note, sort_order FROM courses ORDER BY sort_order ASC, name ASC, id DESC'
+    'SELECT id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note, sort_order FROM courses WHERE tenant_id = ? ORDER BY sort_order ASC, name ASC, id DESC',
+    [tenantId]
   )
   return rows.map(r => ({
     ...r,
@@ -1100,22 +1111,22 @@ export async function listCourses() {
   }))
 }
 
-export async function reorderCourses(orderedIds) {
+export async function reorderCourses(tenantId, orderedIds) {
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
   // 一次更新：用 CASE WHEN 把每個 id 對應到它的新 sort_order（每筆相差 10）
   const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
-  const sql = `UPDATE courses SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?)`
-  await pool.query(sql, [...orderedIds, orderedIds])
+  const sql = `UPDATE courses SET sort_order = CASE id ${cases} ELSE sort_order END WHERE id IN (?) AND tenant_id = ?`
+  await pool.query(sql, [...orderedIds, orderedIds, tenantId])
 }
 
-export async function insertCourse({ id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note }) {
+export async function insertCourse(tenantId, { id, name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note }) {
   await pool.query(
-    'INSERT INTO courses (id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, hourlyRate ?? 0, teacherHourlyRate ?? 0, discountPerStudent ?? 0, defaultTeacherId || null, durationHours ?? 1, note || '']
+    'INSERT INTO courses (id, tenant_id, name, hourly_rate, teacher_hourly_rate, discount_per_student, default_teacher_id, duration_hours, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, tenantId, name, hourlyRate ?? 0, teacherHourlyRate ?? 0, discountPerStudent ?? 0, defaultTeacherId || null, durationHours ?? 1, note || '']
   )
 }
 
-export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note }) {
+export async function updateCourse(tenantId, id, { name, hourlyRate, teacherHourlyRate, discountPerStudent, defaultTeacherId, durationHours, note }) {
   const sets = []
   const params = []
   if (name               !== undefined) { sets.push('name = ?');                 params.push(name) }
@@ -1126,13 +1137,13 @@ export async function updateCourse(id, { name, hourlyRate, teacherHourlyRate, di
   if (durationHours      !== undefined) { sets.push('duration_hours = ?');       params.push(durationHours) }
   if (note               !== undefined) { sets.push('note = ?');                 params.push(note || '') }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE courses SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE courses SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function deleteCourse(id) {
-  const [res] = await pool.query('DELETE FROM courses WHERE id = ?', [id])
+export async function deleteCourse(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM courses WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
@@ -1172,9 +1183,9 @@ function buildSessionStudents(records) {
 
 // ── Lesson Records ────────────────────────────────────────────────────────────
 
-export async function listLessons({ from, to, studentId, teacherId, courseId } = {}) {
-  const conditions = []
-  const params = []
+export async function listLessons(tenantId, { from, to, studentId, teacherId, courseId } = {}) {
+  const conditions = ['lr.tenant_id = ?']
+  const params = [tenantId]
 
   if (from) { conditions.push('lr.lesson_date >= ?'); params.push(from) }
   if (to)   { conditions.push('lr.lesson_date <= ?'); params.push(to) }
@@ -1182,7 +1193,7 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
   if (teacherId) { conditions.push('lr.teacher_id = ?'); params.push(teacherId) }
   if (courseId)  { conditions.push('lr.course_id = ?');  params.push(courseId) }
 
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+  const where = 'WHERE ' + conditions.join(' AND ')
 
   const [rows] = await pool.query(
     `SELECT lr.id, lr.student_id, s.name AS student_name,
@@ -1195,15 +1206,16 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
             lv.id                 AS leave_request_id,
             lv.reason             AS leave_reason
      FROM lesson_records lr
-     JOIN students s ON s.id = lr.student_id
-     JOIN courses  c ON c.id = lr.course_id
-     LEFT JOIN teachers t ON t.id = lr.teacher_id
+     JOIN students s ON s.id = lr.student_id AND s.tenant_id = lr.tenant_id
+     JOIN courses  c ON c.id = lr.course_id  AND c.tenant_id = lr.tenant_id
+     LEFT JOIN teachers t ON t.id = lr.teacher_id AND t.tenant_id = lr.tenant_id
      LEFT JOIN leave_requests lv
-       ON (lv.lesson_record_id = lr.id)
+       ON lv.tenant_id = lr.tenant_id
+       AND ((lv.lesson_record_id = lr.id)
        OR (lv.lesson_record_id IS NULL
            AND lv.student_id = lr.student_id
            AND lv.course_id  = lr.course_id
-           AND lv.leave_date = lr.lesson_date)
+           AND lv.leave_date = lr.lesson_date))
      ${where}
      ORDER BY lr.lesson_date DESC, lr.start_time ASC, lr.created_at DESC`,
     params
@@ -1211,27 +1223,27 @@ export async function listLessons({ from, to, studentId, teacherId, courseId } =
   return rows.map(r => ({ ...r, is_on_leave: !!r.is_on_leave }))
 }
 
-export async function findDuplicateLesson({ studentId, courseId, lessonDate }) {
+export async function findDuplicateLesson(tenantId, { studentId, courseId, lessonDate }) {
   const [rows] = await pool.query(
     `SELECT lr.id, lr.start_time, lr.hours, lr.teacher_id, t.name AS teacher_name
        FROM lesson_records lr
-       LEFT JOIN teachers t ON t.id = lr.teacher_id
-      WHERE lr.student_id = ? AND lr.course_id = ? AND lr.lesson_date = ?
+       LEFT JOIN teachers t ON t.id = lr.teacher_id AND t.tenant_id = lr.tenant_id
+      WHERE lr.tenant_id = ? AND lr.student_id = ? AND lr.course_id = ? AND lr.lesson_date = ?
       ORDER BY lr.start_time IS NULL, lr.start_time ASC`,
-    [studentId, courseId, lessonDate]
+    [tenantId, studentId, courseId, lessonDate]
   )
   return rows
 }
 
-export async function insertLesson({ id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status, fromEnrollBatch }) {
+export async function insertLesson(tenantId, { id, studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status, fromEnrollBatch }) {
   await pool.query(
-    `INSERT INTO lesson_records (id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status, from_enroll_batch)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, courseId, teacherId || null, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending', fromEnrollBatch ? 1 : 0]
+    `INSERT INTO lesson_records (id, tenant_id, student_id, course_id, teacher_id, hours, lesson_date, start_time, unit_price, teacher_unit_price, note, status, from_enroll_batch)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, tenantId, studentId, courseId, teacherId || null, hours, lessonDate, startTime || null, unitPrice ?? null, teacherUnitPrice ?? null, note || '', status || 'pending', fromEnrollBatch ? 1 : 0]
   )
 }
 
-export async function updateLesson(id, { studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status }) {
+export async function updateLesson(tenantId, id, { studentId, courseId, teacherId, hours, lessonDate, startTime, unitPrice, teacherUnitPrice, note, status }) {
   const sets = []
   const params = []
   if (studentId        !== undefined) { sets.push('student_id = ?');         params.push(studentId) }
@@ -1245,19 +1257,19 @@ export async function updateLesson(id, { studentId, courseId, teacherId, hours, 
   if (note             !== undefined) { sets.push('note = ?');               params.push(note) }
   if (status           !== undefined) { sets.push('status = ?');             params.push(status) }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE lesson_records SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE lesson_records SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function deleteLesson(id) {
-  const [res] = await pool.query('DELETE FROM lesson_records WHERE id = ?', [id])
+export async function deleteLesson(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM lesson_records WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
 // ── Settlement ────────────────────────────────────────────────────────────────
 
-export async function settlementTuition(from, to) {
+export async function settlementTuition(tenantId, from, to) {
   // 逐筆取出，讓每筆紀錄的 unit_price 覆蓋優先於課程預設；其次查 course_rates 對照表（依當日同課同師實際出席人數），最後 fallback course.hourly_rate
   const [rows] = await pool.query(
     `SELECT
@@ -1273,11 +1285,11 @@ export async function settlementTuition(from, to) {
        c.hourly_rate                                 AS course_hourly_rate,
        c.discount_per_student                        AS course_discount_per_student
      FROM lesson_records lr
-     JOIN students s ON s.id = lr.student_id
-     JOIN courses  c ON c.id = lr.course_id
-     WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
+     JOIN students s ON s.id = lr.student_id AND s.tenant_id = lr.tenant_id
+     JOIN courses  c ON c.id = lr.course_id  AND c.tenant_id = lr.tenant_id
+     WHERE lr.tenant_id = ? AND lr.lesson_date >= ? AND lr.lesson_date <= ?
      ORDER BY s.name ASC, c.name ASC`,
-    [from, to]
+    [tenantId, from, to]
   )
 
   const sessionStudents = buildSessionStudents(rows)
@@ -1311,12 +1323,12 @@ export async function settlementTuition(from, to) {
        g.monthly_fee,
        COUNT(DISTINCT DATE_FORMAT(gr.record_date, '%Y-%m')) AS billable_months
      FROM group_records gr
-     JOIN \`groups\`  g ON g.id = gr.group_id
-     JOIN students   s ON s.id = gr.student_id
-     WHERE gr.record_date >= ? AND gr.record_date <= ?
+     JOIN \`groups\`  g ON g.id = gr.group_id AND g.tenant_id = gr.tenant_id
+     JOIN students   s ON s.id = gr.student_id AND s.tenant_id = gr.tenant_id
+     WHERE gr.tenant_id = ? AND gr.record_date >= ? AND gr.record_date <= ?
      GROUP BY gr.student_id, s.name, gr.group_id, g.name, g.monthly_fee
      ORDER BY s.name ASC, g.name ASC`,
-    [from, to]
+    [tenantId, from, to]
   )
   for (const row of grRows) {
     if (!map.has(row.student_id)) {
@@ -1340,10 +1352,10 @@ export async function settlementTuition(from, to) {
        m.unit_price,
        SUM(mr.quantity) AS total_qty
      FROM material_records mr
-     JOIN materials m ON m.id = mr.material_id
-     WHERE mr.record_date >= ? AND mr.record_date <= ?
+     JOIN materials m ON m.id = mr.material_id AND m.tenant_id = mr.tenant_id
+     WHERE mr.tenant_id = ? AND mr.record_date >= ? AND mr.record_date <= ?
      GROUP BY mr.student_id, mr.material_id, m.name, m.unit_price`,
-    [from, to]
+    [tenantId, from, to]
   )
   for (const row of mrRows) {
     if (!map.has(row.student_id)) continue // 只補既有學生（沒上課且沒上團課的教材費不列入）
@@ -1366,7 +1378,7 @@ export async function settlementTuition(from, to) {
   }))
 }
 
-export async function settlementSalary(from, to) {
+export async function settlementSalary(tenantId, from, to) {
   const [rows] = await pool.query(
     `SELECT
        lr.teacher_id,
@@ -1377,11 +1389,11 @@ export async function settlementSalary(from, to) {
        lr.status,
        COALESCE(lr.teacher_unit_price, c.teacher_hourly_rate)          AS hourly_rate
      FROM lesson_records lr
-     JOIN teachers t ON t.id = lr.teacher_id
-     JOIN courses  c ON c.id = lr.course_id
-     WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
+     JOIN teachers t ON t.id = lr.teacher_id AND t.tenant_id = lr.tenant_id
+     JOIN courses  c ON c.id = lr.course_id  AND c.tenant_id = lr.tenant_id
+     WHERE lr.tenant_id = ? AND lr.lesson_date >= ? AND lr.lesson_date <= ?
      ORDER BY t.name ASC, c.name ASC`,
-    [from, to]
+    [tenantId, from, to]
   )
 
   const map = new Map()
@@ -1420,15 +1432,15 @@ export async function settlementSalary(from, to) {
             gr.record_date,
             DATE_FORMAT(gr.record_date, '%Y-%m') AS ym
        FROM group_records gr
-       JOIN \`groups\` g ON g.id = gr.group_id
-       JOIN teachers   t ON t.id = gr.teacher_id
-      WHERE gr.record_date >= ? AND gr.record_date <= ?
+       JOIN \`groups\` g ON g.id = gr.group_id AND g.tenant_id = gr.tenant_id
+       JOIN teachers   t ON t.id = gr.teacher_id AND t.tenant_id = gr.tenant_id
+      WHERE gr.tenant_id = ? AND gr.record_date >= ? AND gr.record_date <= ?
         AND gr.teacher_id IS NOT NULL
         AND gr.status <> 'pre_enroll'
       GROUP BY gr.teacher_id, t.name, gr.group_id, g.name, g.duration_hours,
                g.teacher_hourly_rate, g.salary_type, g.monthly_salary, gr.record_date
       ORDER BY t.name ASC, g.name ASC, gr.record_date ASC`,
-    [from, to]
+    [tenantId, from, to]
   )
 
   // 收集月薪型 (group_id, ym) 桶與 (teacher, group, ym) 區間內堂數 X
@@ -1494,14 +1506,14 @@ export async function settlementSalary(from, to) {
               DATE_FORMAT(gr.record_date, '%Y-%m') AS ym,
               COUNT(DISTINCT CONCAT(gr.record_date, '|', gr.teacher_id)) AS total
          FROM group_records gr
-         JOIN \`groups\` g ON g.id = gr.group_id
-        WHERE gr.group_id IN (?)
+         JOIN \`groups\` g ON g.id = gr.group_id AND g.tenant_id = gr.tenant_id
+        WHERE gr.tenant_id = ? AND gr.group_id IN (?)
           AND gr.record_date >= ? AND gr.record_date <= ?
           AND gr.teacher_id IS NOT NULL
           AND gr.status <> 'pre_enroll'
           AND g.salary_type = 'monthly'
         GROUP BY gr.group_id, ym`,
-      [Array.from(monthlyGroupIds), monthRangeFrom, monthRangeTo]
+      [tenantId, Array.from(monthlyGroupIds), monthRangeFrom, monthRangeTo]
     )
     const yMap = new Map()
     for (const r of yRows) yMap.set(`${r.group_id}::${r.ym}`, parseInt(r.total, 10))
@@ -1549,9 +1561,9 @@ export async function settlementSalary(from, to) {
 // 計入「課次」的狀態（pending / pre_enroll 視為尚未發生，不算）
 const COUNTABLE_STATUSES = ['attended', 'leave', 'rescheduled', 'makeup']
 
-export async function statsReschedule(from, to, studentId = null) {
-  const params = [from, to, ...COUNTABLE_STATUSES]
-  let where = 'lr.lesson_date >= ? AND lr.lesson_date <= ? AND lr.status IN (?, ?, ?, ?)'
+export async function statsReschedule(tenantId, from, to, studentId = null) {
+  const params = [tenantId, from, to, ...COUNTABLE_STATUSES]
+  let where = 'lr.tenant_id = ? AND lr.lesson_date >= ? AND lr.lesson_date <= ? AND lr.status IN (?, ?, ?, ?)'
   if (studentId) {
     where += ' AND lr.student_id = ?'
     params.push(studentId)
@@ -1559,7 +1571,7 @@ export async function statsReschedule(from, to, studentId = null) {
   const [rows] = await pool.query(
     `SELECT lr.student_id, s.name AS student_name, lr.status, COUNT(*) AS n
        FROM lesson_records lr
-       JOIN students s ON s.id = lr.student_id
+       JOIN students s ON s.id = lr.student_id AND s.tenant_id = lr.tenant_id
       WHERE ${where}
       GROUP BY lr.student_id, s.name, lr.status`,
     params
@@ -1622,48 +1634,49 @@ export async function statsReschedule(from, to, studentId = null) {
 
 // ── Materials ─────────────────────────────────────────────────────────────────
 
-export async function listMaterials() {
+export async function listMaterials(tenantId) {
   const [rows] = await pool.query(
-    'SELECT id, name, unit_price FROM materials ORDER BY unit_price DESC, id DESC'
+    'SELECT id, name, unit_price FROM materials WHERE tenant_id = ? ORDER BY unit_price DESC, id DESC',
+    [tenantId]
   )
   return rows
 }
 
-export async function insertMaterial({ id, name, unitPrice }) {
-  await pool.query('INSERT INTO materials (id, name, unit_price) VALUES (?, ?, ?)', [id, name, unitPrice ?? 0])
+export async function insertMaterial(tenantId, { id, name, unitPrice }) {
+  await pool.query('INSERT INTO materials (id, tenant_id, name, unit_price) VALUES (?, ?, ?, ?)', [id, tenantId, name, unitPrice ?? 0])
 }
 
-export async function updateMaterial(id, { name, unitPrice }) {
+export async function updateMaterial(tenantId, id, { name, unitPrice }) {
   const sets = []; const params = []
   if (name      !== undefined) { sets.push('name = ?');       params.push(name) }
   if (unitPrice !== undefined) { sets.push('unit_price = ?'); params.push(unitPrice) }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE materials SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE materials SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function deleteMaterial(id) {
-  const [res] = await pool.query('DELETE FROM materials WHERE id = ?', [id])
+export async function deleteMaterial(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM materials WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
 // ── Material Records ──────────────────────────────────────────────────────────
 
-export async function listMaterialRecords({ from, to, studentId } = {}) {
-  const conditions = []; const params = []
+export async function listMaterialRecords(tenantId, { from, to, studentId } = {}) {
+  const conditions = ['mr.tenant_id = ?']; const params = [tenantId]
   if (from)      { conditions.push('mr.record_date >= ?'); params.push(from) }
   if (to)        { conditions.push('mr.record_date <= ?'); params.push(to) }
   if (studentId) { conditions.push('mr.student_id = ?');   params.push(studentId) }
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+  const where = 'WHERE ' + conditions.join(' AND ')
   const [rows] = await pool.query(
     `SELECT mr.id, mr.student_id, s.name AS student_name,
             mr.material_id, m.name AS material_name,
             COALESCE(mr.unit_price, m.unit_price) AS unit_price,
             mr.quantity, mr.record_date, mr.note
      FROM material_records mr
-     JOIN students  s ON s.id = mr.student_id
-     JOIN materials m ON m.id = mr.material_id
+     JOIN students  s ON s.id = mr.student_id  AND s.tenant_id = mr.tenant_id
+     JOIN materials m ON m.id = mr.material_id AND m.tenant_id = mr.tenant_id
      ${where}
      ORDER BY mr.record_date DESC, mr.created_at DESC`,
     params
@@ -1671,36 +1684,36 @@ export async function listMaterialRecords({ from, to, studentId } = {}) {
   return rows
 }
 
-export async function insertMaterialRecord({ id, studentId, materialId, quantity, recordDate, note, unitPrice }) {
+export async function insertMaterialRecord(tenantId, { id, studentId, materialId, quantity, recordDate, note, unitPrice }) {
   // 沒指定就 snapshot 當下 materials.unit_price
   let snapPrice = unitPrice
   if (snapPrice === undefined || snapPrice === null) {
-    const [matRows] = await pool.query('SELECT unit_price FROM materials WHERE id = ? LIMIT 1', [materialId])
+    const [matRows] = await pool.query('SELECT unit_price FROM materials WHERE id = ? AND tenant_id = ? LIMIT 1', [materialId, tenantId])
     snapPrice = matRows[0]?.unit_price ?? 0
   }
   await pool.query(
-    `INSERT INTO material_records (id, student_id, material_id, quantity, unit_price, record_date, note)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, studentId, materialId, quantity ?? 1, snapPrice, recordDate, note || '']
+    `INSERT INTO material_records (id, tenant_id, student_id, material_id, quantity, unit_price, record_date, note)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, tenantId, studentId, materialId, quantity ?? 1, snapPrice, recordDate, note || '']
   )
 }
 
-export async function sumMaterialCost({ from, to } = {}) {
-  const conds = []; const params = []
+export async function sumMaterialCost(tenantId, { from, to } = {}) {
+  const conds = ['mr.tenant_id = ?']; const params = [tenantId]
   if (from) { conds.push('mr.record_date >= ?'); params.push(from) }
   if (to)   { conds.push('mr.record_date <= ?'); params.push(to) }
-  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : ''
+  const where = 'WHERE ' + conds.join(' AND ')
   const [rows] = await pool.query(
     `SELECT COALESCE(SUM(mr.quantity * COALESCE(mr.unit_price, m.unit_price)), 0) AS total
        FROM material_records mr
-       JOIN materials m ON m.id = mr.material_id
+       JOIN materials m ON m.id = mr.material_id AND m.tenant_id = mr.tenant_id
        ${where}`,
     params
   )
   return parseFloat(rows[0]?.total || 0)
 }
 
-export async function updateMaterialRecord(id, { studentId, materialId, quantity, recordDate, note, unitPrice }) {
+export async function updateMaterialRecord(tenantId, id, { studentId, materialId, quantity, recordDate, note, unitPrice }) {
   const sets = []; const params = []
   if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
   if (materialId !== undefined) { sets.push('material_id = ?'); params.push(materialId) }
@@ -1711,25 +1724,26 @@ export async function updateMaterialRecord(id, { studentId, materialId, quantity
   if (unitPrice !== undefined) {
     sets.push('unit_price = ?'); params.push(unitPrice)
   } else if (materialId !== undefined) {
-    const [mr] = await pool.query('SELECT unit_price FROM materials WHERE id = ? LIMIT 1', [materialId])
+    const [mr] = await pool.query('SELECT unit_price FROM materials WHERE id = ? AND tenant_id = ? LIMIT 1', [materialId, tenantId])
     sets.push('unit_price = ?'); params.push(mr[0]?.unit_price ?? 0)
   }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE material_records SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE material_records SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function deleteMaterialRecord(id) {
-  const [res] = await pool.query('DELETE FROM material_records WHERE id = ?', [id])
+export async function deleteMaterialRecord(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM material_records WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
 // ── Groups ───────────────────────────────────────────────────────────────────
 
-export async function listGroups() {
+export async function listGroups(tenantId) {
   const [rows] = await pool.query(
-    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, salary_type, monthly_salary, note, default_teacher_id, sort_order FROM `groups` ORDER BY sort_order ASC, monthly_fee DESC, id DESC'
+    'SELECT id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, salary_type, monthly_salary, note, default_teacher_id, sort_order FROM `groups` WHERE tenant_id = ? ORDER BY sort_order ASC, monthly_fee DESC, id DESC',
+    [tenantId]
   )
   return rows.map(r => ({
     ...r,
@@ -1739,21 +1753,21 @@ export async function listGroups() {
   }))
 }
 
-export async function reorderGroups(orderedIds) {
+export async function reorderGroups(tenantId, orderedIds) {
   if (!Array.isArray(orderedIds) || orderedIds.length === 0) return
   const cases = orderedIds.map((_, i) => `WHEN ? THEN ${(i + 1) * 10}`).join(' ')
-  const sql = 'UPDATE `groups` SET sort_order = CASE id ' + cases + ' ELSE sort_order END WHERE id IN (?)'
-  await pool.query(sql, [...orderedIds, orderedIds])
+  const sql = 'UPDATE `groups` SET sort_order = CASE id ' + cases + ' ELSE sort_order END WHERE id IN (?) AND tenant_id = ?'
+  await pool.query(sql, [...orderedIds, orderedIds, tenantId])
 }
 
-export async function insertGroup({ id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId }) {
+export async function insertGroup(tenantId, { id, name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId }) {
   await pool.query(
-    'INSERT INTO `groups` (id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, salary_type, monthly_salary, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, teacherHourlyRate ?? 0, salaryType || 'hourly', monthlySalary ?? 0, note || '', defaultTeacherId || null]
+    'INSERT INTO `groups` (id, tenant_id, name, weekdays, duration_months, monthly_fee, start_time, duration_hours, teacher_hourly_rate, salary_type, monthly_salary, note, default_teacher_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, tenantId, name, weekdays || '', durationMonths ?? 0, monthlyFee ?? 0, startTime || null, durationHours ?? 0, teacherHourlyRate ?? 0, salaryType || 'hourly', monthlySalary ?? 0, note || '', defaultTeacherId || null]
   )
 }
 
-export async function updateGroup(id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId }) {
+export async function updateGroup(tenantId, id, { name, weekdays, durationMonths, monthlyFee, startTime, durationHours, teacherHourlyRate, salaryType, monthlySalary, note, defaultTeacherId }) {
   const sets = []; const params = []
   if (name              !== undefined) { sets.push('name = ?');                params.push(name) }
   if (weekdays          !== undefined) { sets.push('weekdays = ?');            params.push(weekdays || '') }
@@ -1767,26 +1781,26 @@ export async function updateGroup(id, { name, weekdays, durationMonths, monthlyF
   if (note              !== undefined) { sets.push('note = ?');                params.push(note || '') }
   if (defaultTeacherId  !== undefined) { sets.push('default_teacher_id = ?');  params.push(defaultTeacherId || null) }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE \`groups\` SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function deleteGroup(id) {
-  const [res] = await pool.query('DELETE FROM `groups` WHERE id = ?', [id])
+export async function deleteGroup(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM `groups` WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
 // ── Group Records ────────────────────────────────────────────────────────────
 
-export async function listGroupRecords({ from, to, groupId, studentId, teacherId } = {}) {
-  const conditions = []; const params = []
+export async function listGroupRecords(tenantId, { from, to, groupId, studentId, teacherId } = {}) {
+  const conditions = ['gr.tenant_id = ?']; const params = [tenantId]
   if (from)      { conditions.push('gr.record_date >= ?'); params.push(from) }
   if (to)        { conditions.push('gr.record_date <= ?'); params.push(to) }
   if (groupId)   { conditions.push('gr.group_id = ?');     params.push(groupId) }
   if (studentId) { conditions.push('gr.student_id = ?');   params.push(studentId) }
   if (teacherId) { conditions.push('gr.teacher_id = ?');   params.push(teacherId) }
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+  const where = 'WHERE ' + conditions.join(' AND ')
   const [rows] = await pool.query(
     `SELECT gr.id, gr.group_id, g.name AS group_name,
             gr.student_id, s.name AS student_name,
@@ -1795,9 +1809,9 @@ export async function listGroupRecords({ from, to, groupId, studentId, teacherId
             g.start_time AS group_start_time,
             g.duration_hours AS group_duration_hours
      FROM group_records gr
-     JOIN \`groups\`  g ON g.id = gr.group_id
-     JOIN students   s ON s.id = gr.student_id
-     LEFT JOIN teachers t ON t.id = gr.teacher_id
+     JOIN \`groups\`  g ON g.id = gr.group_id  AND g.tenant_id = gr.tenant_id
+     JOIN students   s ON s.id = gr.student_id AND s.tenant_id = gr.tenant_id
+     LEFT JOIN teachers t ON t.id = gr.teacher_id AND t.tenant_id = gr.tenant_id
      ${where}
      ORDER BY gr.record_date DESC, gr.created_at DESC`,
     params
@@ -1805,15 +1819,15 @@ export async function listGroupRecords({ from, to, groupId, studentId, teacherId
   return rows
 }
 
-export async function insertGroupRecord({ id, groupId, studentId, teacherId, recordDate, note, status }) {
+export async function insertGroupRecord(tenantId, { id, groupId, studentId, teacherId, recordDate, note, status }) {
   await pool.query(
-    `INSERT INTO group_records (id, group_id, student_id, teacher_id, record_date, note, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, groupId, studentId, teacherId || null, recordDate, note || '', status || 'pending']
+    `INSERT INTO group_records (id, tenant_id, group_id, student_id, teacher_id, record_date, note, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, tenantId, groupId, studentId, teacherId || null, recordDate, note || '', status || 'pending']
   )
 }
 
-export async function updateGroupRecord(id, { groupId, studentId, teacherId, recordDate, note, status }) {
+export async function updateGroupRecord(tenantId, id, { groupId, studentId, teacherId, recordDate, note, status }) {
   const sets = []; const params = []
   if (groupId    !== undefined) { sets.push('group_id = ?');    params.push(groupId) }
   if (studentId  !== undefined) { sets.push('student_id = ?');  params.push(studentId) }
@@ -1822,31 +1836,31 @@ export async function updateGroupRecord(id, { groupId, studentId, teacherId, rec
   if (note       !== undefined) { sets.push('note = ?');        params.push(note || '') }
   if (status     !== undefined) { sets.push('status = ?');      params.push(status) }
   if (!sets.length) return false
-  params.push(id)
-  const [res] = await pool.query(`UPDATE group_records SET ${sets.join(', ')} WHERE id = ?`, params)
+  params.push(id, tenantId)
+  const [res] = await pool.query(`UPDATE group_records SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params)
   return res.affectedRows > 0
 }
 
-export async function deleteGroupRecord(id) {
-  const [res] = await pool.query('DELETE FROM group_records WHERE id = ?', [id])
+export async function deleteGroupRecord(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM group_records WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }
 
 // ── Group Members（應到名單） ─────────────────────────────────────────────────
 
-export async function listGroupMembers(groupId) {
+export async function listGroupMembers(tenantId, groupId) {
   const [rows] = await pool.query(
     `SELECT s.id, s.name
        FROM group_members gm
-       JOIN students s ON s.id = gm.student_id
+       JOIN students s ON s.id = gm.student_id AND s.tenant_id = ?
       WHERE gm.group_id = ?
       ORDER BY s.name ASC, s.id ASC`,
-    [groupId]
+    [tenantId, groupId]
   )
   return rows
 }
 
-export async function setGroupMembers(groupId, studentIds) {
+export async function setGroupMembers(tenantId, groupId, studentIds) {
   const cleaned = Array.from(new Set((studentIds || []).filter(Boolean)))
   const [existRows] = await pool.query(
     'SELECT student_id FROM group_members WHERE group_id = ?',
@@ -1862,45 +1876,45 @@ export async function setGroupMembers(groupId, studentIds) {
   }
 
   for (const sid of newlyAdded) {
-    try { await backfillGroupRecordsForStudent(groupId, sid) }
+    try { await backfillGroupRecordsForStudent(tenantId, groupId, sid) }
     catch (e) { console.error('[backfillGroupRecords] failed:', groupId, sid, e) }
   }
 }
 
 // ── Share Tokens ──────────────────────────────────────────────────────────────
 
-export async function insertShareToken({ id, token, studentId, periodFrom, periodTo, expiresAt }) {
+export async function insertShareToken(tenantId, { id, token, studentId, periodFrom, periodTo, expiresAt }) {
   await pool.query(
-    `INSERT INTO share_tokens (id, token, student_id, period_from, period_to, expires_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [id, token, studentId, periodFrom, periodTo, expiresAt]
+    `INSERT INTO share_tokens (id, tenant_id, token, student_id, period_from, period_to, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, tenantId, token, studentId, periodFrom, periodTo, expiresAt]
   )
 }
 
 export async function getShareTokenByToken(token) {
   const [rows] = await pool.query(
-    `SELECT st.id, st.token, st.student_id, s.name AS student_name,
+    `SELECT st.id, st.token, st.tenant_id, st.student_id, s.name AS student_name,
             st.period_from, st.period_to, st.expires_at
      FROM share_tokens st
-     JOIN students s ON s.id = st.student_id
+     JOIN students s ON s.id = st.student_id AND s.tenant_id = st.tenant_id
      WHERE st.token = ?`,
     [token]
   )
   return rows[0] || null
 }
 
-export async function getStudentBill(studentId, from, to) {
+export async function getStudentBill(tenantId, studentId, from, to) {
   // 家教課：先抓區間內 *所有* lessons（不只該生）以計算「同日同課同師」實際人數
   const [allLessonRows] = await pool.query(
     `SELECT lr.student_id, lr.teacher_id, lr.lesson_date, lr.hours, lr.unit_price, lr.note,
             c.id AS course_id, c.name AS course_name, c.hourly_rate AS course_hourly_rate, c.discount_per_student AS course_discount_per_student,
             t.name AS teacher_name
      FROM lesson_records lr
-     JOIN courses  c ON c.id = lr.course_id
-     LEFT JOIN teachers t ON t.id = lr.teacher_id
-     WHERE lr.lesson_date >= ? AND lr.lesson_date <= ?
+     JOIN courses  c ON c.id = lr.course_id AND c.tenant_id = lr.tenant_id
+     LEFT JOIN teachers t ON t.id = lr.teacher_id AND t.tenant_id = lr.tenant_id
+     WHERE lr.tenant_id = ? AND lr.lesson_date >= ? AND lr.lesson_date <= ?
      ORDER BY lr.lesson_date ASC`,
-    [from, to]
+    [tenantId, from, to]
   )
   const sessionStudents = buildSessionStudents(allLessonRows)
   const lessonRows = allLessonRows.filter(r => r.student_id === studentId)
@@ -1933,11 +1947,11 @@ export async function getStudentBill(studentId, from, to) {
     `SELECT gr.group_id, g.name AS group_name, g.monthly_fee,
             COUNT(DISTINCT DATE_FORMAT(gr.record_date, '%Y-%m')) AS billable_months
      FROM group_records gr
-     JOIN \`groups\` g ON g.id = gr.group_id
-     WHERE gr.student_id = ? AND gr.record_date >= ? AND gr.record_date <= ?
+     JOIN \`groups\` g ON g.id = gr.group_id AND g.tenant_id = gr.tenant_id
+     WHERE gr.tenant_id = ? AND gr.student_id = ? AND gr.record_date >= ? AND gr.record_date <= ?
      GROUP BY gr.group_id, g.name, g.monthly_fee
      ORDER BY g.name ASC`,
-    [studentId, from, to]
+    [tenantId, studentId, from, to]
   )
   const groups = groupRows.map(row => {
     const months = parseInt(row.billable_months, 10)
@@ -1952,10 +1966,10 @@ export async function getStudentBill(studentId, from, to) {
     `SELECT mr.record_date, mr.quantity, mr.note,
             m.id AS material_id, m.name AS material_name, m.unit_price
      FROM material_records mr
-     JOIN materials m ON m.id = mr.material_id
-     WHERE mr.student_id = ? AND mr.record_date >= ? AND mr.record_date <= ?
+     JOIN materials m ON m.id = mr.material_id AND m.tenant_id = mr.tenant_id
+     WHERE mr.tenant_id = ? AND mr.student_id = ? AND mr.record_date >= ? AND mr.record_date <= ?
      ORDER BY mr.record_date ASC`,
-    [studentId, from, to]
+    [tenantId, studentId, from, to]
   )
   const materialMap = new Map()
   for (const row of materialRows) {
@@ -1982,16 +1996,16 @@ export async function getStudentBill(studentId, from, to) {
 
 // ── Payment Records ───────────────────────────────────────────────────────────
 
-export async function listPaymentRecords({ from, to } = {}) {
-  const conditions = []; const params = []
+export async function listPaymentRecords(tenantId, { from, to } = {}) {
+  const conditions = ['pr.tenant_id = ?']; const params = [tenantId]
   if (from) { conditions.push('pr.period_from >= ?'); params.push(from) }
   if (to)   { conditions.push('pr.period_to <= ?');   params.push(to) }
-  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : ''
+  const where = 'WHERE ' + conditions.join(' AND ')
   const [rows] = await pool.query(
     `SELECT pr.id, pr.student_id, s.name AS student_name,
             pr.period_from, pr.period_to, pr.paid_at, pr.note
      FROM payment_records pr
-     JOIN students s ON s.id = pr.student_id
+     JOIN students s ON s.id = pr.student_id AND s.tenant_id = pr.tenant_id
      ${where}
      ORDER BY pr.paid_at DESC`,
     params
@@ -1999,15 +2013,15 @@ export async function listPaymentRecords({ from, to } = {}) {
   return rows
 }
 
-export async function insertPaymentRecord({ id, studentId, periodFrom, periodTo, note }) {
+export async function insertPaymentRecord(tenantId, { id, studentId, periodFrom, periodTo, note }) {
   await pool.query(
-    `INSERT INTO payment_records (id, student_id, period_from, period_to, note)
-     VALUES (?, ?, ?, ?, ?)`,
-    [id, studentId, periodFrom, periodTo, note || '']
+    `INSERT INTO payment_records (id, tenant_id, student_id, period_from, period_to, note)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, tenantId, studentId, periodFrom, periodTo, note || '']
   )
 }
 
-export async function deletePaymentRecord(id) {
-  const [res] = await pool.query('DELETE FROM payment_records WHERE id = ?', [id])
+export async function deletePaymentRecord(tenantId, id) {
+  const [res] = await pool.query('DELETE FROM payment_records WHERE id = ? AND tenant_id = ?', [id, tenantId])
   return res.affectedRows > 0
 }

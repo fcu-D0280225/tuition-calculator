@@ -302,7 +302,7 @@ function buildSessionCookie(token, maxAgeSec) {
 
 async function findUserByUsername(username) {
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.password_hash, u.group_id, u.teacher_id, g.name AS group_name, g.is_admin
+    `SELECT u.id, u.username, u.password_hash, u.group_id, u.teacher_id, u.tenant_id, g.name AS group_name, g.is_admin
        FROM auth_users u
        LEFT JOIN auth_groups g ON g.id = u.group_id
       WHERE u.username = ? LIMIT 1`,
@@ -313,7 +313,7 @@ async function findUserByUsername(username) {
 
 async function findUserById(id) {
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.group_id, u.teacher_id, g.name AS group_name, g.is_admin
+    `SELECT u.id, u.username, u.group_id, u.teacher_id, u.tenant_id, g.name AS group_name, g.is_admin
        FROM auth_users u
        LEFT JOIN auth_groups g ON g.id = u.group_id
       WHERE u.id = ? LIMIT 1`,
@@ -363,7 +363,7 @@ async function createSession(userId) {
 async function getSessionUser(token) {
   if (!token) return null
   const [rows] = await pool.query(
-    `SELECT u.id, u.username, u.group_id, u.teacher_id, g.name AS group_name, g.is_admin, s.expires_at
+    `SELECT u.id, u.username, u.group_id, u.teacher_id, u.tenant_id, g.name AS group_name, g.is_admin, s.expires_at
        FROM auth_sessions s
        JOIN auth_users u ON u.id = s.user_id
        LEFT JOIN auth_groups g ON g.id = u.group_id
@@ -380,6 +380,7 @@ async function getSessionUser(token) {
     id: row.id, username: row.username,
     group_id: row.group_id, group_name: row.group_name,
     teacher_id: row.teacher_id || null,
+    tenant_id: row.tenant_id || 1,
     is_admin: !!row.is_admin,
   }
 }
@@ -510,6 +511,7 @@ export function registerAuthRoutes(app) {
         group: user.group_id ? { id: user.group_id, name: user.group_name } : null,
         is_admin: !!user.is_admin,
         teacher_id: user.teacher_id || null,
+        tenant_id: user.tenant_id || 1,
         permissions: perms,
       })
     } catch (e) {
@@ -541,6 +543,7 @@ export function registerAuthRoutes(app) {
         group: user.group_id ? { id: user.group_id, name: user.group_name } : null,
         is_admin: !!user.is_admin,
         teacher_id: user.teacher_id || null,
+        tenant_id: user.tenant_id || 1,
         permissions: perms,
       })
     } catch (e) {
