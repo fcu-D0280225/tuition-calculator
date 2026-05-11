@@ -395,11 +395,13 @@ const PUBLIC_PATHS = new Set([
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/me',
+  '/api/auth/register-with-invite',
 ])
 
 function isPublicPath(p) {
   if (PUBLIC_PATHS.has(p)) return true
   if (p.startsWith('/api/share/')) return true
+  if (p.startsWith('/api/invites/')) return true
   return false
 }
 
@@ -550,6 +552,135 @@ export function registerAuthRoutes(app) {
     } catch (e) {
       console.error(e)
       res.status(500).json({ error: 'failed' })
+    }
+  })
+
+  // ─── 邀請 Token（public）───────────────────────────────────────────────────
+
+  // GET /api/invites/:token — 查詢邀請資訊（public，不需登入）
+  app.get('/api/invites/:token', async (req, res) => {
+    const token = req.params.token
+    try {
+      const [rows] = await pool.query(
+        `SELECT i.token, i.tenant_id, i.group_id, i.expires_at, i.used_at,
+                t.name AS tenant_name,
+                g.name AS group_name
+           FROM tenant_invites i
+           JOIN tenants     t ON t.id = i.tenant_id
+           JOIN auth_groups g ON g.id = i.group_id
+          WHERE i.token = ? LIMIT 1`,
+        [token]
+      )
+      if (!rows[0]) return res.status(404).json({ error: 'not_found' })
+      const inv = rows[0]
+      if (new Date(inv.expires_at) < new Date()) return res.status(410).json({ error: 'expired' })
+      if (inv.used_at) return res.status(410).json({ error: 'already_used' })
+      res.json({
+        tenant: { id: inv.tenant_id, name: inv.tenant_name },
+        group:  { id: inv.group_id,  name: inv.group_name  },
+        expires_at: inv.expires_at,
+      })
+    } catch (e) {
+      console.error(e)
+      res.status(500).json({ error: 'failed' })
+    }
+  })
+
+  // POST /api/auth/register-with-invite — 用 token 完成註冊（public）
+  app.post('/api/auth/register-with-invite', async (req, res) => {
+    const token    = typeof req.body?.token    === 'string' ? req.body.token.trim()    : ''
+    const username = typeof req.body?.username === 'string' ? req.body.username.trim() : ''
+    const password = typeof req.body?.password === 'string' ? req.body.password        : ''
+    if (!token)    return res.status(400).json({ error: 'token_required' })
+    if (!username) return res.status(400).json({ error: 'username_required' })
+    if (password.length < 6) return res.status(400).json({ error: 'password_too_short' })
+
+    const conn = await pool.getConnection()
+    try {
+      await conn.beginTransaction()
+
+      // 用 FOR UPDATE 鎖住 token row，防止 race condition
+      const [invRows] = await conn.query(
+        `SELECT i.token, i.tenant_id, i.group_id, i.expires_at, i.used_at,
+                g.is_admin AS group_is_admin
+           FROM tenant_invites i
+           JOIN auth_groups g ON g.id = i.group_id
+          WHERE i.token = ? LIMIT 1 FOR UPDATE`,
+        [token]
+      )
+      if (!invRows[0]) {
+        await conn.rollback()
+        return res.status(404).json({ error: 'not_found' })
+      }
+      const inv = invRows[0]
+      if (new Date(inv.expires_at) < new Date()) {
+        await conn.rollback()
+        return res.status(410).json({ error: 'expired' })
+      }
+      if (inv.used_at) {
+        await conn.rollback()
+        return res.status(410).json({ error: 'already_used' })
+      }
+
+      // 檢查同 tenant 是否有同名帳號
+      const [dupRows] = await conn.query(
+        'SELECT id FROM auth_users WHERE tenant_id = ? AND username = ? LIMIT 1',
+        [inv.tenant_id, username]
+      )
+      if (dupRows.length > 0) {
+        await conn.rollback()
+        return res.status(409).json({ error: 'username_taken' })
+      }
+
+      // 建立新使用者
+      const newUserId = `au_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+      await conn.query(
+        'INSERT INTO auth_users (id, tenant_id, username, password_hash, is_admin, group_id) VALUES (?, ?, ?, ?, ?, ?)',
+        [newUserId, inv.tenant_id, username, hashPassword(password), inv.group_is_admin ? 1 : 0, inv.group_id]
+      )
+
+      // 標記 token 已使用
+      await conn.query(
+        'UPDATE tenant_invites SET used_at = NOW(), used_by_user_id = ? WHERE token = ?',
+        [newUserId, token]
+      )
+
+      await conn.commit()
+
+      // 建立 session，自動登入
+      const sessionToken = crypto.randomBytes(32).toString('base64url')
+      const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString().slice(0, 19).replace('T', ' ')
+      await pool.query(
+        'INSERT INTO auth_sessions (token, user_id, expires_at) VALUES (?, ?, ?)',
+        [sessionToken, newUserId, expiresAt]
+      )
+      res.setHeader('Set-Cookie', buildSessionCookie(sessionToken, SESSION_TTL_MS / 1000))
+
+      // 取得群組資訊
+      const [grpRows] = await pool.query(
+        'SELECT id, name, is_admin FROM auth_groups WHERE id = ? LIMIT 1',
+        [inv.group_id]
+      )
+      const grp = grpRows[0]
+      const perms = grp?.is_admin ? VALID_NAV_IDS : (await (async () => {
+        const [p] = await pool.query('SELECT nav_id FROM auth_group_permissions WHERE group_id = ?', [inv.group_id])
+        return p.map(r => r.nav_id)
+      })())
+
+      res.json({
+        user: { id: newUserId, username },
+        group: grp ? { id: grp.id, name: grp.name } : null,
+        is_admin: !!grp?.is_admin,
+        teacher_id: null,
+        tenant_id: inv.tenant_id,
+        permissions: perms,
+      })
+    } catch (e) {
+      await conn.rollback()
+      console.error(e)
+      res.status(500).json({ error: 'failed' })
+    } finally {
+      conn.release()
     }
   })
 
@@ -795,5 +926,117 @@ export function registerAdminRoutes(app) {
       if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
       res.status(204).end()
     } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+  })
+
+  // ─── 邀請 Token 管理（admin only）──────────────────────────────────────────
+
+  // POST /api/admin/invites — 產生邀請 token
+  app.post('/api/admin/invites', requireAdmin(), async (req, res) => {
+    const groupId     = typeof req.body?.group_id === 'string' ? req.body.group_id.trim() : ''
+    const expiresInDays = req.body?.expires_in_days !== undefined
+      ? parseInt(req.body.expires_in_days, 10)
+      : 7
+
+    if (!groupId) return res.status(400).json({ error: 'group_id_required' })
+    if (isNaN(expiresInDays) || expiresInDays < 1 || expiresInDays > 30) {
+      return res.status(400).json({ error: 'expires_in_days_out_of_range' })
+    }
+
+    try {
+      // 確認 group 屬於同一 tenant
+      const [grpRows] = await pool.query(
+        'SELECT id, name, tenant_id FROM auth_groups WHERE id = ? LIMIT 1',
+        [groupId]
+      )
+      if (!grpRows[0] || grpRows[0].tenant_id !== req.user.tenant_id) {
+        return res.status(400).json({ error: 'invalid_group' })
+      }
+
+      const token = crypto.randomBytes(48).toString('base64url')
+      const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+        .toISOString().slice(0, 19).replace('T', ' ')
+
+      await pool.query(
+        `INSERT INTO tenant_invites (token, tenant_id, group_id, created_by, expires_at)
+         VALUES (?, ?, ?, ?, ?)`,
+        [token, req.user.tenant_id, groupId, req.user.id, expiresAt]
+      )
+
+      res.status(201).json({
+        token,
+        tenant_id: req.user.tenant_id,
+        group_id: groupId,
+        expires_at: expiresAt,
+        invite_url: `/invite/${token}`,
+      })
+    } catch (e) {
+      console.error(e)
+      res.status(500).json({ error: 'failed' })
+    }
+  })
+
+  // GET /api/admin/invites — 列出自己 tenant 的所有邀請
+  app.get('/api/admin/invites', requireAdmin(), async (req, res) => {
+    try {
+      const [rows] = await pool.query(
+        `SELECT i.token, i.expires_at, i.used_at, i.created_at,
+                g.id AS group_id, g.name AS group_name,
+                uc.username AS created_by_username,
+                uu.username AS used_by_username
+           FROM tenant_invites i
+           JOIN auth_groups g  ON g.id = i.group_id
+           JOIN auth_users  uc ON uc.id = i.created_by
+           LEFT JOIN auth_users uu ON uu.id = i.used_by_user_id
+          WHERE i.tenant_id = ?
+          ORDER BY i.created_at DESC`,
+        [req.user.tenant_id]
+      )
+
+      const now = new Date()
+      res.json(rows.map(r => {
+        let status = 'active'
+        if (r.used_at) status = 'used'
+        else if (new Date(r.expires_at) < now) status = 'expired'
+        return {
+          token: r.token,
+          group: { id: r.group_id, name: r.group_name },
+          created_by_username: r.created_by_username,
+          expires_at: r.expires_at,
+          used_at: r.used_at || null,
+          used_by_username: r.used_by_username || null,
+          status,
+          created_at: r.created_at,
+        }
+      }))
+    } catch (e) {
+      console.error(e)
+      res.status(500).json({ error: 'failed' })
+    }
+  })
+
+  // DELETE /api/admin/invites/:token — 撤銷邀請
+  app.delete('/api/admin/invites/:token', requireAdmin(), async (req, res) => {
+    const token = req.params.token
+    try {
+      const [rows] = await pool.query(
+        'SELECT token, tenant_id, used_at, expires_at FROM tenant_invites WHERE token = ? LIMIT 1',
+        [token]
+      )
+      if (!rows[0] || rows[0].tenant_id !== req.user.tenant_id) {
+        return res.status(404).json({ error: 'not_found' })
+      }
+      const inv = rows[0]
+      if (inv.used_at) return res.status(400).json({ error: 'already_used' })
+
+      // 已過期也刪掉（noop 語意但仍清除）
+      await pool.query(
+        'DELETE FROM tenant_invites WHERE token = ? AND tenant_id = ?',
+        [token, req.user.tenant_id]
+      )
+      res.json({ ok: true })
+    } catch (e) {
+      console.error(e)
+      res.status(500).json({ error: 'failed' })
+    }
   })
 }
