@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useStudents } from '../contexts/StudentsContext.jsx'
 import { useTeachers } from '../contexts/TeachersContext.jsx'
 import { useGroups } from '../contexts/GroupsContext.jsx'
@@ -11,12 +11,12 @@ function todayStr() {
 }
 
 const STATUS_OPTIONS = [
-  { value: 'attended',    label: '已點名' },
-  { value: 'pending',     label: '未點名' },
-  { value: 'pre_enroll',  label: '尚未開始' },
-  { value: 'leave',       label: '請假' },
-  { value: 'rescheduled', label: '改課' },
-  { value: 'makeup',      label: '補課' },
+  { value: 'attended',    label: '已點名',   cls: 'status-attended' },
+  { value: 'pending',     label: '未點名',   cls: 'status-pending' },
+  { value: 'pre_enroll',  label: '尚未開始', cls: 'status-pre' },
+  { value: 'leave',       label: '請假',     cls: 'status-leave' },
+  { value: 'rescheduled', label: '改課',     cls: 'status-rescheduled' },
+  { value: 'makeup',      label: '補課',     cls: 'status-makeup' },
 ]
 
 function getDisplayStatus(record) {
@@ -69,6 +69,7 @@ export default function GroupLessonsPage() {
   const [filterGroups, setFilterGroups]     = useState([])  // 多選團課
   const [filterStudents, setFilterStudents] = useState([])  // 多選學生
   const [filterTeacher, setFilterTeacher]   = useState('')
+  const [filterStatuses, setFilterStatuses] = useState(() => new Set())
 
   function handleFilter(e) {
     e.preventDefault()
@@ -81,7 +82,16 @@ export default function GroupLessonsPage() {
   }
   function resetFilter() {
     setFilterFrom(''); setFilterTo(''); setFilterGroups([]); setFilterStudents([]); setFilterTeacher('')
+    setFilterStatuses(new Set())
     loadGroupRecords()
+  }
+  function toggleStatusFilter(value) {
+    setFilterStatuses(prev => {
+      const next = new Set(prev)
+      if (next.has(value)) next.delete(value)
+      else next.add(value)
+      return next
+    })
   }
   function addFilterGroup(id) {
     if (!id) return
@@ -318,10 +328,28 @@ export default function GroupLessonsPage() {
         </div>
       )}
 
+      <div className="status-filter-bar">
+        <span className="status-filter-label">點名狀態：</span>
+        {STATUS_OPTIONS.map(o => (
+          <button
+            key={o.value}
+            type="button"
+            className={`status-filter-chip ${o.cls}${filterStatuses.has(o.value) ? ' active' : ''}`}
+            onClick={() => toggleStatusFilter(o.value)}
+            aria-pressed={filterStatuses.has(o.value)}
+          >{o.label}</button>
+        ))}
+        {filterStatuses.size === 0
+          ? <span className="status-filter-label" style={{ marginLeft: 4 }}>（未選＝顯示全部）</span>
+          : <button type="button" className="status-filter-clear" onClick={() => setFilterStatuses(new Set())}>清除狀態</button>
+        }
+      </div>
+
       {(() => {
         const filtered = groupRecords.filter(r =>
           (filterGroups.length === 0 || filterGroups.includes(r.group_id)) &&
-          (filterStudents.length === 0 || filterStudents.includes(r.student_id))
+          (filterStudents.length === 0 || filterStudents.includes(r.student_id)) &&
+          (filterStatuses.size === 0 || filterStatuses.has(getDisplayStatus(r)))
         )
         if (filtered.length === 0) {
           return <div className="empty-hint">目前沒有團課上課紀錄</div>
@@ -342,73 +370,106 @@ export default function GroupLessonsPage() {
           <tbody>
             {filtered.map(r => (
               <tr key={r.id}>
-                {editGroupRecId === r.id ? (
-                  <Fragment>
-                    <td><input type="date" className="inline-edit-input" value={editGroupRec.record_date} onChange={e => setEditGroupRec(f => ({ ...f, record_date: e.target.value }))} /></td>
-                    <td>
-                      <div className="combobox-cell">
-                        <Combobox
-                          items={groups}
-                          value={editGroupRec.group_id}
-                          onChange={id => setEditGroupRec(f => ({ ...f, group_id: id }))}
-                          placeholder="搜尋團課…"
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <div className="combobox-cell">
-                        <Combobox
-                          items={activeStudents}
-                          value={editGroupRec.student_id}
-                          onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
-                          placeholder="搜尋學生…"
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <div className="combobox-cell">
-                        <Combobox
-                          items={activeTeachers}
-                          value={editGroupRec.teacher_id}
-                          onChange={id => setEditGroupRec(f => ({ ...f, teacher_id: id }))}
-                          placeholder="搜尋老師…"
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <select className="inline-edit-input"
-                        value={editGroupRec.status || 'attended'}
-                        onChange={e => setEditGroupRec(f => ({ ...f, status: e.target.value }))}
-                      >
-                        {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </td>
-                    <td><input type="text" className="inline-edit-input" value={editGroupRec.note} onChange={e => setEditGroupRec(f => ({ ...f, note: e.target.value }))} /></td>
-                    <td className="row-actions">
-                      <button className="btn-sm btn-primary" onClick={() => handleSaveEditGroupRec(r.id)} disabled={saving}>儲存</button>
-                      <button className="btn-sm" onClick={() => { setEditGroupRecId(null); setEditGroupRec(null) }}>取消</button>
-                    </td>
-                  </Fragment>
-                ) : (
-                  <Fragment>
-                    <td>{r.record_date}</td>
-                    <td>{r.group_name}</td>
-                    <td>{r.student_name}</td>
-                    <td>{r.teacher_name || <span style={{ color: 'var(--muted)' }}>—</span>}</td>
-                    <td><GroupRecordStatus record={r} /></td>
-                    <td className="note-cell">{r.note}</td>
-                    <td className="row-actions">
-                      <button className="btn-sm" onClick={() => startEditGroupRec(r)}>編輯</button>
-                      <button className="btn-sm btn-danger" onClick={() => handleDeleteGroupRecord(r.id)} disabled={saving}>刪除</button>
-                    </td>
-                  </Fragment>
-                )}
+                <td>{r.record_date}</td>
+                <td>{r.group_name}</td>
+                <td>{r.student_name}</td>
+                <td>{r.teacher_name || <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+                <td><GroupRecordStatus record={r} /></td>
+                <td className="note-cell">{r.note}</td>
+                <td className="row-actions">
+                  <button className="btn-sm" onClick={() => startEditGroupRec(r)}>編輯</button>
+                  <button className="btn-sm btn-danger" onClick={() => handleDeleteGroupRecord(r.id)} disabled={saving}>刪除</button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         )
       })()}
+
+      {editGroupRecId && editGroupRec && (
+        <div className="modal-overlay" onClick={() => !saving && (setEditGroupRecId(null), setEditGroupRec(null))}>
+          <div className="modal-card group-edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>編輯團課上課紀錄</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => !saving && (setEditGroupRecId(null), setEditGroupRec(null))}
+              >✕</button>
+            </div>
+            <div className="modal-body">
+              <label className="modal-field">
+                <span>日期</span>
+                <input
+                  type="date"
+                  value={editGroupRec.record_date}
+                  onChange={e => setEditGroupRec(f => ({ ...f, record_date: e.target.value }))}
+                />
+              </label>
+              <label className="modal-field">
+                <span>團課</span>
+                <Combobox
+                  items={groups}
+                  value={editGroupRec.group_id}
+                  onChange={id => setEditGroupRec(f => ({ ...f, group_id: id }))}
+                  placeholder="搜尋團課…"
+                />
+              </label>
+              <label className="modal-field">
+                <span>學生</span>
+                <Combobox
+                  items={activeStudents}
+                  value={editGroupRec.student_id}
+                  onChange={id => setEditGroupRec(f => ({ ...f, student_id: id }))}
+                  placeholder="搜尋學生…"
+                />
+              </label>
+              <label className="modal-field">
+                <span>老師</span>
+                <Combobox
+                  items={activeTeachers}
+                  value={editGroupRec.teacher_id}
+                  onChange={id => setEditGroupRec(f => ({ ...f, teacher_id: id }))}
+                  placeholder="搜尋老師…"
+                />
+              </label>
+              <label className="modal-field">
+                <span>狀態</span>
+                <select
+                  value={editGroupRec.status || 'attended'}
+                  onChange={e => setEditGroupRec(f => ({ ...f, status: e.target.value }))}
+                >
+                  {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </label>
+              <label className="modal-field">
+                <span>備註</span>
+                <input
+                  type="text"
+                  value={editGroupRec.note}
+                  onChange={e => setEditGroupRec(f => ({ ...f, note: e.target.value }))}
+                  placeholder="（選填）"
+                />
+              </label>
+              {error && <div className="error-msg">{error}</div>}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                onClick={() => { setEditGroupRecId(null); setEditGroupRec(null); setError('') }}
+                disabled={saving}
+              >取消</button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleSaveEditGroupRec(editGroupRecId)}
+                disabled={saving}
+              >{saving ? '儲存中…' : '儲存'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

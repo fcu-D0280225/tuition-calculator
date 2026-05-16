@@ -366,163 +366,35 @@ export default function GroupsPage() {
             <tbody>
               {displayGroups.map(g => (
                 <tr key={g.id}>
-                  <td>
-                    {editId === g.id ? (
-                      <input
-                        autoFocus
-                        className="inline-edit-input"
-                        value={editGroup.name}
-                        onChange={e => setEditGroup(eg => ({ ...eg, name: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleUpdateGroup(g.id); if (e.key === 'Escape') setEditId(null) }}
-                      />
-                    ) : g.name}
-                  </td>
-                  <td>
-                    {editId === g.id ? (
-                      <WeekdayPicker
-                        value={editGroup.weekdays}
-                        onChange={w => setEditGroup(eg => ({ ...eg, weekdays: w }))}
-                        disabled={saving}
-                      />
-                    ) : formatWeekdays(g.weekdays)}
-                  </td>
-                  <td>
-                    {editId === g.id ? (
-                      <div className="time-duration-edit">
-                        <input type="time" step="900" className="inline-edit-input"
-                          value={editGroup.start_time}
-                          onChange={e => setEditGroup(eg => ({ ...eg, start_time: e.target.value }))}
-                        />
-                        <input type="number" min="0" max="24" step="0.5" className="inline-edit-input"
-                          placeholder="時數"
-                          value={editGroup.duration_hours}
-                          onChange={e => setEditGroup(eg => ({ ...eg, duration_hours: e.target.value }))}
-                        />
-                      </div>
-                    ) : (g.start_time ? `${String(g.start_time).slice(0, 5)}（${parseFloat(g.duration_hours || 0)} 小時）` : '—')}
-                  </td>
-                  <td>
-                    {editId === g.id ? (
-                      <select
-                        value={editGroup.duration_months}
-                        onChange={e => setEditGroup(eg => ({ ...eg, duration_months: parseInt(e.target.value, 10) }))}
-                        className="inline-edit-input"
-                      >
-                        <option value={0}>未設定</option>
-                        <option value={1}>1 個月</option>
-                        <option value={2}>2 個月</option>
-                        <option value={3}>3 個月</option>
-                        <option value={4}>4 個月</option>
-                      </select>
-                    ) : (g.duration_months > 0 ? `${g.duration_months} 個月` : '—')}
-                  </td>
-                  <td>
-                    {editId === g.id ? (
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        className="inline-edit-input"
-                        value={editGroup.monthly_fee}
-                        onChange={e => setEditGroup(eg => ({ ...eg, monthly_fee: e.target.value }))}
-                      />
-                    ) : (g.monthly_fee > 0 ? amt(g.monthly_fee) : '—')}
-                  </td>
+                  <td>{g.name}</td>
+                  <td>{formatWeekdays(g.weekdays)}</td>
+                  <td>{g.start_time ? `${String(g.start_time).slice(0, 5)}（${parseFloat(g.duration_hours || 0)} 小時）` : '—'}</td>
+                  <td>{g.duration_months > 0 ? `${g.duration_months} 個月` : '—'}</td>
+                  <td>{g.monthly_fee > 0 ? amt(g.monthly_fee) : '—'}</td>
                   {canViewRates && (
                     <td>
-                      {editId === g.id ? (
-                        <div className="salary-cell-edit">
-                          <select
-                            className="inline-edit-input"
-                            value={editGroup.salary_type}
-                            onChange={e => setEditGroup(eg => ({ ...eg, salary_type: e.target.value }))}
-                          >
-                            <option value="hourly">時薪</option>
-                            <option value="monthly">月薪</option>
-                          </select>
-                          {editGroup.salary_type === 'monthly' ? (
-                            <>
-                              <input
-                                type="number" min="0" step="1"
-                                className="inline-edit-input"
-                                placeholder="月薪"
-                                value={editGroup.monthly_salary}
-                                onChange={e => setEditGroup(eg => ({ ...eg, monthly_salary: e.target.value }))}
-                              />
-                              <input
-                                type="number" min="0" step="1"
-                                className="inline-edit-input"
-                                placeholder="代課時薪"
-                                value={editGroup.teacher_hourly_rate}
-                                onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
-                              />
-                            </>
-                          ) : (
-                            <input
-                              type="number" min="0" step="1"
-                              className="inline-edit-input"
-                              placeholder="時薪"
-                              value={editGroup.teacher_hourly_rate}
-                              onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
-                            />
+                      {g.salary_type === 'monthly' ? (
+                        <>
+                          <span className="salary-type-badge salary-type-monthly">月薪</span>
+                          <span style={{ marginLeft: 6 }}>{g.monthly_salary > 0 ? amt(g.monthly_salary) : '—'}</span>
+                          {g.teacher_hourly_rate > 0 && (
+                            <div style={{ fontSize: 11, color: '#64748b' }}>代課 {amt(g.teacher_hourly_rate)}/時</div>
                           )}
-                        </div>
+                        </>
                       ) : (
-                        g.salary_type === 'monthly'
-                          ? (
-                            <>
-                              <span className="salary-type-badge salary-type-monthly">月薪</span>
-                              <span style={{ marginLeft: 6 }}>{g.monthly_salary > 0 ? amt(g.monthly_salary) : '—'}</span>
-                              {g.teacher_hourly_rate > 0 && (
-                                <div style={{ fontSize: 11, color: '#64748b' }}>代課 {amt(g.teacher_hourly_rate)}/時</div>
-                              )}
-                            </>
-                          )
-                          : (
-                            <>
-                              <span className="salary-type-badge salary-type-hourly">時薪</span>
-                              <span style={{ marginLeft: 6 }}>{g.teacher_hourly_rate > 0 ? amt(g.teacher_hourly_rate) : '—'}</span>
-                            </>
-                          )
+                        <>
+                          <span className="salary-type-badge salary-type-hourly">時薪</span>
+                          <span style={{ marginLeft: 6 }}>{g.teacher_hourly_rate > 0 ? amt(g.teacher_hourly_rate) : '—'}</span>
+                        </>
                       )}
                     </td>
                   )}
-                  <td>
-                    {editId === g.id ? (
-                      <div className="combobox-cell">
-                        <Combobox
-                          items={teachersState.teachers.filter(t => t.active !== 0)}
-                          value={editGroup.default_teacher_id}
-                          onChange={tid => setEditGroup(eg => ({ ...eg, default_teacher_id: tid }))}
-                          placeholder="（無）"
-                          allLabel="（無）"
-                        />
-                      </div>
-                    ) : (teachersState.teachers.find(t => t.id === g.default_teacher_id)?.name || '—')}
-                  </td>
+                  <td>{teachersState.teachers.find(t => t.id === g.default_teacher_id)?.name || '—'}</td>
                   <td>{memberCounts[g.id] ?? '—'} 人</td>
-                  <td className="note-cell">
-                    {editId === g.id ? (
-                      <input
-                        className="inline-edit-input"
-                        value={editGroup.note}
-                        onChange={e => setEditGroup(eg => ({ ...eg, note: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleUpdateGroup(g.id); if (e.key === 'Escape') setEditId(null) }}
-                      />
-                    ) : (g.note || '')}
-                  </td>
+                  <td className="note-cell">{g.note || ''}</td>
                   <td className="row-actions">
-                    {editId === g.id ? (
-                      <>
-                        <button className="btn-sm btn-primary" onClick={() => handleUpdateGroup(g.id)} disabled={saving}>儲存</button>
-                        <button className="btn-sm" onClick={() => setEditId(null)}>取消</button>
-                      </>
-                    ) : (
-                      <>
-                        <button className="btn-sm" onClick={() => startEdit(g)}>編輯</button>
-                        <button className="btn-sm btn-danger" onClick={() => handleDeleteGroup(g.id)} disabled={saving}>刪除</button>
-                      </>
-                    )}
+                    <button className="btn-sm" onClick={() => startEdit(g)}>編輯</button>
+                    <button className="btn-sm btn-danger" onClick={() => handleDeleteGroup(g.id)} disabled={saving}>刪除</button>
                   </td>
                 </tr>
               ))}
@@ -530,6 +402,160 @@ export default function GroupsPage() {
           </table>
         )}
       </div>
+
+      {editId && (
+        <div className="modal-overlay" onClick={() => !saving && setEditId(null)}>
+          <div className="modal-card group-edit-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>編輯團課</h3>
+              <button type="button" className="modal-close" onClick={() => !saving && setEditId(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <label className="modal-field">
+                <span>團課名稱</span>
+                <input
+                  type="text"
+                  value={editGroup.name}
+                  onChange={e => setEditGroup(eg => ({ ...eg, name: e.target.value }))}
+                />
+              </label>
+              <div className="modal-field">
+                <span>上課星期</span>
+                <WeekdayPicker
+                  value={editGroup.weekdays}
+                  onChange={w => setEditGroup(eg => ({ ...eg, weekdays: w }))}
+                  disabled={saving}
+                />
+              </div>
+              <div className="modal-field-row">
+                <label className="modal-field">
+                  <span>開始時間</span>
+                  <input
+                    type="time"
+                    step="900"
+                    value={editGroup.start_time}
+                    onChange={e => setEditGroup(eg => ({ ...eg, start_time: e.target.value }))}
+                  />
+                </label>
+                <label className="modal-field">
+                  <span>課堂時數</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    step="0.5"
+                    value={editGroup.duration_hours}
+                    onChange={e => setEditGroup(eg => ({ ...eg, duration_hours: e.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="modal-field-row">
+                <label className="modal-field">
+                  <span>持續時間</span>
+                  <select
+                    value={editGroup.duration_months}
+                    onChange={e => setEditGroup(eg => ({ ...eg, duration_months: parseInt(e.target.value, 10) }))}
+                  >
+                    <option value={0}>未設定</option>
+                    <option value={1}>1 個月</option>
+                    <option value={2}>2 個月</option>
+                    <option value={3}>3 個月</option>
+                    <option value={4}>4 個月</option>
+                  </select>
+                </label>
+                <label className="modal-field">
+                  <span>月費（元）</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={editGroup.monthly_fee}
+                    onChange={e => setEditGroup(eg => ({ ...eg, monthly_fee: e.target.value }))}
+                  />
+                </label>
+              </div>
+              {canViewRates && (
+                <>
+                  <label className="modal-field">
+                    <span>計薪方式</span>
+                    <select
+                      value={editGroup.salary_type}
+                      onChange={e => setEditGroup(eg => ({ ...eg, salary_type: e.target.value }))}
+                    >
+                      <option value="hourly">時薪</option>
+                      <option value="monthly">月薪</option>
+                    </select>
+                  </label>
+                  {editGroup.salary_type === 'monthly' ? (
+                    <div className="modal-field-row">
+                      <label className="modal-field">
+                        <span>月薪（元/月）</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editGroup.monthly_salary}
+                          onChange={e => setEditGroup(eg => ({ ...eg, monthly_salary: e.target.value }))}
+                        />
+                      </label>
+                      <label className="modal-field">
+                        <span>代課時薪（元/小時）</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={editGroup.teacher_hourly_rate}
+                          onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="modal-field">
+                      <span>老師時薪（元/小時）</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={editGroup.teacher_hourly_rate}
+                        onChange={e => setEditGroup(eg => ({ ...eg, teacher_hourly_rate: e.target.value }))}
+                      />
+                    </label>
+                  )}
+                </>
+              )}
+              <div className="modal-field">
+                <span>預設老師</span>
+                <Combobox
+                  items={teachersState.teachers.filter(t => t.active !== 0)}
+                  value={editGroup.default_teacher_id}
+                  onChange={tid => setEditGroup(eg => ({ ...eg, default_teacher_id: tid }))}
+                  placeholder="（無預設）"
+                  allLabel="（無預設）"
+                />
+              </div>
+              <label className="modal-field">
+                <span>備註</span>
+                <input
+                  type="text"
+                  placeholder="（選填）"
+                  value={editGroup.note}
+                  onChange={e => setEditGroup(eg => ({ ...eg, note: e.target.value }))}
+                />
+              </label>
+              {error && <div className="error-msg">{error}</div>}
+            </div>
+            <div className="modal-actions">
+              <button type="button" onClick={() => { setEditId(null); setError('') }} disabled={saving}>取消</button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => handleUpdateGroup(editId)}
+                disabled={saving}
+              >{saving ? '儲存中…' : '儲存'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

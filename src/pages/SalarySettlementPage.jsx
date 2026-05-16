@@ -128,14 +128,14 @@ export default function SalarySettlementPage() {
                       {gs.map((g, i) => {
                         const isMonthly = g.kind === 'monthly'
                         return (
-                          <tr key={`g-${isMonthly ? 'm' : 'h'}-${g.group_id}`} style={{ background: '#ecfdf5' }}>
+                          <tr key={`g-${isMonthly ? 'm' : 'h'}-${g.group_id}`} className="settlement-row-group">
                             {i === 0 && firstKind === 'group' && nameCell}
                             <td>
                               <span className={`salary-type-badge ${isMonthly ? 'salary-type-monthly' : 'salary-type-hourly'}`}>
                                 {isMonthly ? '月薪' : '時薪'}
                               </span>
                             </td>
-                            <td style={{ color: '#166534' }}>
+                            <td>
                               {isMonthly
                                 ? <>團課：{g.group_name}（{g.x_sum}/{g.y_sum} 堂）</>
                                 : <>團課：{g.group_name}（{g.session_count} 堂 × {g.duration_hours} 小時）</>

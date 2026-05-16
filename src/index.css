@@ -4265,6 +4265,62 @@ select.catalog-input.catalog-select {
 }
 .modal-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* 結算表內的分類列（團課 / 教材）— 亮暗模式都要看得清楚 */
+.settlement-row-group {
+  background: #ecfdf5;
+}
+.settlement-row-group > td {
+  color: #166534;
+}
+.settlement-row-material {
+  background: #fefce8;
+}
+.settlement-row-material > td {
+  color: #a16207;
+}
+:root[data-theme='dark'] .settlement-row-group {
+  background: #064e3b;
+}
+:root[data-theme='dark'] .settlement-row-group > td {
+  color: #bbf7d0;
+}
+:root[data-theme='dark'] .settlement-row-material {
+  background: #3a2d05;
+}
+:root[data-theme='dark'] .settlement-row-material > td {
+  color: #fde68a;
+}
+
+.group-edit-modal { max-width: 520px; }
+.group-edit-modal .modal-body { gap: 14px; }
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.modal-field > span { font-weight: 600; color: var(--text, inherit); }
+.modal-field input[type="text"],
+.modal-field input[type="date"],
+.modal-field input[type="time"],
+.modal-field input[type="number"],
+.modal-field select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+}
+.modal-field .combobox { width: 100%; }
+.modal-field-row {
+  display: flex;
+  gap: 12px;
+}
+.modal-field-row > .modal-field { flex: 1 1 0; min-width: 0; }
+
 .roster-filter-input {
   width: 100%;
   padding: 8px 10px;
@@ -4410,6 +4466,63 @@ select.catalog-input.catalog-select {
 .status-tag.status-pre         { background: #ede9fe; color: #6d28d9; border-color: transparent; }
 .status-tag.status-rescheduled { background: #fee2e2; color: #b91c1c; border-color: transparent; }
 .status-tag.status-makeup      { background: #cffafe; color: #0e7490; border-color: transparent; }
+
+/* 點名狀態篩選 */
+.status-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: -6px 0 var(--space-4);
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+.status-filter-bar .status-filter-label {
+  color: var(--muted);
+  margin-right: 4px;
+}
+.status-filter-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+  opacity: 0.55;
+  transition: opacity 0.15s, transform 0.05s;
+}
+.status-filter-chip:hover { opacity: 0.85; }
+.status-filter-chip.active { opacity: 1; border-color: transparent; }
+.status-filter-chip.active.status-attended    { background: #dcfce7; color: #15803d; }
+.status-filter-chip.active.status-pending     { background: #f1f5f9; color: #64748b; }
+.status-filter-chip.active.status-leave       { background: #ffedd5; color: #ea580c; }
+.status-filter-chip.active.status-pre         { background: #ede9fe; color: #6d28d9; }
+.status-filter-chip.active.status-rescheduled { background: #fee2e2; color: #b91c1c; }
+.status-filter-chip.active.status-makeup      { background: #cffafe; color: #0e7490; }
+.status-filter-clear {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+:root[data-theme='dark'] .status-filter-chip { background: var(--surface-soft); }
+:root[data-theme='dark'] .status-filter-chip.active.status-attended    { background: #064e3b; color: #bbf7d0; }
+:root[data-theme='dark'] .status-filter-chip.active.status-pending     { background: #1e293b; color: #cbd5e1; }
+:root[data-theme='dark'] .status-filter-chip.active.status-leave       { background: #3a2d05; color: #fed7aa; }
+:root[data-theme='dark'] .status-filter-chip.active.status-pre         { background: #2e1065; color: #ddd6fe; }
+:root[data-theme='dark'] .status-filter-chip.active.status-rescheduled { background: #450a0a; color: #fecaca; }
+:root[data-theme='dark'] .status-filter-chip.active.status-makeup      { background: #083344; color: #a5f3fc; }
 
 /* ── Inline time + duration edit cell ──────────────────────────────────── */
 .time-duration-edit {

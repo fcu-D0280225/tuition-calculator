@@ -237,9 +237,9 @@ export default function TuitionSettlementPage() {
                         </tr>
                       ))}
                       {(student.groups || []).map((g, i) => (
-                        <tr key={`g-${g.group_id}`} style={{ background: '#ecfdf5' }}>
+                        <tr key={`g-${g.group_id}`} className="settlement-row-group">
                           {i === 0 && firstKind === 'group' && nameCell}
-                          <td style={{ color: '#166534' }}>團課：{g.group_name}</td>
+                          <td>團課：{g.group_name}</td>
                           <td className="num-cell">{g.billable_months} 月</td>
                           <td className="num-cell">{amt(g.monthly_fee, '/月')}</td>
                           <td className="num-cell">{amt(g.amount)}</td>
@@ -247,9 +247,9 @@ export default function TuitionSettlementPage() {
                         </tr>
                       ))}
                       {(student.materials || []).map((m, i) => (
-                        <tr key={`m-${m.material_id}`} style={{ background: '#fefce8' }}>
+                        <tr key={`m-${m.material_id}`} className="settlement-row-material">
                           {i === 0 && firstKind === 'material' && nameCell}
-                          <td style={{ color: '#a16207' }}>教材：{m.material_name}</td>
+                          <td>教材：{m.material_name}</td>
                           <td className="num-cell">{m.total_qty} 本</td>
                           <td className="num-cell">{amt(m.unit_price)}</td>
                           <td className="num-cell">{amt(m.amount)}</td>

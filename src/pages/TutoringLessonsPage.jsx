@@ -11,12 +11,12 @@ const AVATAR_COLORS = ['', 'green', 'purple', 'orange', 'teal', 'pink']
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
 const STATUS_OPTIONS = [
-  { value: 'attended',    label: '已點名' },
-  { value: 'pending',     label: '未點名' },
-  { value: 'pre_enroll',  label: '尚未開始' },
-  { value: 'leave',       label: '請假' },
-  { value: 'rescheduled', label: '改課' },
-  { value: 'makeup',      label: '補課' },
+  { value: 'attended',    label: '已點名',   cls: 'status-attended' },
+  { value: 'pending',     label: '未點名',   cls: 'status-pending' },
+  { value: 'pre_enroll',  label: '尚未開始', cls: 'status-pre' },
+  { value: 'leave',       label: '請假',     cls: 'status-leave' },
+  { value: 'rescheduled', label: '改課',     cls: 'status-rescheduled' },
+  { value: 'makeup',      label: '補課',     cls: 'status-makeup' },
 ]
 
 function getDisplayStatus(record) {
@@ -59,6 +59,7 @@ export default function TutoringLessonsPage() {
   const [filterStudent, setFilterStudent] = useState('')
   const [filterTeacher, setFilterTeacher] = useState('')
   const [filterCourse, setFilterCourse]   = useState('')
+  const [filterStatuses, setFilterStatuses] = useState(() => new Set())
 
   const [studentCourseMap, setStudentCourseMap] = useState({})
 
@@ -91,7 +92,16 @@ export default function TutoringLessonsPage() {
   }
   function resetFilter() {
     setFilterFrom(''); setFilterTo(''); setFilterStudent(''); setFilterTeacher(''); setFilterCourse('')
+    setFilterStatuses(new Set())
     loadLessons({})
+  }
+  function toggleStatusFilter(value) {
+    setFilterStatuses(prev => {
+      const next = new Set(prev)
+      if (next.has(value)) next.delete(value)
+      else next.add(value)
+      return next
+    })
   }
 
   async function handleCreate(e) {
@@ -343,11 +353,32 @@ export default function TutoringLessonsPage() {
         <button className="btn-sm" type="button" onClick={resetFilter}>重設</button>
       </form>
 
-      {loading ? (
-        <div className="loading">載入中⋯</div>
-      ) : lessons.length === 0 ? (
-        <div className="empty-hint">目前沒有符合條件的紀錄</div>
-      ) : (
+      <div className="status-filter-bar">
+        <span className="status-filter-label">點名狀態：</span>
+        {STATUS_OPTIONS.map(o => (
+          <button
+            key={o.value}
+            type="button"
+            className={`status-filter-chip ${o.cls}${filterStatuses.has(o.value) ? ' active' : ''}`}
+            onClick={() => toggleStatusFilter(o.value)}
+            aria-pressed={filterStatuses.has(o.value)}
+          >{o.label}</button>
+        ))}
+        {filterStatuses.size === 0
+          ? <span className="status-filter-label" style={{ marginLeft: 4 }}>（未選＝顯示全部）</span>
+          : <button type="button" className="status-filter-clear" onClick={() => setFilterStatuses(new Set())}>清除狀態</button>
+        }
+      </div>
+
+      {(() => {
+        const displayedLessons = filterStatuses.size === 0
+          ? lessons
+          : lessons.filter(l => filterStatuses.has(getDisplayStatus(l)))
+        return loading ? (
+          <div className="loading">載入中⋯</div>
+        ) : displayedLessons.length === 0 ? (
+          <div className="empty-hint">目前沒有符合條件的紀錄</div>
+        ) : (
         <table className="lesson-table">
           <thead>
             <tr>
@@ -362,7 +393,7 @@ export default function TutoringLessonsPage() {
             </tr>
           </thead>
           <tbody>
-            {lessons.map(l => (
+            {displayedLessons.map(l => (
               <tr key={l.id}>
                 {editId === l.id ? (
                   <Fragment>
@@ -470,7 +501,8 @@ export default function TutoringLessonsPage() {
             ))}
           </tbody>
         </table>
-      )}
+        )
+      })()}
     </div>
   )
 }

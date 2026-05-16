@@ -51,16 +51,16 @@ export default function SharePage({ token }) {
               </tr>
             ))}
             {groups.map(g => (
-              <tr key={`g-${g.group_id}`} style={{ background: '#ecfdf5' }}>
-                <td style={{ color: '#166534' }}>團課：{g.group_name}</td>
+              <tr key={`g-${g.group_id}`} className="settlement-row-group">
+                <td>團課：{g.group_name}</td>
                 <td className="num-cell">{g.billable_months} 月</td>
                 <td className="num-cell">{g.monthly_fee.toLocaleString()}/月</td>
                 <td className="num-cell">{g.amount.toLocaleString()}</td>
               </tr>
             ))}
             {materials.map(m => (
-              <tr key={`m-${m.material_id}`} style={{ background: '#fefce8' }}>
-                <td style={{ color: '#a16207' }}>教材：{m.material_name}</td>
+              <tr key={`m-${m.material_id}`} className="settlement-row-material">
+                <td>教材：{m.material_name}</td>
                 <td className="num-cell">{m.total_qty} 本</td>
                 <td className="num-cell">{m.unit_price.toLocaleString()}</td>
                 <td className="num-cell">{m.amount.toLocaleString()}</td>
