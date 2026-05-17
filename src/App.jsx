@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
-import CareDashboard       from './pages/care/CareDashboard.jsx'
-import CareAttendancePage  from './pages/care/CareAttendancePage.jsx'
-import CareLogsPage        from './pages/care/CareLogsPage.jsx'
-import ParentPortalPage    from './pages/care/ParentPortalPage.jsx'
+import CareDashboard         from './pages/care/CareDashboard.jsx'
+import CareAttendancePage    from './pages/care/CareAttendancePage.jsx'
+import CareLogsPage          from './pages/care/CareLogsPage.jsx'
+import CareNoticesPage       from './pages/care/CareNoticesPage.jsx'
+import CareGrowthPage        from './pages/care/CareGrowthPage.jsx'
+import CareTemperaturePage   from './pages/care/CareTemperaturePage.jsx'
+import CareMedicationsPage   from './pages/care/CareMedicationsPage.jsx'
+import ParentPortalPage      from './pages/care/ParentPortalPage.jsx'
 import CoursesPage         from './pages/CoursesPage.jsx'
 import CourseDetailPage  from './pages/CourseDetailPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
@@ -279,9 +283,13 @@ function TuitionCareApp() {
   // 安親班模組 shell（獨立 sidebar）
   if (mode === 'care') {
     const CARE_NAV = [
-      { id: 'dashboard',   label: '今日總覽' },
-      { id: 'attendance',  label: '出席管理' },
-      { id: 'logs',        label: '聯絡簿' },
+      { id: 'dashboard',    label: '今日總覽' },
+      { id: 'attendance',   label: '出席管理' },
+      { id: 'logs',         label: '聯絡簿' },
+      { id: 'notices',      label: '通知單' },
+      { id: 'growth',       label: '成長記錄' },
+      { id: 'temperature',  label: '體溫紀錄' },
+      { id: 'medications',  label: '託藥單' },
     ]
     return (
       <AuthProvider value={{ user: authState.user, is_admin: authState.is_admin, permissions: authState.permissions, teacher_id: authState.teacher_id }}>
@@ -344,9 +352,13 @@ function TuitionCareApp() {
               </div>
             </header>
             <main className="app-main">
-              {careTab === 'dashboard' && <CareDashboard />}
-              {careTab === 'attendance' && <CareAttendancePage />}
-              {careTab === 'logs' && <CareLogsPage />}
+              {careTab === 'dashboard'   && <CareDashboard />}
+              {careTab === 'attendance'  && <CareAttendancePage />}
+              {careTab === 'logs'        && <CareLogsPage />}
+              {careTab === 'notices'     && <CareNoticesPage />}
+              {careTab === 'growth'      && <CareGrowthPage />}
+              {careTab === 'temperature' && <CareTemperaturePage />}
+              {careTab === 'medications' && <CareMedicationsPage />}
             </main>
           </div>
         </div>

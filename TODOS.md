@@ -79,14 +79,14 @@
 
 ---
 
-## P2 延後項目（P1 驗證後再做）
+## P2 項目
 
-- [ ] 通知單（care_notices）
-- [ ] 成長記錄（care_growth）
-- [ ] 體溫紀錄（care_temperature）
-- [ ] 託藥單（care_medications）
-- [ ] 評估 Line 推送整合（取代無後台訊息功能）
-- [ ] 家長帳號系統（目前 share token 無需帳號）
+- [x] 通知單（care_notices）— 後端 API + 前端 CareNoticesPage
+- [x] 成長記錄（care_growth）— 後端 API + 前端 CareGrowthPage
+- [x] 體溫紀錄（care_temperature）— 後端 API + 前端 CareTemperaturePage
+- [x] 託藥單（care_medications）— 後端 API + 前端 CareMedicationsPage
+- [ ] 評估 Line 推送整合（評估項目，暫不實作）
+- [ ] 家長帳號系統（評估項目，暫不實作）
 
 ---
 

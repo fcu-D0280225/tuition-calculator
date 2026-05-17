@@ -323,3 +323,42 @@ export const apiCareParentLeave = (token, data) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   }).then(r => r.json().then(b => r.ok ? b : Promise.reject(Object.assign(new Error(b.error), { status: r.status, body: b }))))
+
+// ── Care P2 APIs ──────────────────────────────────────────────────────────────
+
+export const apiCareNotices = () => request('/care/notices')
+export const apiCareNoticeCreate = (data) =>
+  request('/care/notices', { method: 'POST', body: JSON.stringify(data) })
+export const apiCareNoticeUpdate = (id, data) =>
+  request(`/care/notices/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+export const apiCareNoticeDelete = (id) =>
+  request(`/care/notices/${id}`, { method: 'DELETE' })
+
+export const apiCareGrowth = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/care/growth${q ? '?' + q : ''}`)
+}
+export const apiCareGrowthCreate = (data) =>
+  request('/care/growth', { method: 'POST', body: JSON.stringify(data) })
+export const apiCareGrowthDelete = (id) =>
+  request(`/care/growth/${id}`, { method: 'DELETE' })
+
+export const apiCareTemperature = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/care/temperature${q ? '?' + q : ''}`)
+}
+export const apiCareTemperatureCreate = (data) =>
+  request('/care/temperature', { method: 'POST', body: JSON.stringify(data) })
+export const apiCareTemperatureDelete = (id) =>
+  request(`/care/temperature/${id}`, { method: 'DELETE' })
+
+export const apiCareMedications = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/care/medications${q ? '?' + q : ''}`)
+}
+export const apiCareMedicationCreate = (data) =>
+  request('/care/medications', { method: 'POST', body: JSON.stringify(data) })
+export const apiCareMedicationGiven = (id) =>
+  request(`/care/medications/${id}/given`, { method: 'POST' })
+export const apiCareMedicationDelete = (id) =>
+  request(`/care/medications/${id}`, { method: 'DELETE' })

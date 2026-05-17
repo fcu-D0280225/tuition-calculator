@@ -330,3 +330,215 @@ careRouter.get('/dashboard', async (req, res) => {
     })
   } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
 })
+
+// ── 通知單（P2）──────────────────────────────────────────────────────────────
+
+careRouter.get('/notices', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try {
+    const [rows] = await pool.query(
+      `SELECT * FROM care_notices WHERE tenant_id = ? ORDER BY created_at DESC`,
+      [tenantId]
+    )
+    res.json(rows)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.post('/notices', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { title, content, target, target_class, publish_now } = req.body || {}
+  if (!title?.trim()) return res.status(400).json({ error: 'title_required' })
+  if (!content?.trim()) return res.status(400).json({ error: 'content_required' })
+  const id = genId('cn')
+  const publishedAt = publish_now ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null
+  try {
+    await pool.query(
+      `INSERT INTO care_notices (id, tenant_id, title, content, target, target_class, published_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, tenantId, title.trim(), content.trim(), target || 'all', target_class || '', publishedAt]
+    )
+    const [[row]] = await pool.query('SELECT * FROM care_notices WHERE id = ?', [id])
+    res.status(201).json(row)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.put('/notices/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { title, content, target, target_class, publish_now } = req.body || {}
+  try {
+    const sets = []; const params = []
+    if (title !== undefined) { sets.push('title = ?'); params.push(title.trim()) }
+    if (content !== undefined) { sets.push('content = ?'); params.push(content.trim()) }
+    if (target !== undefined) { sets.push('target = ?'); params.push(target) }
+    if (target_class !== undefined) { sets.push('target_class = ?'); params.push(target_class) }
+    if (publish_now) { sets.push('published_at = ?'); params.push(new Date().toISOString().slice(0, 19).replace('T', ' ')) }
+    if (sets.length === 0) return res.status(400).json({ error: 'nothing_to_update' })
+    params.push(req.params.id, tenantId)
+    const [r] = await pool.query(
+      `UPDATE care_notices SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`, params
+    )
+    if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
+    const [[row]] = await pool.query('SELECT * FROM care_notices WHERE id = ?', [req.params.id])
+    res.json(row)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.delete('/notices/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try {
+    const [r] = await pool.query('DELETE FROM care_notices WHERE id = ? AND tenant_id = ?', [req.params.id, tenantId])
+    if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── 成長記錄（P2）────────────────────────────────────────────────────────────
+
+careRouter.get('/growth', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { student_id, category } = req.query
+  try {
+    const conditions = ['g.tenant_id = ?']; const params = [tenantId]
+    if (student_id) { conditions.push('g.student_id = ?'); params.push(student_id) }
+    if (category) { conditions.push('g.category = ?'); params.push(category) }
+    const [rows] = await pool.query(
+      `SELECT g.*, s.name AS student_name FROM care_growth g
+       JOIN students s ON s.id = g.student_id AND s.tenant_id = g.tenant_id
+       WHERE ${conditions.join(' AND ')} ORDER BY g.record_date DESC, g.created_at DESC`,
+      params
+    )
+    res.json(rows)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.post('/growth', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { student_id, record_date, category, content } = req.body || {}
+  if (!student_id) return res.status(400).json({ error: 'student_id_required' })
+  if (!record_date || !DATE_RE.test(record_date)) return res.status(400).json({ error: 'invalid_record_date' })
+  if (!content?.trim()) return res.status(400).json({ error: 'content_required' })
+  const id = genId('cg')
+  try {
+    await pool.query(
+      `INSERT INTO care_growth (id, tenant_id, student_id, record_date, category, content) VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, tenantId, student_id, record_date, category || 'general', content.trim()]
+    )
+    const [[row]] = await pool.query('SELECT * FROM care_growth WHERE id = ?', [id])
+    res.status(201).json(row)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.delete('/growth/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try {
+    const [r] = await pool.query('DELETE FROM care_growth WHERE id = ? AND tenant_id = ?', [req.params.id, tenantId])
+    if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── 體溫紀錄（P2）────────────────────────────────────────────────────────────
+
+careRouter.get('/temperature', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { date, student_id } = req.query
+  try {
+    const conditions = ['t.tenant_id = ?']; const params = [tenantId]
+    if (student_id) { conditions.push('t.student_id = ?'); params.push(student_id) }
+    if (date) { conditions.push('DATE(t.measured_at) = ?'); params.push(date) }
+    const [rows] = await pool.query(
+      `SELECT t.*, s.name AS student_name FROM care_temperature t
+       JOIN students s ON s.id = t.student_id AND s.tenant_id = t.tenant_id
+       WHERE ${conditions.join(' AND ')} ORDER BY t.measured_at DESC`,
+      params
+    )
+    res.json(rows)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.post('/temperature', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { student_id, measured_at, temperature, session, note } = req.body || {}
+  if (!student_id) return res.status(400).json({ error: 'student_id_required' })
+  if (!measured_at) return res.status(400).json({ error: 'measured_at_required' })
+  const temp = parseFloat(temperature)
+  if (isNaN(temp) || temp < 34 || temp > 42) return res.status(400).json({ error: 'invalid_temperature' })
+  const validSessions = ['morning', 'noon', 'afternoon']
+  const id = genId('ct')
+  try {
+    await pool.query(
+      `INSERT INTO care_temperature (id, tenant_id, student_id, measured_at, temperature, session, note) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, tenantId, student_id, measured_at, temp, validSessions.includes(session) ? session : 'morning', note || '']
+    )
+    const [[row]] = await pool.query('SELECT * FROM care_temperature WHERE id = ?', [id])
+    res.status(201).json(row)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.delete('/temperature/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try {
+    const [r] = await pool.query('DELETE FROM care_temperature WHERE id = ? AND tenant_id = ?', [req.params.id, tenantId])
+    if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+// ── 託藥單（P2）──────────────────────────────────────────────────────────────
+
+careRouter.get('/medications', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { date, student_id } = req.query
+  try {
+    const conditions = ['m.tenant_id = ?']; const params = [tenantId]
+    if (student_id) { conditions.push('m.student_id = ?'); params.push(student_id) }
+    if (date) { conditions.push('m.med_date = ?'); params.push(date) }
+    const [rows] = await pool.query(
+      `SELECT m.*, s.name AS student_name FROM care_medications m
+       JOIN students s ON s.id = m.student_id AND s.tenant_id = m.tenant_id
+       WHERE ${conditions.join(' AND ')} ORDER BY m.med_date DESC, m.created_at DESC`,
+      params
+    )
+    res.json(rows)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.post('/medications', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const { student_id, med_date, drug_name, dosage, times_per_day, note } = req.body || {}
+  if (!student_id) return res.status(400).json({ error: 'student_id_required' })
+  if (!med_date || !DATE_RE.test(med_date)) return res.status(400).json({ error: 'invalid_med_date' })
+  if (!drug_name?.trim()) return res.status(400).json({ error: 'drug_name_required' })
+  if (!dosage?.trim()) return res.status(400).json({ error: 'dosage_required' })
+  const id = genId('cm')
+  try {
+    await pool.query(
+      `INSERT INTO care_medications (id, tenant_id, student_id, med_date, drug_name, dosage, times_per_day, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, tenantId, student_id, med_date, drug_name.trim(), dosage.trim(), parseInt(times_per_day, 10) || 1, note || '']
+    )
+    const [[row]] = await pool.query('SELECT * FROM care_medications WHERE id = ?', [id])
+    res.status(201).json(row)
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.post('/medications/:id/given', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  const givenAt = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  try {
+    const [r] = await pool.query(
+      `UPDATE care_medications SET given_at = ? WHERE id = ? AND tenant_id = ?`,
+      [givenAt, req.params.id, tenantId]
+    )
+    if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
+    res.json({ ok: true, given_at: givenAt })
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
+
+careRouter.delete('/medications/:id', async (req, res) => {
+  const tenantId = req.user?.tenant_id || 1
+  try {
+    const [r] = await pool.query('DELETE FROM care_medications WHERE id = ? AND tenant_id = ?', [req.params.id, tenantId])
+    if (r.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
+    res.status(204).end()
+  } catch (e) { console.error(e); res.status(500).json({ error: 'failed' }) }
+})
