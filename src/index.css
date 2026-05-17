@@ -44,6 +44,69 @@ html {
   --success-gradient-from: #ecfdf5;
   --success-gradient-to: #e0f2fe;
   --success-border: #a7f3d0;
+  --text-secondary: var(--muted);
+  --bg-secondary: var(--surface-soft);
+  /* 狀態標籤／篩選 */
+  --status-attended-bg: #dcfce7;
+  --status-attended-fg: #15803d;
+  --status-pending-bg: #f1f5f9;
+  --status-pending-fg: #475569;
+  --status-leave-bg: #ffedd5;
+  --status-leave-fg: #c2410c;
+  --status-pre-bg: #ede9fe;
+  --status-pre-fg: #6d28d9;
+  --status-rescheduled-bg: #fee2e2;
+  --status-rescheduled-fg: #b91c1c;
+  --status-makeup-bg: #cffafe;
+  --status-makeup-fg: #0e7490;
+  /* Dashboard 卡片 */
+  --dash-income-bg: #eff6ff;
+  --dash-income-border: #bfdbfe;
+  --dash-income-fg: #1e40af;
+  --dash-expense-bg: #fffbeb;
+  --dash-expense-border: #fde68a;
+  --dash-expense-fg: #92400e;
+  --dash-profit-bg: #f0fdf4;
+  --dash-profit-border: #bbf7d0;
+  --dash-profit-fg: #14532d;
+  --dash-loss-bg: #fff1f2;
+  --dash-loss-border: #fecdd3;
+  --dash-loss-fg: #9f1239;
+  /* 課表區塊 */
+  --schedule-private-bg: #dbeafe;
+  --schedule-private-border: #93c5fd;
+  --schedule-private-fg: #1e3a8a;
+  --schedule-group-bg: #dcfce7;
+  --schedule-group-border: #86efac;
+  --schedule-group-fg: #14532d;
+  --schedule-leave-bg: #fee2e2;
+  --schedule-leave-border: #fca5a5;
+  --schedule-leave-fg: #7f1d1d;
+  --schedule-today-bg: #e0f2fe;
+  --schedule-leave-tag-bg: #fecaca;
+  --schedule-leave-tag-fg: #7f1d1d;
+  /* 點名 */
+  --attendance-leave-bg: #fff8e1;
+  --attendance-leave-border: #e6a800;
+  --attendance-leave-fg: #7a5d00;
+  /* 計薪 badge */
+  --salary-hourly-bg: #eef2ff;
+  --salary-hourly-fg: #4338ca;
+  --salary-monthly-bg: #ecfdf5;
+  --salary-monthly-fg: #166534;
+  /* 表格／提示 */
+  --row-inactive-bg: #f8fafc;
+  --inactive-tag-bg: #f1f5f9;
+  --success-msg-bg: #f0fdf4;
+  --success-msg-fg: #166534;
+  --success-msg-border: #bbf7d0;
+  --calendar-out-bg: #f8fafc;
+  --calendar-out-fg: #94a3b8;
+  --calendar-hover-bg: #f1f5f9;
+  --settlement-group-bg: #ecfdf5;
+  --settlement-group-fg: #166534;
+  --settlement-material-bg: #fefce8;
+  --settlement-material-fg: #a16207;
   --sidebar-w: 300px;
   --radius: 12px;
   --radius-md: 8px;
@@ -84,7 +147,7 @@ html {
   --green-light:   #14532d;
   --green-text:    #bbf7d0;
   --green-text-dark:#86efac;
-  --green-active:  #4d7c0f;
+  --green-active:  #86efac;
   --danger:        #f87171;
   --danger-light:  #450a0a;
   --danger-border: #7f1d1d;
@@ -94,6 +157,63 @@ html {
   --success-gradient-from: #064e3b;
   --success-gradient-to:   #0c4a6e;
   --success-border:        #047857;
+  --text-secondary: var(--muted);
+  --bg-secondary: var(--surface-soft);
+  --status-attended-bg: #064e3b;
+  --status-attended-fg: #bbf7d0;
+  --status-pending-bg: #334155;
+  --status-pending-fg: #e2e8f0;
+  --status-leave-bg: #3a2d05;
+  --status-leave-fg: #fed7aa;
+  --status-pre-bg: #2e1065;
+  --status-pre-fg: #ddd6fe;
+  --status-rescheduled-bg: #450a0a;
+  --status-rescheduled-fg: #fecaca;
+  --status-makeup-bg: #083344;
+  --status-makeup-fg: #a5f3fc;
+  --dash-income-bg: #1e3a5f;
+  --dash-income-border: #2563eb;
+  --dash-income-fg: #bfdbfe;
+  --dash-expense-bg: #3a2d05;
+  --dash-expense-border: #a16207;
+  --dash-expense-fg: #fde68a;
+  --dash-profit-bg: #064e3b;
+  --dash-profit-border: #15803d;
+  --dash-profit-fg: #bbf7d0;
+  --dash-loss-bg: #450a0a;
+  --dash-loss-border: #9f1239;
+  --dash-loss-fg: #fecdd3;
+  --schedule-private-bg: #1e3a5f;
+  --schedule-private-border: #3b82f6;
+  --schedule-private-fg: #dbeafe;
+  --schedule-group-bg: #14532d;
+  --schedule-group-border: #22c55e;
+  --schedule-group-fg: #dcfce7;
+  --schedule-leave-bg: #450a0a;
+  --schedule-leave-border: #f87171;
+  --schedule-leave-fg: #fecaca;
+  --schedule-today-bg: #0c4a6e;
+  --schedule-leave-tag-bg: #7f1d1d;
+  --schedule-leave-tag-fg: #fecaca;
+  --attendance-leave-bg: #3a2d05;
+  --attendance-leave-border: #d97706;
+  --attendance-leave-fg: #fde68a;
+  --salary-hourly-bg: #312e81;
+  --salary-hourly-fg: #c7d2fe;
+  --salary-monthly-bg: #064e3b;
+  --salary-monthly-fg: #bbf7d0;
+  --row-inactive-bg: #1a2332;
+  --inactive-tag-bg: #334155;
+  --success-msg-bg: #064e3b;
+  --success-msg-fg: #bbf7d0;
+  --success-msg-border: #047857;
+  --calendar-out-bg: #1a2332;
+  --calendar-out-fg: #64748b;
+  --calendar-hover-bg: #334155;
+  --settlement-group-bg: #064e3b;
+  --settlement-group-fg: #bbf7d0;
+  --settlement-material-bg: #3a2d05;
+  --settlement-material-fg: #fde68a;
 }
 
 :root[data-theme='dark'] .app-loading-retry {
@@ -1821,8 +1941,13 @@ h1 { font-weight: 800; }
   padding: 20px 24px;
 }
 .course-card--excluded {
-  opacity: 0.72;
   border-top-color: var(--disabled);
+  background: var(--surface-soft);
+}
+.course-card--excluded .course-header,
+.course-card--excluded .course-subtotal,
+.course-card--excluded .invoice-check {
+  color: var(--muted);
 }
 
 .course-detail-collapse {
@@ -3337,13 +3462,14 @@ select.catalog-input.catalog-select {
 .btn-paid {
   background: var(--green-light);
   color: var(--green-text);
-  border: 1px solid #86efac;
+  border: 1px solid var(--success-border);
   font-weight: 700;
   min-width: 72px;
 }
 .btn-paid:hover:not(:disabled) {
-  background: #bbf7d0;
-  border-color: #4ade80;
+  background: var(--status-attended-bg);
+  border-color: var(--green);
+  color: var(--status-attended-fg);
 }
 
 .btn-unpaid {
@@ -3355,7 +3481,7 @@ select.catalog-input.catalog-select {
 .btn-unpaid:hover:not(:disabled) {
   background: var(--bg);
   color: var(--text);
-  border-color: #94a3b8;
+  border-color: var(--disabled);
 }
 
 .paid-date {
@@ -3556,43 +3682,46 @@ select.catalog-input.catalog-select {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  opacity: 0.7;
+  color: inherit;
+  opacity: 0.85;
 }
 
 .dashboard-card-value {
   font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.5px;
+  color: inherit;
 }
 
 .dashboard-card-sub {
   font-size: 11px;
-  opacity: 0.55;
   margin-top: 2px;
+  color: inherit;
+  opacity: 0.8;
 }
 
 .dashboard-card--income {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #1e40af;
+  background: var(--dash-income-bg);
+  border-color: var(--dash-income-border);
+  color: var(--dash-income-fg);
 }
 
 .dashboard-card--expense {
-  background: #fffbeb;
-  border-color: #fde68a;
-  color: #92400e;
+  background: var(--dash-expense-bg);
+  border-color: var(--dash-expense-border);
+  color: var(--dash-expense-fg);
 }
 
 .dashboard-card--profit {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #14532d;
+  background: var(--dash-profit-bg);
+  border-color: var(--dash-profit-border);
+  color: var(--dash-profit-fg);
 }
 
 .dashboard-card--loss {
-  background: #fff1f2;
-  border-color: #fecdd3;
-  color: #9f1239;
+  background: var(--dash-loss-bg);
+  border-color: var(--dash-loss-border);
+  color: var(--dash-loss-fg);
 }
 
 .dashboard-charts {
@@ -3630,7 +3759,7 @@ select.catalog-input.catalog-select {
   padding: var(--space-3) var(--space-4);
   background: var(--green-light);
   color: var(--green-text);
-  border: 1px solid #a7f3d0;
+  border: 1px solid var(--success-border);
   border-radius: var(--radius-sm);
   font-size: 14px;
   margin-bottom: var(--space-3);
@@ -3676,13 +3805,13 @@ select.catalog-input.catalog-select {
   font-weight: 600;
 }
 .attendance-item--leave {
-  background: #fff8e1;
-  border-color: #ffb300;
-  color: #8d6e00;
+  background: var(--attendance-leave-bg);
+  border-color: var(--attendance-leave-border);
+  color: var(--attendance-leave-fg);
 }
 .attendance-item--leave:hover {
-  background: #fff3c4;
-  border-color: #f59f00;
+  filter: brightness(0.97);
+  border-color: var(--attendance-leave-border);
 }
 
 .attendance-item-all {
@@ -3829,8 +3958,9 @@ select.catalog-input.catalog-select {
 }
 .login-error {
   font-size: 13px;
-  color: #b91c1c;
-  background: #fee2e2;
+  color: var(--status-rescheduled-fg);
+  background: var(--status-rescheduled-bg);
+  border: 1px solid var(--danger-border);
   padding: 8px 12px;
   border-radius: var(--radius-sm);
 }
@@ -4124,8 +4254,9 @@ select.catalog-input.catalog-select {
   margin-bottom: var(--space-2);
   padding: 8px 12px;
   font-size: 13px;
-  color: #b91c1c;
-  background: #fee2e2;
+  color: var(--status-rescheduled-fg);
+  background: var(--status-rescheduled-bg);
+  border: 1px solid var(--danger-border);
   border-radius: var(--radius-sm);
 }
 
@@ -4176,9 +4307,9 @@ select.catalog-input.catalog-select {
   border-color: var(--accent);
 }
 .users-row-actions .btn-danger-sm {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fecaca;
+  background: var(--danger-light);
+  color: var(--danger);
+  border-color: var(--danger-border);
 }
 
 /* ── Attendance roster header + modal ───────────────────────────────────── */
@@ -4267,28 +4398,16 @@ select.catalog-input.catalog-select {
 
 /* 結算表內的分類列（團課 / 教材）— 亮暗模式都要看得清楚 */
 .settlement-row-group {
-  background: #ecfdf5;
+  background: var(--settlement-group-bg);
 }
 .settlement-row-group > td {
-  color: #166534;
+  color: var(--settlement-group-fg);
 }
 .settlement-row-material {
-  background: #fefce8;
+  background: var(--settlement-material-bg);
 }
 .settlement-row-material > td {
-  color: #a16207;
-}
-:root[data-theme='dark'] .settlement-row-group {
-  background: #064e3b;
-}
-:root[data-theme='dark'] .settlement-row-group > td {
-  color: #bbf7d0;
-}
-:root[data-theme='dark'] .settlement-row-material {
-  background: #3a2d05;
-}
-:root[data-theme='dark'] .settlement-row-material > td {
-  color: #fde68a;
+  color: var(--settlement-material-fg);
 }
 
 .group-edit-modal { max-width: 520px; }
@@ -4460,12 +4579,12 @@ select.catalog-input.catalog-select {
   border: 1px solid transparent;
   white-space: nowrap;
 }
-.status-tag.status-attended    { background: #dcfce7; color: #15803d; border-color: transparent; }
-.status-tag.status-pending     { background: #f1f5f9; color: #64748b; border-color: transparent; }
-.status-tag.status-leave       { background: #ffedd5; color: #ea580c; border-color: transparent; }
-.status-tag.status-pre         { background: #ede9fe; color: #6d28d9; border-color: transparent; }
-.status-tag.status-rescheduled { background: #fee2e2; color: #b91c1c; border-color: transparent; }
-.status-tag.status-makeup      { background: #cffafe; color: #0e7490; border-color: transparent; }
+.status-tag.status-attended    { background: var(--status-attended-bg); color: var(--status-attended-fg); border-color: transparent; }
+.status-tag.status-pending     { background: var(--status-pending-bg); color: var(--status-pending-fg); border-color: transparent; }
+.status-tag.status-leave       { background: var(--status-leave-bg); color: var(--status-leave-fg); border-color: transparent; }
+.status-tag.status-pre         { background: var(--status-pre-bg); color: var(--status-pre-fg); border-color: transparent; }
+.status-tag.status-rescheduled { background: var(--status-rescheduled-bg); color: var(--status-rescheduled-fg); border-color: transparent; }
+.status-tag.status-makeup      { background: var(--status-makeup-bg); color: var(--status-makeup-fg); border-color: transparent; }
 
 /* 點名狀態篩選 */
 .status-filter-bar {
@@ -4495,17 +4614,17 @@ select.catalog-input.catalog-select {
   color: var(--muted);
   cursor: pointer;
   font-family: inherit;
-  opacity: 0.55;
-  transition: opacity 0.15s, transform 0.05s;
+  opacity: 0.72;
+  transition: opacity 0.15s, transform 0.05s, background 0.15s, color 0.15s;
 }
-.status-filter-chip:hover { opacity: 0.85; }
+.status-filter-chip:hover { opacity: 0.92; }
 .status-filter-chip.active { opacity: 1; border-color: transparent; }
-.status-filter-chip.active.status-attended    { background: #dcfce7; color: #15803d; }
-.status-filter-chip.active.status-pending     { background: #f1f5f9; color: #64748b; }
-.status-filter-chip.active.status-leave       { background: #ffedd5; color: #ea580c; }
-.status-filter-chip.active.status-pre         { background: #ede9fe; color: #6d28d9; }
-.status-filter-chip.active.status-rescheduled { background: #fee2e2; color: #b91c1c; }
-.status-filter-chip.active.status-makeup      { background: #cffafe; color: #0e7490; }
+.status-filter-chip.active.status-attended    { background: var(--status-attended-bg); color: var(--status-attended-fg); }
+.status-filter-chip.active.status-pending     { background: var(--status-pending-bg); color: var(--status-pending-fg); }
+.status-filter-chip.active.status-leave       { background: var(--status-leave-bg); color: var(--status-leave-fg); }
+.status-filter-chip.active.status-pre         { background: var(--status-pre-bg); color: var(--status-pre-fg); }
+.status-filter-chip.active.status-rescheduled { background: var(--status-rescheduled-bg); color: var(--status-rescheduled-fg); }
+.status-filter-chip.active.status-makeup      { background: var(--status-makeup-bg); color: var(--status-makeup-fg); }
 .status-filter-clear {
   margin-left: auto;
   padding: 2px 8px;
@@ -4517,12 +4636,6 @@ select.catalog-input.catalog-select {
   cursor: pointer;
 }
 :root[data-theme='dark'] .status-filter-chip { background: var(--surface-soft); }
-:root[data-theme='dark'] .status-filter-chip.active.status-attended    { background: #064e3b; color: #bbf7d0; }
-:root[data-theme='dark'] .status-filter-chip.active.status-pending     { background: #1e293b; color: #cbd5e1; }
-:root[data-theme='dark'] .status-filter-chip.active.status-leave       { background: #3a2d05; color: #fed7aa; }
-:root[data-theme='dark'] .status-filter-chip.active.status-pre         { background: #2e1065; color: #ddd6fe; }
-:root[data-theme='dark'] .status-filter-chip.active.status-rescheduled { background: #450a0a; color: #fecaca; }
-:root[data-theme='dark'] .status-filter-chip.active.status-makeup      { background: #083344; color: #a5f3fc; }
 
 /* ── Inline time + duration edit cell ──────────────────────────────────── */
 .time-duration-edit {
@@ -4550,8 +4663,8 @@ select.catalog-input.catalog-select {
   border-radius: 4px;
   vertical-align: middle;
 }
-.salary-type-hourly  { background: #eef2ff; color: #4338ca; }
-.salary-type-monthly { background: #ecfdf5; color: #166534; }
+.salary-type-hourly  { background: var(--salary-hourly-bg); color: var(--salary-hourly-fg); }
+.salary-type-monthly { background: var(--salary-monthly-bg); color: var(--salary-monthly-fg); }
 
 /* ── Enrollment list（已選課程） ────────────────────────────────────────── */
 .enrollment-list {
@@ -4651,7 +4764,7 @@ select.catalog-input.catalog-select {
   padding: 8px;
   text-align: center;
 }
-.schedule-day-header.is-today { background: #e0f2fe; }
+.schedule-day-header.is-today { background: var(--schedule-today-bg); }
 .schedule-day-header:last-child { border-right: none; }
 .schedule-dow { font-weight: 700; color: var(--text); font-size: 13px; }
 .schedule-date { color: var(--muted); font-size: 12px; margin-top: 2px; }
@@ -4688,20 +4801,20 @@ select.catalog-input.catalog-select {
   padding: 4px 6px;
   font-size: 12px;
   overflow: hidden;
-  background: #dbeafe;
-  border: 1px solid #93c5fd;
-  color: #1e3a8a;
+  background: var(--schedule-private-bg);
+  border: 1px solid var(--schedule-private-border);
+  color: var(--schedule-private-fg);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   z-index: 1;
 }
 .schedule-item--group {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #14532d;
+  background: var(--schedule-group-bg);
+  border-color: var(--schedule-group-border);
+  color: var(--schedule-group-fg);
 }
-.schedule-item-time { font-size: 10px; opacity: 0.7; }
-.schedule-item-title { font-weight: 700; line-height: 1.2; }
-.schedule-item-sub { font-size: 11px; opacity: 0.85; }
+.schedule-item-time { font-size: 10px; color: inherit; opacity: 0.82; }
+.schedule-item-title { font-weight: 700; line-height: 1.2; color: inherit; }
+.schedule-item-sub { font-size: 11px; color: inherit; opacity: 0.88; }
 .schedule-no-time-list { margin: 0; padding-left: 1.2em; line-height: 1.8; }
 .schedule-no-time-link {
   background: none;
@@ -4720,19 +4833,19 @@ select.catalog-input.catalog-select {
 
 /* 請假狀態 */
 .schedule-item--leave {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #7f1d1d;
+  background: var(--schedule-leave-bg);
+  border-color: var(--schedule-leave-border);
+  color: var(--schedule-leave-fg);
   text-decoration: line-through;
-  text-decoration-color: rgba(127, 29, 29, 0.5);
+  text-decoration-color: color-mix(in srgb, var(--schedule-leave-fg) 50%, transparent);
 }
 .schedule-item--leave .schedule-item-title { text-decoration: line-through; }
 .leave-tag {
   display: inline-block;
   font-size: 10px;
   font-weight: 700;
-  background: #fecaca;
-  color: #7f1d1d;
+  background: var(--schedule-leave-tag-bg);
+  color: var(--schedule-leave-tag-fg);
   padding: 1px 5px;
   border-radius: 4px;
   margin-right: 4px;
@@ -4755,7 +4868,7 @@ select.catalog-input.catalog-select {
 }
 .schedule-item:hover .schedule-item-leave-btn,
 .schedule-item--leave .schedule-item-leave-btn { opacity: 1; }
-.schedule-item-leave-btn:hover { background: #fff; }
+.schedule-item-leave-btn:hover { background: var(--surface); }
 
 /* 請假 modal */
 .leave-modal-overlay {
@@ -4845,21 +4958,21 @@ select.catalog-input.catalog-select {
   font-size: 11px;
   line-height: 1.6;
   border-radius: 999px;
-  background: #f1f5f9;
+  background: var(--inactive-tag-bg);
   color: var(--muted);
   border: 1px solid var(--border);
   vertical-align: middle;
 }
 .entity-table tr.row-inactive td {
-  background: #fafbfc;
+  background: var(--row-inactive-bg);
   color: var(--muted);
 }
-.entity-table tr.row-inactive a { color: var(--muted); }
+.entity-table tr.row-inactive a { color: var(--accent); }
 
 .success-msg {
-  color: #166534;
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
+  color: var(--success-msg-fg);
+  background: var(--success-msg-bg);
+  border: 1px solid var(--success-msg-border);
   border-radius: 6px;
   padding: 8px 12px;
   margin: 8px 0;
@@ -4983,9 +5096,9 @@ select.catalog-input.catalog-select {
   padding: 0;
   transition: background 0.1s, border-color 0.1s;
 }
-.calendar-cell:hover { background: #f1f5f9; }
-.calendar-cell:disabled { cursor: not-allowed; opacity: 0.6; }
-.calendar-cell--out { color: #cbd5e1; background: #fafbfc; }
+.calendar-cell:hover { background: var(--calendar-hover-bg); }
+.calendar-cell:disabled { cursor: not-allowed; opacity: 0.6; color: var(--muted); }
+.calendar-cell--out { color: var(--calendar-out-fg); background: var(--calendar-out-bg); }
 .calendar-cell--today { border-color: var(--accent); }
 .calendar-cell--picked {
   background: var(--accent);
@@ -5052,15 +5165,10 @@ select.catalog-input.catalog-select {
   border-bottom-left-radius: 4px;
 }
 .ai-message--error .ai-message-content {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fca5a5;
+  background: var(--status-rescheduled-bg);
+  color: var(--status-rescheduled-fg);
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
-}
-[data-theme="dark"] .ai-message--error .ai-message-content {
-  background: #450a0a;
-  color: #fca5a5;
-  border-color: #7f1d1d;
 }
 
 .ai-thinking { display: flex; gap: 5px; align-items: center; padding: 12px 16px; }

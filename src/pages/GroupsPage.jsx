@@ -378,7 +378,7 @@ export default function GroupsPage() {
                           <span className="salary-type-badge salary-type-monthly">月薪</span>
                           <span style={{ marginLeft: 6 }}>{g.monthly_salary > 0 ? amt(g.monthly_salary) : '—'}</span>
                           {g.teacher_hourly_rate > 0 && (
-                            <div style={{ fontSize: 11, color: '#64748b' }}>代課 {amt(g.teacher_hourly_rate)}/時</div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>代課 {amt(g.teacher_hourly_rate)}/時</div>
                           )}
                         </>
                       ) : (
