@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import crypto from 'node:crypto'
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import {
   initSchema,
   // students
@@ -39,6 +40,7 @@ import {
 } from './db.js'
 import { initAuthSchema, requireAuth, registerAuthRoutes, registerAdminRoutes } from './auth.js'
 import { runAiChat } from './ai.js'
+import { careRouter } from './routes/care.js'
 
 const PORT = parseInt(process.env.PORT || '3100', 10)
 
@@ -84,6 +86,18 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }))
 registerAuthRoutes(app)
 app.use(requireAuth())
 registerAdminRoutes(app)
+
+// ── Care Module ───────────────────────────────────────────────────────────────
+
+const careParentLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'too_many_requests' },
+})
+app.use('/api/care/parent', careParentLimiter)
+app.use('/api/care', careRouter)
 
 // ── Students ──────────────────────────────────────────────────────────────────
 

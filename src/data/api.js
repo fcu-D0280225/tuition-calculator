@@ -281,3 +281,45 @@ export const apiListInvites       = () =>
 
 export const apiDeleteInvite      = (token) =>
   request(`/admin/invites/${encodeURIComponent(token)}`, { method: 'DELETE' })
+
+// ── Care Module ───────────────────────────────────────────────────────────────
+
+export const apiCareDashboard = () => request('/care/dashboard')
+
+export const apiCareAttendance = (date) => request(`/care/attendance?date=${date}`)
+export const apiCareAttendanceUpsert = (data) =>
+  request('/care/attendance', { method: 'POST', body: JSON.stringify(data) })
+
+export const apiCareLogs = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/care/logs${q ? '?' + q : ''}`)
+}
+export const apiCareLogCreate = (data) =>
+  request('/care/logs', { method: 'POST', body: JSON.stringify(data) })
+export const apiCareLogUpdate = (id, data) =>
+  request(`/care/logs/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+
+export const apiCareLeaveRequests = (params = {}) => {
+  const q = new URLSearchParams(params).toString()
+  return request(`/care/leave-requests${q ? '?' + q : ''}`)
+}
+export const apiCareLeaveApprove = (id) =>
+  request(`/care/leave-requests/${id}/approve`, { method: 'POST' })
+export const apiCareLeaveReject = (id, reject_reason) =>
+  request(`/care/leave-requests/${id}/reject`, { method: 'POST', body: JSON.stringify({ reject_reason }) })
+
+export const apiCareGetToken = (studentId) => request(`/care/tokens/${studentId}`)
+
+// Parent portal（無需 auth）
+export const apiCareParent = (token) =>
+  fetch(`/api/care/parent/${encodeURIComponent(token)}`, { credentials: 'same-origin' }).then(r => {
+    if (!r.ok) throw Object.assign(new Error('not_found'), { status: r.status })
+    return r.json()
+  })
+export const apiCareParentLeave = (token, data) =>
+  fetch(`/api/care/parent/${encodeURIComponent(token)}/leave`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => r.json().then(b => r.ok ? b : Promise.reject(Object.assign(new Error(b.error), { status: r.status, body: b }))))

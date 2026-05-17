@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AppProviders } from './contexts/AppProviders.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
-import CoursesPage       from './pages/CoursesPage.jsx'
+import CareDashboard       from './pages/care/CareDashboard.jsx'
+import CareAttendancePage  from './pages/care/CareAttendancePage.jsx'
+import CareLogsPage        from './pages/care/CareLogsPage.jsx'
+import ParentPortalPage    from './pages/care/ParentPortalPage.jsx'
+import CoursesPage         from './pages/CoursesPage.jsx'
 import CourseDetailPage  from './pages/CourseDetailPage.jsx'
 import StudentsPage      from './pages/StudentsPage.jsx'
 import StudentEnrollPage from './pages/StudentEnrollPage.jsx'
@@ -124,7 +128,18 @@ function firstAllowedTab(visibleNav, preferId = null) {
   return null
 }
 
+// 頂層 dispatcher：家長 Portal 不需登入，獨立處理
 export default function App() {
+  if (window.location.pathname.startsWith('/care/parent/')) {
+    return <ParentPortalPage />
+  }
+  return <TuitionCareApp />
+}
+
+function TuitionCareApp() {
+  const [mode, setMode] = useState('tuition') // 'tuition' | 'care'
+  const [careTab, setCareTab] = useState('dashboard') // care 模組內的子頁
+
   const [tab, setTab] = useState(null)
   const [enrollContext, setEnrollContext] = useState(null) // { studentId, studentName }
   const [courseEditId, setCourseEditId] = useState(null)
@@ -261,6 +276,85 @@ export default function App() {
     return <LoginPage onLoggedIn={({ user, is_admin, permissions, teacher_id, tenant_name }) => setAuthState({ status: 'authed', user, is_admin: !!is_admin, permissions: permissions || [], teacher_id: teacher_id || null, tenant_name: tenant_name || null })} />
   }
 
+  // 安親班模組 shell（獨立 sidebar）
+  if (mode === 'care') {
+    const CARE_NAV = [
+      { id: 'dashboard',   label: '今日總覽' },
+      { id: 'attendance',  label: '出席管理' },
+      { id: 'logs',        label: '聯絡簿' },
+    ]
+    return (
+      <AuthProvider value={{ user: authState.user, is_admin: authState.is_admin, permissions: authState.permissions, teacher_id: authState.teacher_id }}>
+      <AppProviders>
+        <div className="app-shell">
+          {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+          <aside className={`app-sidebar${sidebarOpen ? ' open' : ''}`}>
+            <div className="app-sidebar-header">
+              <div className="app-logo">
+                <div className="app-logo-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                  </svg>
+                </div>
+                <div className="app-logo-text">
+                  <div className="app-title">安親班管理</div>
+                  <div className="app-subtitle">CARE MODULE</div>
+                </div>
+              </div>
+              <button type="button" className="sidebar-close-btn" onClick={() => setSidebarOpen(false)} aria-label="關閉選單">✕</button>
+            </div>
+            {/* 頂層模式切換 */}
+            <div style={{ display: 'flex', gap: 4, margin: '8px 10px 4px', borderRadius: 8, background: 'var(--surface-alt, var(--surface))', padding: 4 }}>
+              <button type="button" onClick={() => setMode('tuition')} style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>補習班</button>
+              <button type="button" onClick={() => setMode('care')} style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: 'var(--accent-bg, #6366f122)', color: 'var(--accent, #6366f1)', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>安親班</button>
+            </div>
+            <nav className="app-nav">
+              {CARE_NAV.map(item => (
+                <button key={item.id} type="button"
+                  className={`nav-tab ${careTab === item.id ? 'active' : ''}`}
+                  onClick={() => { setCareTab(item.id); setSidebarOpen(false) }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+            <div className="app-sidebar-footer">
+              <div className="app-sidebar-user">
+                <div className="app-sidebar-avatar">{authState.user?.username?.charAt(0)?.toUpperCase() || 'U'}</div>
+                <div className="app-sidebar-user-info">
+                  <div className="app-sidebar-username">{authState.user?.username}{authState.is_admin && <span className="users-self-tag"> ·管理員</span>}</div>
+                </div>
+              </div>
+              <button type="button" className="logout-btn" onClick={handleLogout}>登出</button>
+            </div>
+          </aside>
+          <div className="app-content">
+            <header className="app-topbar">
+              <button type="button" className="sidebar-toggle-btn" onClick={() => setSidebarOpen(true)} aria-label="開啟選單"><span /><span /><span /></button>
+              <span className="mobile-topbar-title">安親班管理</span>
+              <div className="topbar-actions">
+                <button type="button" className="topbar-icon-btn" onClick={toggleTheme} aria-label="切換主題">
+                  {theme === 'dark' ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg>
+                  )}
+                </button>
+              </div>
+            </header>
+            <main className="app-main">
+              {careTab === 'dashboard' && <CareDashboard />}
+              {careTab === 'attendance' && <CareAttendancePage />}
+              {careTab === 'logs' && <CareLogsPage />}
+            </main>
+          </div>
+        </div>
+      </AppProviders>
+      </AuthProvider>
+    )
+  }
+
   return (
     <AuthProvider value={{
       user: authState.user,
@@ -294,6 +388,11 @@ export default function App() {
               onClick={() => setSidebarOpen(false)}
               aria-label="關閉選單"
             >✕</button>
+          </div>
+          {/* 頂層模式切換：補習班 ↔ 安親班 */}
+          <div style={{ display: 'flex', gap: 4, margin: '8px 10px 4px', borderRadius: 8, background: 'var(--surface-alt, var(--surface))', padding: 4 }}>
+            <button type="button" onClick={() => setMode('tuition')} style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: 'var(--accent-bg, #6366f122)', color: 'var(--accent, #6366f1)', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>補習班</button>
+            <button type="button" onClick={() => setMode('care')} style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--muted)', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>安親班</button>
           </div>
           <nav className="app-nav">
             {visibleNav.map(item => {

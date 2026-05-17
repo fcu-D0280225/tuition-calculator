@@ -665,6 +665,104 @@ export async function initSchema() {
       )
     }
   }
+
+  // ── Care Module Schema（P1）────────────────────────────────────────────────
+
+  // Migration: tenants 補 type 欄位
+  const [tenantTypeCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'tenants' AND COLUMN_NAME = 'type'`
+  )
+  if (tenantTypeCols.length === 0) {
+    await pool.query(
+      `ALTER TABLE tenants ADD COLUMN \`type\` ENUM('tuition','care','both') NOT NULL DEFAULT 'both' AFTER name`
+    )
+  }
+
+  // Migration: students 補 care_class、care_enrolled 欄位
+  const [stuCareCols] = await pool.query(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'students'
+       AND COLUMN_NAME IN ('care_class', 'care_enrolled')`
+  )
+  const stuCareSet = new Set(stuCareCols.map(c => c.COLUMN_NAME))
+  if (!stuCareSet.has('care_class')) {
+    await pool.query(`ALTER TABLE students ADD COLUMN care_class VARCHAR(64) NOT NULL DEFAULT '' AFTER grade`)
+  }
+  if (!stuCareSet.has('care_enrolled')) {
+    await pool.query(`ALTER TABLE students ADD COLUMN care_enrolled TINYINT(1) NOT NULL DEFAULT 0 AFTER care_class`)
+  }
+
+  // care_share_tokens
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS care_share_tokens (
+      id          VARCHAR(64)  NOT NULL,
+      tenant_id   INT UNSIGNED NOT NULL DEFAULT 1,
+      student_id  VARCHAR(64)  NOT NULL,
+      token       VARCHAR(64)  NOT NULL,
+      expires_at  DATETIME     NOT NULL,
+      created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_care_token (token),
+      INDEX idx_cst_student (tenant_id, student_id),
+      INDEX idx_cst_expires (expires_at)
+    ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  // care_attendance
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS care_attendance (
+      id           VARCHAR(64)  NOT NULL,
+      tenant_id    INT UNSIGNED NOT NULL DEFAULT 1,
+      student_id   VARCHAR(64)  NOT NULL,
+      attend_date  DATE         NOT NULL,
+      checkin_at   DATETIME     DEFAULT NULL,
+      checkout_at  DATETIME     DEFAULT NULL,
+      status       ENUM('present','absent','leave_approved') NOT NULL DEFAULT 'present',
+      note         VARCHAR(255) NOT NULL DEFAULT '',
+      created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_care_attend (tenant_id, student_id, attend_date),
+      INDEX idx_care_attendance_date (tenant_id, attend_date)
+    ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  // care_logs
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS care_logs (
+      id                   VARCHAR(64)  NOT NULL,
+      tenant_id            INT UNSIGNED NOT NULL DEFAULT 1,
+      student_id           VARCHAR(64)  NOT NULL,
+      log_date             DATE         NOT NULL,
+      teacher_note         TEXT         DEFAULT NULL,
+      parent_note          TEXT         DEFAULT NULL,
+      teacher_confirmed_at DATETIME     DEFAULT NULL,
+      parent_confirmed_at  DATETIME     DEFAULT NULL,
+      created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_care_log (tenant_id, student_id, log_date),
+      INDEX idx_care_logs_date (tenant_id, log_date)
+    ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
+
+  // care_leave_requests
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS care_leave_requests (
+      id            VARCHAR(64)  NOT NULL,
+      tenant_id     INT UNSIGNED NOT NULL DEFAULT 1,
+      student_id    VARCHAR(64)  NOT NULL,
+      leave_date    DATE         NOT NULL,
+      reason        VARCHAR(255) NOT NULL DEFAULT '',
+      status        ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+      reject_reason VARCHAR(255) NOT NULL DEFAULT '',
+      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_care_leave (tenant_id, student_id, leave_date),
+      INDEX idx_care_leave_date (tenant_id, leave_date),
+      INDEX idx_care_leave_status (tenant_id, status)
+    ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+  `)
 }
 
 // ── Leave Requests ───────────────────────────────────────────────────────────

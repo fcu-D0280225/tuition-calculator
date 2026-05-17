@@ -405,6 +405,7 @@ function isPublicPath(p) {
   if (PUBLIC_PATHS.has(p)) return true
   if (p.startsWith('/api/share/')) return true
   if (p.startsWith('/api/invites/')) return true
+  if (p.startsWith('/api/care/parent/')) return true
   return false
 }
 
